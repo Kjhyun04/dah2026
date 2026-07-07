@@ -1,0 +1,40 @@
+# P2 — EPC (단일 epc 컨테이너 + epc_mongo). net_cellular 에서 eNB(P3)가 도달.
+name: dahv2
+
+networks:
+  net_cellular:
+    name: net_cellular
+    ipam:
+      config:
+        - subnet: 10.44.0.0/24
+
+volumes:
+  vol_mongo:
+
+services:
+  epc_mongo:
+    image: mongo:6.0
+    container_name: epc_mongo
+    networks: [net_cellular]
+    volumes:
+      - vol_mongo:/data/db
+    restart: unless-stopped
+
+  epc:
+    image: dahv2/epc:latest
+    container_name: epc
+    depends_on: [epc_mongo]
+    cap_add: [NET_ADMIN]
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    sysctls:
+      - net.ipv4.ip_forward=1
+    environment:
+      EPC_IP: 10.44.0.10
+    networks:
+      net_cellular:
+        ipv4_address: 10.44.0.10
+    volumes:
+      - ./epc-entrypoint.sh:/epc-entrypoint.sh:ro
+    command: ["bash", "/epc-entrypoint.sh"]
+    restart: unless-stopped

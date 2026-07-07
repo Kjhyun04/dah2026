@@ -1,0 +1,6 @@
+# LF 강제 — Windows 편집 시 .sh CRLF 오염 예방(리눅스 컨테이너에서 shebang 깨짐 방지)
+*.sh   text eol=lf
+*.py   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.env  text eol=lf

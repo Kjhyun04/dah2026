@@ -1,0 +1,8 @@
+# goal.testbed.yaml — recon 스모크 목표(계층 RECON 강제는 --recon-only 가 수행).
+# recon-only 폐루프는 목표 도달이 아니라 KB 정찰 사실 축적을 산출한다(seed-only).
+goal:
+  type: signing_bypass          # 원 목표(recon-only 에선 미도달·시드만)
+  target: mode=4
+  defense: auto
+  success: ack
+  scope: [A, B, C, D]

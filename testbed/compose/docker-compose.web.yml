@@ -1,0 +1,25 @@
+# P8 — 웹 대시보드 백엔드(평문 tap → WebSocket). net_sgi + 호스트 8080 노출(SSH 터널).
+name: dahv2
+
+networks:
+  net_sgi:
+    external: true
+
+services:
+  web_backend:
+    image: dahv2/web:latest
+    container_name: web_backend
+    networks:
+      net_sgi:
+        ipv4_address: 172.30.0.20        # gcs_proxy fan-out(14560) 수신
+    ports:
+      - "127.0.0.1:8080:8080"            # 대시보드 HTTP/WS — SSH 터널 전용(루프백)
+    volumes:
+      - ../web/backend/app.py:/app/app.py:ro
+      - ../web/frontend:/app/frontend:ro
+      - ../.mav-sign-key:/sign.key:ro
+    environment:
+      MAVLINK20: "1"
+      MAV_SIGN_KEYFILE: /sign.key
+    command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080"]
+    restart: unless-stopped

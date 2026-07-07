@@ -1,0 +1,88 @@
+# config.example.yaml — DAH 2026 공격계획 에이전트 입력 규격 (문서 10 §5)
+#
+# 심사원은 아래 값을 **자기 격리 테스트베드** 값으로 채운다.
+# 원칙: 하드코딩 0 — 모든 IP/키/경로/컨테이너명은 여기(입력)에서만 정의된다.
+#       비밀은 env var **이름**만 기재(값 아님). 값은 os.environ 에서 부트스트랩 시 조회.
+# 실행:
+#   python -m attack_agent --config config.yaml --goal goal.yaml
+#   python -m attack_agent --config config.yaml --goal-expr "mode_set mode=4 defense=on"
+
+# ── 2-A. 환경/접속 (필수) ────────────────────────────────────────────────
+testbed:
+  host: ${TESTBED_HOST:-127.0.0.1}        # 테스트베드 SSH 호스트
+  user: ${TESTBED_USER:-ubuntu}
+  ssh_key: ${SSH_KEY:-~/.ssh/id_rsa}       # SSH 키 경로
+
+exec:
+  vantage:
+    ue: attacker_ue           # UE netns 공유 사이드카 (A·B-mongo·D 대안)
+    sgi: net_sgi              # D 계층 SGi vantage
+    core: pivot               # (옵션) B-pfcp/측면이동(pivot 후 net_core)
+  mode: docker_exec           # docker_exec / ssh / host
+
+tools:
+  image:
+    air: dahv2/air            # MAV 툴링 사이드카 이미지 (필수)
+    pfcp: dahv2/pfcp-poc      # (옵션) PFCP 툴링 이미지
+
+# ── 2-B. 타깃 (컨테이너 **이름** 권장 — IP 는 런타임 docker inspect 해석) ──
+# 예시 주석의 IP 는 참고값. 목표별로 필요한 키만 채우면 됨.
+tgt:
+  uav5762: uav_ue             # A: SITL 시리얼 직결 (예: 10.45.0.3:5762)
+  s1u: sgw_u                  # A: SGW-U(S1-U 캡처)   (예: 10.44.0.16)
+  mongo: epc_mongo            # B: 가입자DB           (예: 10.44.0.2:27017)
+  pfcp_upf: epc_upf           # B: PFCP               (예: 10.50.0.7:8805)
+  pivot: pivot                # B: 측면이동 pivot     (예: 10.44.0.50)
+  uav_proxy: uav_proxy        # C: ARIA키 docker inspect 대상
+  signkey: /sign.key          # C: 서명키 노출 경로
+  oracle: gcs_proxy           # D: 평문 오라클        (예: 172.30.0.10:14556)
+  cipher: gcs_proxy           # D: ARIA 암호문        (예: 172.30.0.10:14555)
+  web: web_backend            # D: web /api/cmd       (예: 172.30.0.20:8080)
+
+# ── 2-D. LLM (필수) ──────────────────────────────────────────────────────
+llm:
+  mode: live                  # live / replay(심사 재현)
+  model: claude-opus-4-8
+  api_key_env: OPENROUTER_API_KEY   # env var **이름**(값 아님)
+
+# ── 2-E. 실행 제어 (전부 기본값) ─────────────────────────────────────────
+run:
+  max_iters: 30               # ReAct 최대 스텝
+  max_pivots: 8               # ADAPT 하드캡
+  termination_timeout: 30s    # '30s' 문자열 / 30 정수 모두 수용
+  hitl: off                   # off=완전자율(forceland 실행 확인 생략)
+  # budget: 100000            # (옵션) 토큰/호출 예산
+
+# ── 2-F. 산출/뷰어 ───────────────────────────────────────────────────────
+out:
+  log: ./run.jsonl            # 동작 로그(viewer 소스 JSONL)
+
+viewer:
+  port: 8090                  # 동작·통신 뷰
+
+supervisor:
+  enabled: true               # 감독 agent 별 프로세스 기동
+  tap_container: gcs_proxy    # 감독 복호 tap netns(14555 양방향 sniff)
+  aria_key_env: ARIA_KEY      # ARIA 복호 키 env **이름**(소유자 특권)
+
+observer:
+  enabled: false              # 공격 agent 보조 관측(기본 OFF, non-load-bearing)
+  iface: any                  # tcpdump interface
+  port: 14555                 # C2 wire(ARIA) UDP port
+  sample_s: 2                 # 샘플링 길이(초)
+  gap_s: 8                    # 패킷 무관측 gap 임계(초)
+  quiet_pps: 0.5              # 저활성 임계(pps)
+  tcpdump_bin: tcpdump
+  max_packets: 400
+
+evidence:
+  enabled: false              # LLM 증거요약(비적재, 결정 비개입)
+  temperature: 0.2
+  max_chars: 260
+
+# ── 2-G. 전제 (공격자 초기 발판 · APT 전제) ──────────────────────────────
+premise:
+  footholds:
+    - container_access(sgi)   # 시작 발판(예: signkey_leak 활성)
+    - host_access(uav_proxy)  # 시작 발판(예: key_extract 활성)
+  weakcred_pivot: true        # pivot 약자격 전제(T2 측면이동)

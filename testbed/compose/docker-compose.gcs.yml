@@ -1,0 +1,37 @@
+# P7 — GCS측: gcs_proxy(ARIA 복호) + gcs_c2(GCS, 프록시 netns 공유). net_sgi.
+name: dahv2
+
+networks:
+  net_sgi:
+    external: true
+
+services:
+  gcs_proxy:
+    image: dahv2/air:latest
+    container_name: gcs_proxy
+    cap_add: [NET_ADMIN]
+    networks:
+      net_sgi:
+        ipv4_address: 172.30.0.10           # UAV가 접속하는 GCS측 주소(암호문 수신)
+    volumes:
+      - ../proxy/mav_aria_proxy.py:/proxy.py:ro
+    # UE풀 역경로(다운링크) + ARIA 프록시(암호문 14555 ↔ 평문 gcs_c2)
+    command:
+      - sh
+      - -c
+      - ip route replace 10.45.0.0/16 via 172.30.0.2 && python3 /proxy.py --plain-listen 0.0.0.0:14556 --plain-peer 127.0.0.1:14550,172.30.0.20:14560 --cipher-listen 0.0.0.0:14555 --key-hex ${ARIA_KEY_HEX}
+    restart: unless-stopped
+
+  gcs_c2:
+    image: dahv2/air:latest
+    container_name: gcs_c2
+    network_mode: "container:gcs_proxy"       # 프록시 netns 공유(localhost 14550 = 복호 평문)
+    depends_on: [gcs_proxy]
+    volumes:
+      - ../gcs/gcs.py:/gcs.py:ro
+      - ../.mav-sign-key:/sign.key:ro
+    environment:
+      MAVLINK20: "1"
+      MAV_SIGN_KEYFILE: /sign.key
+    command: ["python3", "/gcs.py", "udpin:0.0.0.0:14550"]
+    restart: unless-stopped

@@ -1,0 +1,45 @@
+# P5 — UAV 엔드포인트: uav_sitl(ArduPilot) + uav_gps(인젝터). uav_ue netns 공유(로컬).
+name: dahv2
+
+services:
+  uav_sitl:
+    image: dahv2/air:latest
+    container_name: uav_sitl
+    network_mode: "container:uav_ue"      # UE netns 공유(tun_srsue, localhost)
+    volumes:
+      - ./configs/uav/gps-ext.parm:/config/gps-ext.parm:ro
+    command:
+      - /ardupilot/build/sitl/bin/arducopter
+      - --model=quad
+      - --speedup=1
+      - -I0
+      - --defaults=/ardupilot/Tools/autotest/default_params/copter.parm,/config/gps-ext.parm
+      - --home=37.5665,126.9780,30,0
+      # P7: C2 평문은 로컬 uav_proxy(14550)로. 프록시가 ARIA-GCM 암호화해 셀룰러로.
+      - --serial0=udpclient:127.0.0.1:14550
+      - --serial2=udpclient:127.0.0.1:14540
+    restart: unless-stopped
+
+  uav_gps:
+    image: dahv2/air:latest
+    container_name: uav_gps
+    network_mode: "container:uav_ue"
+    volumes:
+      - ../gps/gps_inject.py:/gps_inject.py:ro
+    command: ["python3", "/gps_inject.py", "udpin:0.0.0.0:14540"]
+    restart: unless-stopped
+
+  uav_proxy:
+    image: dahv2/air:latest
+    container_name: uav_proxy
+    network_mode: "container:uav_ue"          # UE netns(로컬 14550 = SITL, 셀룰러로 암호문)
+    volumes:
+      - ../proxy/mav_aria_proxy.py:/proxy.py:ro
+      - ../.mav-sign-key:/sign.key:ro
+    environment:
+      MAV_SIGN_KEYFILE: /sign.key
+    command:
+      - sh
+      - -c
+      - python3 /proxy.py --plain-listen 127.0.0.1:14550 --cipher-listen 0.0.0.0:14555 --cipher-peer 172.30.0.10:14555 --key-hex ${ARIA_KEY_HEX}
+    restart: unless-stopped

@@ -1,0 +1,32 @@
+{
+  "schema": "dah.supervisor.evaluation/1",
+  "goal": {
+    "type": "mode_set",
+    "target": {"mode": 4}
+  },
+  "ground_truth": {
+    "signing_observed": true,
+    "mode_timeline": [[0.52, 0], [3.20, 5], [7.14, 0]],
+    "modes_ever_reached": [0, 5],
+    "final_mode": 0,
+    "uplink_cmds": [[4.01, 4], [6.55, 4]],
+    "heartbeats": 8,
+    "decrypted_frames": 12
+  },
+  "verdict": {
+    "type": "mode_set",
+    "target_mode": 4,
+    "sampling": "heartbeat-rate-limited(~1Hz downlink) — transient 놓칠 수 있음",
+    "truth_verdict": "pending",
+    "reached_target": false,
+    "reverted": false,
+    "uplink_to_target_on_14555": true,
+    "signing_enforced_on_link": true,
+    "note": "target 미관측 — heartbeat 표본율 한계로 transient 놓쳤을 가능성",
+    "autonomy_accuracy": {
+      "agent_reached": true,
+      "truth_reached": false,
+      "agree": false
+    }
+  }
+}

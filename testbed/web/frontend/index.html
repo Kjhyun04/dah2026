@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DAH v2 — UAV C2 (ARIA-GCM over 4G)</title>
+<script src="https://cdn.jsdelivr.net/npm/cesium@1.118/Build/Cesium/Cesium.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/cesium@1.118/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+<style>
+  :root{--cyan:#22d3ee;--ink:#e6f2fb;--dim:#7b93ad;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;--panel:rgba(9,14,22,.72);--line:rgba(120,160,200,.18)}
+  html,body{margin:0;height:100%;font-family:-apple-system,"Segoe UI",Roboto,sans-serif;background:#05080d;color:var(--ink);overflow:hidden}
+  #c{position:absolute;inset:0}
+  /* 상단 그라디언트 + 하단 로그 위 그라디언트 */
+  .scrim{position:absolute;left:0;right:0;pointer-events:none;z-index:5}
+  .scrim.top{top:0;height:120px;background:linear-gradient(180deg,rgba(3,6,11,.75),transparent)}
+  /* 글래스 패널 공통 */
+  .glass{background:var(--panel);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+  #brand{position:absolute;top:16px;left:18px;z-index:10;display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.02em;text-shadow:0 2px 12px #000}
+  #brand .dot{width:9px;height:9px;border-radius:50%;background:var(--cyan);box-shadow:0 0 12px var(--cyan);animation:pulse 1.6s infinite}
+  #brand small{display:block;font-weight:500;font-size:10.5px;color:var(--dim);letter-spacing:.14em;text-transform:uppercase}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  /* HUD 좌측 텔레메트리 */
+  #hud{position:absolute;top:70px;left:18px;z-index:10;width:214px;padding:16px 18px}
+  .row{display:flex;justify-content:space-between;align-items:baseline;margin:2px 0}
+  .k{font-size:10.5px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase}
+  .v{font-variant-numeric:tabular-nums}
+  .big{font-size:30px;font-weight:750;line-height:1.05;letter-spacing:-.02em}
+  .big .u{font-size:13px;color:var(--dim);font-weight:600;margin-left:3px}
+  .sub{font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums}
+  .divider{height:1px;background:var(--line);margin:12px -18px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin-top:2px}
+  .cell .n{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px}
+  .b-ok{background:rgba(34,197,94,.16);color:#4ade80}.b-warn{background:rgba(245,158,11,.16);color:#fbbf24}.b-bad{background:rgba(239,68,68,.16);color:#f87171}
+  /* 컴퍼스 */
+  #compass{position:relative;width:64px;height:64px;margin:2px auto 0}
+  #compass svg{position:absolute;inset:0}
+  /* 연결상태 pill */
+  #conn{position:absolute;top:16px;right:18px;z-index:10;padding:8px 14px;font-size:12px;display:flex;align-items:center;gap:8px}
+  #conn .led{width:8px;height:8px;border-radius:50%;background:var(--bad);box-shadow:0 0 8px var(--bad)}
+  #conn.on .led{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  /* 컨트롤 버튼 */
+  #ctrl{position:absolute;bottom:calc(30vh + 14px);right:18px;z-index:10;display:flex;flex-direction:column;gap:8px}
+  #ctrl button{width:40px;height:40px;border-radius:11px;cursor:pointer;color:var(--ink);font-size:16px;
+    background:var(--panel);backdrop-filter:blur(14px);border:1px solid var(--line);transition:.15s}
+  #ctrl button:hover{border-color:var(--cyan);color:var(--cyan)}
+  #ctrl button.active{border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 14px rgba(34,211,238,.35)}
+  /* 로그 */
+  #log{position:absolute;left:0;right:0;bottom:0;height:30vh;z-index:8;overflow:auto;
+    background:linear-gradient(180deg,rgba(3,6,11,.55),rgba(3,6,11,.92));border-top:1px solid var(--line);
+    padding:10px 16px 14px;font:12px ui-monospace,SFMono-Regular,Consolas,monospace}
+  #log .lh{position:sticky;top:0;color:var(--dim);font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding-bottom:6px;background:linear-gradient(180deg,rgba(3,6,11,.9),transparent)}
+  #log .ln{color:#9fd8ef;line-height:1.7;white-space:nowrap;opacity:.92}
+  #log .ln .t{color:#4b6a86}
+  #log .ln .ty{color:var(--cyan)}
+  /* Cesium 크레딧 최소화 */
+  .cesium-widget-credits{font-size:9px!important;opacity:.35}
+  .cesium-viewer-bottom{right:6px;bottom:calc(30vh + 4px)}
+  /* C2 서명 제어 패널 (좌하단, 카메라버튼과 분리) */
+  #c2{position:absolute;bottom:calc(30vh + 14px);left:18px;z-index:10;width:222px;padding:12px 14px}
+  #c2 .c2t{font-size:10.5px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase}
+  #c2 #cmdstat{color:var(--cyan);font:12px ui-monospace,monospace;margin:5px 0 8px;min-height:15px}
+  #c2 .r{display:flex;gap:6px;margin-top:6px}
+  #c2 .b{flex:1;padding:7px 4px;background:rgba(120,160,200,.08);color:var(--ink);border:1px solid var(--line);border-radius:8px;cursor:pointer;font:12px ui-monospace,monospace;transition:.15s}
+  #c2 .b:hover{border-color:var(--cyan);color:var(--cyan)}
+  #c2 .b.arm{background:rgba(34,197,94,.16);border-color:rgba(34,197,94,.4);color:#4ade80}
+  #c2 .b.dis{background:rgba(245,158,11,.16);border-color:rgba(245,158,11,.4);color:#fbbf24}
+  #c2 .b.tko{flex:2;background:rgba(34,211,238,.16);border-color:rgba(34,211,238,.4);color:var(--cyan)}
+  #c2 input{width:52px;background:rgba(3,6,11,.6);color:#7dd3fc;border:1px solid var(--line);border-radius:8px;padding:6px;font:12px ui-monospace,monospace}
+</style></head><body>
+<div id="c"></div>
+<div class="scrim top"></div>
+
+<div id="brand">
+  <span class="dot"></span>
+  <div>DAH&nbsp;v2 · UAV&nbsp;C2<small>ARIA-256-GCM over 4G · Cellular telemetry</small></div>
+</div>
+
+<div id="conn" class="glass"><span class="led"></span><span id="connt">연결중…</span></div>
+
+<div id="hud" class="glass">
+  <div class="k">Altitude (MSL)</div>
+  <div class="big"><span id="alt" class="v">—</span><span class="u">m</span></div>
+  <div class="sub" id="agl">rel —</div>
+  <div class="divider"></div>
+  <div class="grid2">
+    <div class="cell"><div class="k">Speed</div><div class="n"><span id="spd">—</span> <span style="font-size:11px;color:var(--dim)">m/s</span></div></div>
+    <div class="cell"><div class="k">Heading</div><div class="n"><span id="hdg">—</span>°</div></div>
+  </div>
+  <div id="compass"></div>
+  <div class="divider"></div>
+  <div class="row"><span class="k">GPS Fix</span><span id="fixb" class="badge b-bad">NO FIX</span></div>
+  <div class="row" style="margin-top:8px"><span class="k">Lat</span><span class="v sub" id="lat">—</span></div>
+  <div class="row"><span class="k">Lon</span><span class="v sub" id="lon">—</span></div>
+</div>
+
+<div id="ctrl">
+  <button id="bFollow" class="active" title="추적 카메라">◎</button>
+  <button id="bTop" title="상공(탑다운) 뷰">⬇</button>
+  <button id="bHome" title="기체로 이동">⌂</button>
+</div>
+
+<div id="c2" class="glass">
+  <div class="c2t">C2 제어 · 서명주입</div>
+  <div id="cmdstat">대기</div>
+  <div class="r"><button class="b arm" onclick="cmd('arm',1)">ARM</button><button class="b dis" onclick="cmd('arm',0)">DISARM</button></div>
+  <div class="r"><button class="b" onclick="cmd('mode',4)">GUIDED</button><button class="b" onclick="cmd('mode',5)">LOITER</button><button class="b" onclick="cmd('mode',6)">RTL</button></div>
+  <div class="r"><button class="b" onclick="cmd('mode',9)">LAND</button><button class="b" onclick="cmd('mode',0)">STABILIZE</button></div>
+  <div class="r"><input id="c2alt" type="number" value="30" min="1" max="120"><button class="b tko" onclick="cmd('takeoff',parseFloat(document.getElementById('c2alt').value))">TAKEOFF</button></div>
+</div>
+<div id="log" class="glass" style="border-radius:0"><div class="lh">▍ Telemetry log</div><div id="logbody"></div></div>
+
+<script>
+try { Cesium.Ion.defaultAccessToken = undefined; } catch(e){}
+const HOME = { lon:126.9780, lat:37.5665, alt:30 };
+
+// ── 위성 베이스맵 (Esri World Imagery, 토큰 불필요·고해상) ────────────────
+const satLayer = new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
+  url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  credit:'Esri · Maxar · Earthstar Geographics', maximumLevel:19
+}));
+
+const viewer = new Cesium.Viewer('c', {
+  baseLayer: satLayer,
+  baseLayerPicker:false, geocoder:false, timeline:false, animation:false, sceneModePicker:false,
+  homeButton:false, navigationHelpButton:false, fullscreenButton:false, infoBox:false, selectionIndicator:false
+});
+const scene = viewer.scene, cam = viewer.camera, globe = scene.globe;
+globe.baseColor = Cesium.Color.fromCssColorString('#0a1420');
+globe.enableLighting = false;             // 위성영상은 조명 끄는 게 더 선명
+scene.skyAtmosphere.show = true;
+scene.fog.enabled = true; scene.fog.density = 0.00012;
+scene.backgroundColor = Cesium.Color.fromCssColorString('#05080d');
+satLayer.saturation = 1.12; satLayer.contrast = 1.06;   // 위성영상 살짝 또렷하게
+try{ scene.postProcessStages.bloom.enabled = false; }catch(e){}   // bloom 제거(화면 어두워짐 방지)
+
+// ── 드론 아이콘 (인라인 SVG, 외부 자원 불필요) ──────────────────────────
+const DRONE = 'data:image/svg+xml;base64,' + btoa(`
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 72 72">
+<g fill="none" stroke="#22d3ee" stroke-width="3">
+<circle cx="20" cy="20" r="11" fill="rgba(34,211,238,.18)"/><circle cx="52" cy="20" r="11" fill="rgba(34,211,238,.18)"/>
+<circle cx="20" cy="52" r="11" fill="rgba(34,211,238,.18)"/><circle cx="52" cy="52" r="11" fill="rgba(34,211,238,.18)"/>
+<line x1="27" y1="27" x2="45" y2="45"/><line x1="45" y1="27" x2="27" y2="45"/>
+</g><rect x="30" y="30" width="12" height="12" rx="3" fill="#22d3ee"/>
+<circle cx="36" cy="36" r="19" fill="none" stroke="rgba(34,211,238,.35)" stroke-width="1.5"/>
+</svg>`);
+
+// ── 기체: 3D 드론 모델 + 지면투영 (궤적 없음) ───────────────────────────
+const DRONE_GLB='https://raw.githubusercontent.com/CesiumGS/cesium/main/Apps/SampleData/models/CesiumDrone/CesiumDrone.glb';
+// 목표(텔레메트리) → 렌더(프레임 이징): 부드러운 비행
+let tgtPos=Cesium.Cartesian3.fromDegrees(HOME.lon,HOME.lat,HOME.alt), renPos=tgtPos.clone();
+let curGround=Cesium.Cartesian3.fromDegrees(HOME.lon,HOME.lat,0);
+let tgtHdg=0,renHdg=0,tgtPitch=0,renPitch=0,tgtRoll=0,renRoll=0,hdgRad=0,haveFix=false;
+function orient(){ return Cesium.Transforms.headingPitchRollQuaternion(renPos, new Cesium.HeadingPitchRoll(renHdg,renPitch,renRoll)); }
+
+viewer.entities.add({ polyline:{ positions:new Cesium.CallbackProperty(()=>[renPos,curGround],false),  // 지면 수직선(현재 위치만)
+  width:1.2, material:new Cesium.PolylineDashMaterialProperty({color:Cesium.Color.fromCssColorString('#22d3ee').withAlpha(0.4),dashLength:8}) }});
+viewer.entities.add({ position:new Cesium.CallbackProperty(()=>curGround,false),  // 지면 그림자
+  ellipse:{ semiMinorAxis:2.6,semiMajorAxis:2.6, material:Cesium.Color.fromCssColorString('#22d3ee').withAlpha(0.20),
+    outline:true, outlineColor:Cesium.Color.fromCssColorString('#22d3ee').withAlpha(0.5), height:0.2 }});
+
+let uav;
+function addUav(useModel){
+  const common={ position:new Cesium.CallbackProperty(()=>renPos,false),
+    orientation:new Cesium.CallbackProperty(()=>orient(),false),
+    point:{ pixelSize:5, color:Cesium.Color.WHITE, disableDepthTestDistance:Number.POSITIVE_INFINITY } };
+  uav=viewer.entities.add(useModel ? Object.assign(common,{
+      model:{ uri:DRONE_GLB, minimumPixelSize:72, maximumScale:400, scale:1.0, runAnimations:true,
+        silhouetteColor:Cesium.Color.fromCssColorString('#22d3ee'), silhouetteSize:1.6 } })
+    : Object.assign(common,{
+      billboard:{ image:DRONE, scale:0.6, disableDepthTestDistance:Number.POSITIVE_INFINITY,
+        rotation:new Cesium.CallbackProperty(()=>-renHdg,false), alignedAxis:Cesium.Cartesian3.ZERO } }));
+}
+fetch(DRONE_GLB,{method:'HEAD'}).then(r=>addUav(r.ok)).catch(()=>addUav(false));  // glb 도달 가능하면 3D모델, 아니면 아이콘
+
+// ── 카메라: 시네마틱 체이스 (기체 뒤를 따라감) ─────────────────────────
+let follow=true;
+function lerpAng(a,b,t){ let d=((b-a+Math.PI*3)%(Math.PI*2))-Math.PI; return a+d*t; }
+scene.preRender.addEventListener(()=>{
+  renPos=Cesium.Cartesian3.lerp(renPos,tgtPos,0.12,renPos);            // 위치 이징
+  const c=Cesium.Cartographic.fromCartesian(renPos);
+  curGround=Cesium.Cartesian3.fromRadians(c.longitude,c.latitude,0);
+  renHdg=lerpAng(renHdg,tgtHdg,0.10); renPitch+=(tgtPitch-renPitch)*0.10; renRoll+=(tgtRoll-renRoll)*0.10;
+  if(follow && haveFix){
+    cam.lookAt(renPos, new Cesium.HeadingPitchRange(renHdg+Math.PI, Cesium.Math.toRadians(-16), 120)); // 뒤에서 추적
+  }
+});
+function releaseCam(){ cam.lookAtTransform(Cesium.Matrix4.IDENTITY); }
+cam.setView({ destination:Cesium.Cartesian3.fromDegrees(HOME.lon,HOME.lat-0.003,170),
+  orientation:{heading:0,pitch:Cesium.Math.toRadians(-20),roll:0} });
+
+const $=id=>document.getElementById(id);
+$('bFollow').onclick=e=>{ follow=!follow; e.currentTarget.classList.toggle('active',follow); if(!follow) releaseCam(); };
+$('bTop').onclick=()=>{ follow=false; $('bFollow').classList.remove('active'); releaseCam();
+  const c=Cesium.Cartographic.fromCartesian(renPos);
+  cam.flyTo({destination:Cesium.Cartesian3.fromRadians(c.longitude,c.latitude,700),
+    orientation:{heading:0,pitch:Cesium.Math.toRadians(-90),roll:0}, duration:1.2}); };
+$('bHome').onclick=()=>{ follow=true; $('bFollow').classList.add('active'); };
+
+// ── 컴퍼스 렌더 ─────────────────────────────────────────────────────────
+function compass(deg){
+  $('compass').innerHTML = `<svg viewBox="0 0 64 64">
+    <circle cx="32" cy="32" r="29" fill="rgba(120,160,200,.06)" stroke="rgba(120,160,200,.25)"/>
+    ${[0,90,180,270].map(a=>{const r=(a-90)*Math.PI/180;return `<text x="${32+24*Math.cos(r)}" y="${32+24*Math.sin(r)+4}" fill="#7b93ad" font-size="9" text-anchor="middle">${['N','E','S','W'][a/90]}</text>`}).join('')}
+    <g transform="rotate(${deg} 32 32)"><polygon points="32,9 27,34 37,34" fill="#22d3ee"/><polygon points="32,55 27,34 37,34" fill="#3a5570"/></g>
+    <circle cx="32" cy="32" r="3" fill="#22d3ee"/></svg>`;
+}
+compass(0);
+
+// ── 텔레메트리 상태 계산 (heading·speed 클라이언트 산출) ────────────────
+let last=null;   // {lon,lat,alt,t}
+function fixBadge(f){ const b=$('fixb');
+  if(f>=3){b.className='badge b-ok';b.textContent=(f>=4?'DGPS/RTK':'3D FIX');}
+  else if(f===2){b.className='badge b-warn';b.textContent='2D FIX';}
+  else{b.className='badge b-bad';b.textContent='NO FIX';} }
+
+function onPos(pos, fix){
+  const t=performance.now()/1000;
+  tgtPos = Cesium.Cartesian3.fromDegrees(pos.lon, pos.lat, Math.max(0,pos.alt));
+  if(last){
+    const dt=Math.max(1e-2,t-last.t);
+    const dN=(pos.lat-last.lat)*111320, dE=(pos.lon-last.lon)*111320*Math.cos(pos.lat*Math.PI/180);
+    const horiz=Math.hypot(dN,dE), dAlt=pos.alt-last.alt;
+    const spd=Math.hypot(horiz,dAlt)/dt; $('spd').textContent=spd.toFixed(1);
+    if(horiz>0.6){
+      const nh=Math.atan2(dE,dN);
+      let dh=((nh-tgtHdg+Math.PI*3)%(Math.PI*2))-Math.PI;
+      tgtRoll=Cesium.Math.clamp(-dh*2.2,-0.6,0.6);          // 회전 방향으로 뱅크
+      tgtHdg=nh; hdgRad=nh;
+      let deg=(nh*180/Math.PI+360)%360; $('hdg').textContent=Math.round(deg); compass(deg);
+    } else tgtRoll=0;
+    tgtPitch=Cesium.Math.clamp(Math.atan2(dAlt,Math.max(0.2,horiz))*0.5,-0.35,0.35);  // 상승/하강 기수
+  }
+  last={lon:pos.lon,lat:pos.lat,alt:pos.alt,t};
+  $('alt').textContent=pos.alt.toFixed(1);
+  $('agl').textContent='rel '+(pos.alt-HOME.alt).toFixed(1)+' m (home '+HOME.alt+')';
+  $('lat').textContent=pos.lat.toFixed(6); $('lon').textContent=pos.lon.toFixed(6);
+  fixBadge(fix); haveFix=true;
+}
+
+// ── 로그 ────────────────────────────────────────────────────────────────
+const logbody=$('logbody');
+function addLog(s){
+  const m=s.match(/^(\S+)\s+(\S+)(.*)$/)||[null,'',s,''];
+  const div=document.createElement('div'); div.className='ln';
+  div.innerHTML=`<span class="t">${m[1]}</span> <span class="ty">${m[2]}</span>${m[3]}`;
+  logbody.appendChild(div);
+  while(logbody.childNodes.length>250) logbody.removeChild(logbody.firstChild);
+  const l=$('log'); l.scrollTop=l.scrollHeight;
+}
+
+// ── WebSocket ───────────────────────────────────────────────────────────
+function setConn(on,txt){ const c=$('conn'); c.classList.toggle('on',on); $('connt').textContent=txt; }
+function connect(){
+  const ws=new WebSocket('ws://'+location.host+'/ws');
+  ws.onopen=()=>setConn(true,'텔레메트리 수신중');
+  ws.onclose=()=>{ setConn(false,'연결 끊김 — 재시도'); setTimeout(connect,2000); };
+  ws.onerror=()=>setConn(false,'연결 오류');
+  ws.onmessage=e=>{ const d=JSON.parse(e.data);
+    if(d.pos) onPos(d.pos, d.fix);
+    if(d.log) addLog(d.log);
+  };
+}
+// 데모: index.html?demo — 합성 나선 상승 경로 (백엔드 없이 미리보기용)
+function demo(){
+  setConn(true,'DEMO 시뮬레이션'); let t=0;
+  const TYPES=['GLOBAL_POSITION_INT','ATTITUDE','HEARTBEAT','VFR_HUD','GPS_RAW_INT','SYS_STATUS'];
+  setInterval(()=>{
+    t+=0.12;
+    const R=Math.min(0.0011,Math.max(0,(t-7))*0.00007), a=t*0.6;
+    const lat=HOME.lat+R*Math.sin(a), lon=HOME.lon+R*Math.cos(a);
+    const alt=HOME.alt+Math.min(55,Math.max(0,(t-4)*3));
+    onPos({lat,lon,alt},3);
+    if(Math.random()<0.25) addLog(new Date().toISOString().substr(11,8)+' '+TYPES[Math.floor(Math.random()*TYPES.length)]);
+  },100);
+}
+async function cmd(type,value){
+  const s=document.getElementById('cmdstat');
+  s.textContent='▸ '+type+' '+(value!==undefined?value:'');
+  try{
+    const r=await fetch('/api/cmd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,value})});
+    const d=await r.json();
+    s.textContent=(d.ok?'✓ ':'✗ ')+type+' '+(value!==undefined?value:'')+(d.signed?' · 서명':' · 무서명!');
+  }catch(e){ s.textContent='✗ '+e; }
+}
+if(location.search.indexOf('demo')>=0) demo(); else connect();
+</script></body></html>

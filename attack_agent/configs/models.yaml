@@ -1,0 +1,33 @@
+# configs/models.yaml — MODEL_MAP (A5 · 07 §4 · aixcc configs/models-final.toml 미러).
+# agent-role → litellm-routable 모델 id. 하드코딩 0(외부화). 비밀 0(API 키는 여기 없음).
+#
+# ★ 인증: 모델 문자열엔 키를 넣지 않는다. config.llm.api_key_env 가 가리키는 env 이름
+#   (예: OPENROUTER_API_KEY)을 운영자가 export 하면 litellm 이 런타임에 읽어 provider 인증.
+#
+# ★ provider 라우팅(litellm 규약):
+#   - OpenRouter 경유: 'openrouter/anthropic/<slug>'  (config.llm.api_key_env=OPENROUTER_API_KEY)
+#   - 직접 Anthropic:  'anthropic/<slug>'            (config.llm.api_key_env=ANTHROPIC_API_KEY)
+#
+# ⚠ 정직한 한계(A5 미결): 아래 <slug> 는 provider 카탈로그 종속이라 예시값이다.
+#   live 캠페인 전 운영자가 자기 계정 카탈로그에서 정확한 slug 로 교체할 것.
+
+default: openrouter/anthropic/claude-sonnet-4
+
+# agent-role → routable id. 현재 LLM 은 1곳(AttackOrchestrator, 07 §1.5).
+# ★ 2026-07-06: opus-4 slug 가 OpenRouter 429(일시 rate-limit) → 검증된 sonnet-4 로 교체.
+models:
+  AttackOrchestrator: openrouter/anthropic/claude-sonnet-4
+  # (Planner/Evidence 분리 시 확장 슬롯 — 현재 단일 LLM 이라 미사용)
+  # Evidence: openrouter/anthropic/claude-3.5-haiku
+
+# friendly名 → routable. config.llm.model 이 friendly名(Claude Code 내부 id)일 때 라우팅.
+aliases:
+  claude-opus-4-8: openrouter/anthropic/claude-sonnet-4
+  claude-sonnet-5: openrouter/anthropic/claude-sonnet-4
+  claude-haiku-4-5-20251001: openrouter/anthropic/claude-3.5-haiku
+  claude-sonnet-4: openrouter/anthropic/claude-sonnet-4
+
+# live 기본 파라미터 (temp 0.7 고정 · tool 강제).
+params:
+  temperature: 0.7
+  tool_choice: required

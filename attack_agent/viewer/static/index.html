@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>dah viewer — 동작·통신·감독</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <!-- agent≠truth 배너(최상단) -->
+  <div id="banner" class="banner hidden" role="alert"></div>
+
+  <header class="topbar">
+    <h1>dah viewer</h1>
+    <div class="meta">
+      <span id="conn" class="pill pill-wait">연결 대기</span>
+      <span id="comms-source" class="pill"></span>
+      <span class="pill pill-ro">READ-ONLY · 되먹임 0</span>
+    </div>
+  </header>
+
+  <main class="grid">
+    <!-- 동작: 공격 agent StepRecord/CampaignResult -->
+    <section id="panel-action" class="panel">
+      <h2>동작 <small>공격 agent 타임라인</small></h2>
+      <div id="action-summary" class="summary"></div>
+      <ol id="action-timeline" class="timeline"></ol>
+    </section>
+
+    <!-- 통신: 감독 복호 wire + 공격측 주입 로그 레인 -->
+    <section id="panel-comms" class="panel">
+      <h2>통신 <small>복호 wire · 주입 로그</small></h2>
+      <h3>복호 wire (감독 관측)</h3>
+      <div class="table-wrap">
+        <table id="comms-wire">
+          <thead><tr><th>t</th><th>dir</th><th>mtype</th><th>mode</th><th>signed</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <h3>주입 로그 레인 <small>attacker-inject (자기-ACK)</small></h3>
+      <div class="table-wrap">
+        <table id="comms-inject">
+          <thead><tr><th>step</th><th>tool</th><th>layer</th><th>mode</th><th>verdict</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 감독(사용자 전용): evaluation.json ground-truth -->
+    <section id="panel-supervisor" class="panel">
+      <h2>감독 <small>ground-truth · 사용자 전용</small></h2>
+      <div id="supervisor-body" class="sup-body">
+        <p class="empty">감독 evaluation 미탑재</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>동작=step 인덱스 순 · 통신=감독 캡처 t 순 — 두 타임라인 절대시각 정렬 불가(인과상관은 감독 uplink↔downlink만 인용).</span>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

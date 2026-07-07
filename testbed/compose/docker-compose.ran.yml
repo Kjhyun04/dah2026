@@ -1,0 +1,57 @@
+# P3 — RAN (ran_enb + uav_ue, srsRAN ZMQ). net_cellular(외부, epc compose 생성)에 참여.
+name: dahv2
+
+networks:
+  net_cellular:
+    external: true
+
+services:
+  ran_enb:
+    image: dahv2/ran:latest
+    container_name: ran_enb
+    networks:
+      net_cellular:
+        ipv4_address: 10.44.0.20
+    volumes:
+      - ./configs/ran/enb.conf:/config/enb.conf:ro
+    command: ["srsenb", "/config/enb.conf"]
+    restart: unless-stopped
+
+  uav_ue:
+    image: dahv2/ran:latest
+    container_name: uav_ue
+    cap_add: [NET_ADMIN]
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    networks:
+      net_cellular:
+        ipv4_address: 10.44.0.30
+    volumes:
+      - ./configs/ran/ue.conf:/config/ue.conf:ro
+    command: ["srsue", "/config/ue.conf"]
+    restart: unless-stopped
+
+  ran_enb2:
+    image: dahv2/ran:latest
+    container_name: ran_enb2
+    networks:
+      net_cellular:
+        ipv4_address: 10.44.0.21
+    volumes:
+      - ./configs/ran/enb2.conf:/config/enb2.conf:ro
+    command: ["srsenb", "/config/enb2.conf"]
+    restart: unless-stopped
+
+  attacker_ue:
+    image: dahv2/ran:latest
+    container_name: attacker_ue
+    cap_add: [NET_ADMIN]
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    networks:
+      net_cellular:
+        ipv4_address: 10.44.0.31
+    volumes:
+      - ./configs/ran/ue2.conf:/config/ue2.conf:ro
+    command: ["srsue", "/config/ue2.conf"]
+    restart: unless-stopped

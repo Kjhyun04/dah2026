@@ -1,0 +1,1 @@
+# P5 : GPS 인젝터. 컨테이너 uav_gps (v1 gps_inject.py seed). SITL 참값→GPS_INPUT @10Hz.

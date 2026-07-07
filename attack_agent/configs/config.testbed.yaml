@@ -1,0 +1,58 @@
+# config.testbed.yaml — DAH 2026 실 테스트베드(<TESTBED_IP>) recon 실행 설정.
+# 온-호스트 LocalBackend(서버에서 실행). 하드코딩 0: role→컨테이너명, IP는 런타임 inspect.
+testbed:
+  host: ${TESTBED_HOST:-127.0.0.1}
+  user: ${TESTBED_USER:-ubuntu}
+  ssh_key: ${SSH_KEY:-~/.ssh/id_rsa}     # local backend 에선 미사용(ssh backend 옵션용)
+
+exec:
+  vantage:
+    ue: attacker_ue              # ue 사이드카 = attacker_ue netns 공유
+    sgi: net_sgi                 # sgi 사이드카 = net_sgi 연결(preflight·D계층)
+    core: pivot                  # (옵션) core 사이드카 = pivot netns(미기동시 session 스킵)
+  mode: docker_exec              # → LocalBackend
+
+tools:
+  image:
+    air: dahv2/air-tools         # ★ 방금 빌드한 baked 툴링 이미지
+    pfcp: dahv2/pfcp-poc
+
+tgt:
+  uav5762: uav_ue
+  mongo: epc_mongo
+  s1u: epc_sgwu
+  oracle: gcs_proxy
+  cipher: gcs_proxy
+  web: web_backend
+  uav_proxy: uav_proxy
+  signkey: /sign.key
+  pivot: pivot
+  pfcp_upf: epc_upf
+
+llm:
+  mode: replay                   # recon 스모크는 no_llm(seed-only) — LLM 미호출
+  model: claude-opus-4-8
+  api_key_env: OPENROUTER_API_KEY
+
+run:
+  max_iters: 30
+  max_pivots: 8
+  termination_timeout: 45s     # recon 넓은 스윕(.1-.32) 여유
+  hitl: off
+
+out:
+  log: ./run_testbed.jsonl
+
+viewer:
+  port: 8090
+
+supervisor:
+  enabled: false                 # recon 스모크는 감독 미기동
+  tap_container: gcs_proxy
+  aria_key_env: ARIA_KEY
+
+premise:
+  footholds:
+    - container_access(sgi)
+    - host_access(uav_proxy)
+  weakcred_pivot: true

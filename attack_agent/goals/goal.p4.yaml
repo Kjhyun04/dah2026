@@ -1,0 +1,8 @@
+# goal.p4.yaml — P4 헤드라인: 서명 강제 하에서 mode 우회(signing_bypass).
+# serial5762(직결)가 ARIA+서명을 관통해 mode:=5 달성 → signing_bypass 성립.
+goal:
+  type: signing_bypass
+  target: mode=5           # GUIDED(4) → LOITER(5), 둘 다 비행안전 자율모드
+  defense: "on"            # 테스트베드 서명 ON(운영자 선언) → signing 시드 (YAML 부울 회피: 따옴표)
+  success: ack
+  scope: [A, B, C, D]      # 전 계층(주입 tool 노출)

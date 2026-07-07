@@ -1,0 +1,1 @@
+# P2+ : docker-compose (EPC → RAN → SITL → proxy → GCS → web). 순차기동(depends_on+healthcheck).

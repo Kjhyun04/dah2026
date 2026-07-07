@@ -1,0 +1,5 @@
+{"schema": "dah.supervisor.frame/1", "t": 0.52, "dir": "down", "mtype": "HEARTBEAT", "mode": 0, "signed": true, "src_ip": "172.30.0.10"}
+{"schema": "dah.supervisor.frame/1", "t": 3.20, "dir": "down", "mtype": "HEARTBEAT", "mode": 5, "signed": true, "src_ip": "172.30.0.10"}
+{"schema": "dah.supervisor.frame/1", "t": 4.01, "dir": "up", "mtype": "COMMAND_LONG(DO_SET_MODE)", "mode": 4, "signed": true, "src_ip": "172.30.0.15"}
+{"schema": "dah.supervisor.frame/1", "t": 6.55, "dir": "up", "mtype": "COMMAND_LONG(DO_SET_MODE)", "mode": 4, "signed": false, "src_ip": "172.30.0.99"}
+{"schema": "dah.supervisor.frame/1", "t": 7.14, "dir": "down", "mtype": "HEARTBEAT", "mode": 0, "signed": true, "src_ip": "172.30.0.10"}

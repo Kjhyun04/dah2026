@@ -1,0 +1,12 @@
+# goal.example.yaml — 공격 목표(선언적 · "시나리오=목표") (문서 10 §5)
+#
+# config.yaml 과 분리된 별도 파일. CLI --goal 로 지정.
+# 또는 CLI 문자열: --goal-expr "mode_set mode=4 defense=on success=ack scope=A,C"
+# target 은 'mode=4'(문자열) 또는 {mode: 4}(매핑) 둘 다 수용된다.
+
+goal:
+  type: mode_set            # mode_set / c2_disrupt / exfil / signing_bypass
+  target: mode=4            # GUIDED=4 · LAND=9 / exfil 은 artifact=k_opc 등
+  defense: auto             # on / off / auto(recon 탐지)
+  success: ack              # ack(자율판정) / ground_truth(감독 참조)
+  scope: [A, B, C, D]       # 허용 계층(옵션 · 미지정=전체 · RECON 상시 허용)

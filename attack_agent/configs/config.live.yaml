@@ -1,0 +1,64 @@
+# config.live.yaml — DAH 2026 라이브 LLM 캠페인 설정 (A5 · P5 models_live).
+# config.testbed.yaml 파생: llm.mode=live + models_path(MODEL_MAP) + 감독 on.
+# 온-호스트 LocalBackend(서버 <TESTBED_IP> 에서 실행). 하드코딩 0.
+#
+# ★ 실행 전(운영자): (1) configs/models.yaml 의 provider slug 를 카탈로그로 확정,
+#   (2) export OPENROUTER_API_KEY=...(값은 서버 밖 반출 금지),
+#   (3) 런북 GATE 0~4 통과 후에만 live 진입(rogue-GCS 실주입은 단발·HITL).
+testbed:
+  host: ${TESTBED_HOST:-127.0.0.1}
+  user: ${TESTBED_USER:-ubuntu}
+  ssh_key: ${SSH_KEY:-~/.ssh/id_rsa}     # local backend 에선 미사용
+
+exec:
+  vantage:
+    ue: attacker_ue
+    sgi: net_sgi
+    core: pivot
+  mode: docker_exec              # → LocalBackend
+
+tools:
+  image:
+    air: dahv2/air-tools
+    pfcp: dahv2/pfcp-poc
+
+tgt:
+  uav5762: uav_ue
+  mongo: epc_mongo
+  s1u: epc_sgwu
+  oracle: gcs_proxy
+  cipher: gcs_proxy
+  web: web_backend
+  uav_proxy: uav_proxy
+  signkey: /sign.key
+  pivot: pivot
+  pfcp_upf: epc_upf
+
+llm:
+  mode: live                     # ★ 실제 litellm 호출(ReAct 자율)
+  model: claude-opus-4-8         # friendly名 → models.yaml aliases 로 routable 해석
+  api_key_env: OPENROUTER_API_KEY
+  models_path: configs/models.yaml   # ★ MODEL_MAP 외부화(A5)
+
+run:
+  max_iters: 80
+  max_pivots: 40
+  termination_timeout: 45s
+  hitl: on                       # 라이브: 고위험(forceland) 승인 게이트 활성(런북 GATE 5)
+
+out:
+  log: ./run_live.jsonl
+
+viewer:
+  port: 8090
+
+supervisor:
+  enabled: true                  # 라이브: 14555 ARIA 복호 ground-truth 독립판정 on
+  tap_container: gcs_proxy
+  aria_key_env: ARIA_KEY
+
+premise:
+  footholds:
+    - container_access(sgi)
+    - host_access(uav_proxy)
+  weakcred_pivot: true

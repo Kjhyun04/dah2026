@@ -1,0 +1,23 @@
+# 비밀 (절대 커밋 금지)
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+**/.env-aria
+**/.mav-sign-key
+dah-testbed-deploy.tgz
+# 파이썬/캐시
+**/.venv/
+**/__pycache__/
+*.pyc
+**/.cache_verify
+*.egg-info/
+# 실행 산출물
+**/runs/
+run_*.jsonl
+evaluation_*.json
+supervisor_*.jsonl
+*.log
+# OS/IDE
+.DS_Store
+**/.claude

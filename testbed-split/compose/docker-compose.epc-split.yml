@@ -1,0 +1,103 @@
+# testbed-split — 분리 Open5GS 코어 (NF별 컨테이너 + net_core 신설).
+# 클론 인스턴스 전용. 단일 docker-compose.epc.yml 대체.
+# 라이브 stock 설정 실측 반영. 클론에서 게이트(G-split-A/B/C)로 최종 수렴.
+name: dahv2
+
+networks:
+  net_cellular: { name: net_cellular, external: true }   # RAN/SGi 기동이 만든 것 재사용
+  net_sgi:      { name: net_sgi, external: true }
+  net_core:                                               # 신설: 코어 제어 평면(S11/PFCP/GTP-C/Diameter)
+    name: net_core
+    ipam: { config: [{ subnet: 10.50.0.0/24 }] }
+
+volumes:
+  vol_mongo:
+
+x-nf: &nf                     # NF 공통 (dahv2/epc 이미지 재사용 + 역할별 entrypoint)
+  image: dahv2/epc:latest
+  restart: unless-stopped
+  cap_add: [NET_ADMIN]
+  volumes:
+    - ./epc-split-entrypoint.sh:/epc-split-entrypoint.sh:ro
+  command: ["bash", "/epc-split-entrypoint.sh"]
+
+services:
+  epc_mongo:                  # net_core에도 연결 (hss/pcrf가 net_core에서 mongo 도달 필요)
+    image: mongo:6.0
+    container_name: epc_mongo
+    networks:
+      net_cellular: { ipv4_address: 10.44.0.2 }
+      net_core:     { ipv4_address: 10.50.0.5 }
+    volumes: [ "vol_mongo:/data/db" ]
+    restart: unless-stopped
+
+  epc_hss:                    # Diameter S6a (↔ mme)
+    <<: *nf
+    container_name: epc_hss
+    depends_on: [epc_mongo]
+    environment: { ROLE: hss }
+    networks: { net_core: { ipv4_address: 10.50.0.8 } }
+
+  epc_pcrf:                   # Diameter Gx (↔ smf)
+    <<: *nf
+    container_name: epc_pcrf
+    depends_on: [epc_mongo]
+    environment: { ROLE: pcrf }
+    networks: { net_core: { ipv4_address: 10.50.0.9 } }
+
+  epc_mme:
+    <<: *nf
+    container_name: epc_mme
+    depends_on: [epc_hss]
+    environment: { ROLE: mme }
+    networks:
+      net_cellular: { ipv4_address: 10.44.0.10 }   # S1AP (enb.conf 호환, 불변)
+      net_core:     { ipv4_address: 10.50.0.2 }
+
+  epc_sgwc:
+    <<: *nf
+    container_name: epc_sgwc
+    depends_on: [epc_mme]
+    environment: { ROLE: sgwc }
+    networks: { net_core: { ipv4_address: 10.50.0.3 } }
+
+  epc_smf:
+    <<: *nf
+    container_name: epc_smf
+    depends_on: [epc_pcrf]
+    environment: { ROLE: smf }
+    networks: { net_core: { ipv4_address: 10.50.0.4 } }
+
+  epc_sgwu:
+    <<: *nf
+    container_name: epc_sgwu
+    depends_on: [epc_sgwc]
+    environment: { ROLE: sgwu, S1U_IP: 10.44.0.16 }
+    devices: [ "/dev/net/tun:/dev/net/tun" ]
+    networks:
+      net_cellular: { ipv4_address: 10.44.0.16 }   # S1-U (eNB GTP-U)
+      net_core:     { ipv4_address: 10.50.0.6 }     # S5-U + PFCP
+
+  epc_upf:
+    <<: *nf
+    container_name: epc_upf
+    depends_on: [epc_smf]
+    environment: { ROLE: upf, U_GTPU: 10.44.0.17 }
+    devices: [ "/dev/net/tun:/dev/net/tun" ]
+    sysctls: [ "net.ipv4.ip_forward=1" ]
+    networks:
+      net_cellular: { ipv4_address: 10.44.0.17 }    # GTP-U S5-U (sgwu와 동일 L2)
+      net_core:     { ipv4_address: 10.50.0.7 }     # PFCP
+      net_sgi:      { ipv4_address: 172.30.0.2 }    # SGi GW (gcs 라우팅 호환, 불변)
+
+  # --- T2 전용: 취약 dual-homed 피벗 호스트 (가입자평면 ↔ net_core 양다리) ---
+  pivot:
+    image: dahv2/epc:latest
+    container_name: pivot
+    profiles: ["t2"]                                 # 기본 미기동, T2: --profile t2
+    cap_add: [NET_ADMIN]
+    volumes: [ "./pivot-setup.sh:/pivot-setup.sh:ro" ]
+    command: ["bash", "/pivot-setup.sh"]
+    networks:
+      net_cellular: { ipv4_address: 10.44.0.50 }     # 공격자(UE) 도달 가능
+      net_core:     { ipv4_address: 10.50.0.99 }     # 침투 후 코어망 피벗

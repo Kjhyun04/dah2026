@@ -1,0 +1,92 @@
+/* viewer/static/style.css — 자기완결(외부 폰트/CDN 0). 2D 표·타임라인(3D 제거). */
+:root {
+  --bg: #0f1218; --panel: #171b24; --panel2: #1d222d; --line: #2a3040;
+  --fg: #e6e9ef; --mut: #98a2b3; --accent: #4f8cff;
+  --ok: #2fbf71; --warn: #e0a800; --err: #e5484d; --blk: #b07cff; --recon: #38b6c4;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 13px/1.5 ui-monospace, "Cascadia Code", "Consolas", monospace;
+}
+.hidden { display: none !important; }
+
+.banner {
+  background: var(--err); color: #fff; padding: 10px 16px; font-weight: 700;
+  position: sticky; top: 0; z-index: 10; letter-spacing: .2px;
+}
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; border-bottom: 1px solid var(--line); gap: 12px; flex-wrap: wrap;
+}
+.topbar h1 { margin: 0; font-size: 15px; color: var(--accent); }
+.meta { display: flex; gap: 8px; flex-wrap: wrap; }
+.pill {
+  padding: 2px 8px; border-radius: 10px; background: var(--panel2);
+  color: var(--mut); border: 1px solid var(--line); font-size: 11px;
+}
+.pill-ok { color: var(--ok); border-color: var(--ok); }
+.pill-wait { color: var(--warn); border-color: var(--warn); }
+.pill-ro { color: var(--accent); border-color: var(--accent); }
+.pill-recon { color: var(--recon); border-color: var(--recon); }
+
+.grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 12px;
+}
+@media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
+.panel {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 12px; min-width: 0; display: flex; flex-direction: column;
+}
+.panel h2 { margin: 0 0 8px; font-size: 14px; }
+.panel h2 small, .panel h3 small { color: var(--mut); font-weight: 400; font-size: 11px; }
+.panel h3 { margin: 12px 0 6px; font-size: 12px; color: var(--mut); }
+
+.summary { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px;
+  background: var(--panel2); border: 1px solid var(--line);
+}
+.b-win { background: rgba(47,191,113,.15); border-color: var(--ok); color: var(--ok); }
+.b-lose { background: rgba(229,72,77,.15); border-color: var(--err); color: var(--err); }
+.b-warn { background: rgba(224,168,0,.15); border-color: var(--warn); color: var(--warn); }
+
+.timeline { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+.step {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  padding: 6px 8px; border-left: 3px solid var(--line); margin-bottom: 4px;
+  background: var(--panel2); border-radius: 0 4px 4px 0;
+}
+.step.v-ok { border-left-color: var(--ok); }
+.step.v-blocked { border-left-color: var(--blk); }
+.step.v-error { border-left-color: var(--err); }
+.step.v-timeout { border-left-color: var(--warn); }
+.sidx { color: var(--mut); }
+.tool { font-weight: 700; color: var(--accent); }
+.params { color: var(--mut); font-size: 11px; }
+.verdict { margin-left: auto; padding: 1px 6px; border-radius: 3px; font-size: 11px; }
+.verdict.v-ok { color: var(--ok); }
+.verdict.v-blocked { color: var(--blk); }
+.verdict.v-error { color: var(--err); }
+.verdict.v-timeout { color: var(--warn); }
+.pivot { color: var(--blk); font-size: 11px; width: 100%; }
+
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--mut); font-weight: 600; position: sticky; top: 0; background: var(--panel); }
+tr.dir-up .dir { color: var(--warn); }
+tr.dir-down .dir { color: var(--recon); }
+td.layer { color: var(--accent); }
+tr.inj-acc .lbl { color: var(--ok); }
+tr.inj-blk .lbl { color: var(--blk); }
+.sg { color: var(--mut); }
+
+.sup-body h3 { margin-top: 14px; }
+.sup-verdict { display: flex; gap: 6px; flex-wrap: wrap; }
+.kv { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; border-bottom: 1px dashed var(--line); }
+.kv .k { color: var(--mut); }
+.kv .val { text-align: right; word-break: break-all; }
+
+.empty { color: var(--mut); font-style: italic; padding: 6px; }
+.foot { color: var(--mut); font-size: 11px; padding: 8px 16px; border-top: 1px solid var(--line); }

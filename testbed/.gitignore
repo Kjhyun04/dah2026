@@ -1,0 +1,7 @@
+# 비밀·런타임 산출물 (커밋 금지)
+.env
+.env-aria
+*.log
+__pycache__/
+*.pyc
+.mav-sign-key

@@ -1,0 +1,6 @@
+# 외부 GPS(MAVLink GPS_INPUT) 사용 — 내장 SIM GPS 끄고 MAV GPS 드라이버.
+# 4.5 명칭 + 구명칭 병기(존재하는 것만 적용, 나머지는 경고 후 무시).
+GPS1_TYPE 14
+SIM_GPS1_ENABLE 0
+GPS_TYPE 14
+SIM_GPS_DISABLE 1
