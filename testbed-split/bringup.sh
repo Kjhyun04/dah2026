@@ -86,6 +86,8 @@ docker compose -f "$RAN" up -d attacker_ue;  wait_tun attacker_ue
 
 log "4/7 SGi 컨테이너 + 라우트 재적용"
 docker compose -f "$SGI" up -d; sleep 3
+# 자기치유: 일시적 up 미끄러짐(set -e 없음)으로 sgi_test 미기동 시 1회 재시도 → 결정론적 19 컨테이너.
+docker ps --format '{{.Names}}' | grep -qx sgi_test || { echo "  sgi_test 미기동 — 재시도"; docker compose -f "$SGI" up -d sgi_test; sleep 2; }
 docker exec sgi_test    ip route replace 10.45.0.0/16 via 172.30.0.2 >/dev/null 2>&1 || true
 docker exec uav_ue      ip route replace 172.30.0.0/24 dev tun_srsue >/dev/null 2>&1 || true
 docker exec attacker_ue ip route replace 172.30.0.0/24 dev tun_srsue >/dev/null 2>&1 || true
