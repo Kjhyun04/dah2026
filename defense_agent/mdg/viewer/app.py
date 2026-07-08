@@ -6,9 +6,16 @@ Three panels (V3 §8):
   - 검증 (verification) : the INDEPENDENT Verifier's per-tick truth, side-by-side with the
                           agent's decision — the *agent ≠ truth* comparison (H-K)
 
+UI (2026-07): the alarming top banner is removed. The agent≠truth semantics survive as
+compact header stat chips (신뢰근원 trust_root + ⚠ 불일치 count) — the Verifier (a separate
+trust root) stays authoritative for link health without a red warning bar. The per-tick
+timeline is grouped into collapsible batches of 10 ticks (newest auto-expanded, expand-state
+preserved across the 3s refresh) and risk-colored (Red=위험 / Yellow=주의 / Green=평시;
+agent≠truth divergence flagged red) for at-a-glance triage.
+
 Security posture (locked):
-  * agent ≠ truth banner pinned at the top — the agent's decisions are NOT ground truth;
-    the Verifier (a separate trust root) is authoritative for link health.
+  * the Verifier (a separate trust root) is authoritative for link health; the header shows
+    its trust_root and the agent≠truth divergence count as stat chips (no alarm banner).
   * record-time redact ONLY (PS-3): the Viewer performs NO display-time redaction. Instead
     it runs a load-time secret scan and FAILS CLOSED (refuses to serve a tainted file) —
     honoring "record-time redact, viewer display-time redact 폐기" while staying safe.
@@ -121,9 +128,8 @@ def load_panels(run_path: str) -> dict:
 
     summary = V.summarize(verdicts)
     return {
+        # 헤더 메타(경고 문구 없음). 신뢰근원·불일치 수만 콤팩트 칩으로 노출.
         "banner": {
-            "text": "에이전트 ≠ 진실 — 에이전트의 판단은 지상진실(ground truth)이 아니다. "
-                    "독립 Verifier(별도 신뢰근원, replay 전용)가 링크 상태의 권위다.",
             "divergences": summary["agent_truth_divergences"],
             "trust_root": "mdg.verifier (out-of-graph, replay-only, deterministic)",
         },
@@ -137,54 +143,137 @@ def load_panels(run_path: str) -> dict:
 # --------------------------------------------------------------------------- #
 # HTML shell (inline; no external assets)
 # --------------------------------------------------------------------------- #
-_HTML = """<!doctype html><html><head><meta charset="utf-8"><title>MDG Replay Viewer</title>
+_HTML = """<!doctype html><html><head><meta charset="utf-8"><title>MDG 방어 로그 뷰어</title>
 <style>
- body{font-family:ui-monospace,Menlo,monospace;background:#0a0e15;color:#c7d3e0;margin:0;padding:18px}
- h1{font-size:15px;color:#9fe7f2;margin:0 0 8px}
- .banner{background:#3a1420;border:1px solid #7a2b3e;border-left:4px solid #ff5470;border-radius:8px;
-   padding:12px 16px;margin-bottom:14px;color:#ffd0d8;font-size:13px}
- .banner b{color:#ff8ea3}
- .root{font-size:11px;color:#8fb8c9;margin-top:4px}
- .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
- .panel{background:#111826;border:1px solid #1f2c3e;border-radius:10px;padding:12px;overflow-x:auto}
- .panel h2{font-size:12px;color:#9fd7e6;margin:0 0 8px;border-bottom:1px solid #1f2c3e;padding-bottom:6px}
- table{border-collapse:collapse;width:100%;font-size:11px}
- td,th{border-bottom:1px solid #16202e;padding:4px 6px;text-align:left;white-space:nowrap}
- th{color:#6f8296}
- .div{color:#ff8ea3;font-weight:bold}
- .ok{color:#7fe0a8}.warn{color:#ffcf6f}.bad{color:#ff8ea3}
- @media(max-width:900px){.grid{grid-template-columns:1fr}}
+ body{font-family:ui-monospace,Menlo,Consolas,monospace;background:#0a0e15;color:#c7d3e0;margin:0;padding:16px}
+ header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:14px}
+ h1{font-size:15px;color:#9fe7f2;margin:0 12px 0 0}
+ .chip{font-size:12px;padding:3px 10px;border-radius:20px;background:#141c2b;border:1px solid #23324a;white-space:nowrap}
+ .chip b{color:#eaf2ff}
+ .chip.red{background:#2a1218;border-color:#7a2b3e;color:#ffb3c0}
+ .chip.amber{background:#241d10;border-color:#7a5a2b;color:#ffd79a}
+ .chip.green{background:#10241b;border-color:#2e7d5b;color:#8fe6bf}
+ .muted{font-size:11px;color:#6f8296}
+ .legend{margin:0 0 12px;font-size:11px;color:#7f92a8;display:flex;gap:14px;flex-wrap:wrap}
+ .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle}
+ details{margin:0}
+ summary{cursor:pointer;list-style:none;user-select:none}
+ summary::-webkit-details-marker{display:none}
+ .arrow{display:inline-block;transition:transform .12s;color:#5f7690}
+ details[open]>summary .arrow{transform:rotate(90deg)}
+ .batch{margin-bottom:8px;border:1px solid #1f2c3e;border-radius:10px;overflow:hidden;background:#0e1420}
+ .batch>summary{padding:9px 12px;font-size:13px;color:#bcd0e4;background:#111a28;display:flex;align-items:center;gap:9px}
+ .batch>summary:hover{background:#15202f}
+ .brows{padding:6px}
+ .trow{border-radius:8px;margin:3px 0;background:#0f1622;border-left:4px solid #26364c}
+ .trow>summary{padding:7px 10px;display:flex;align-items:center;gap:10px;font-size:12px;white-space:nowrap;overflow-x:auto}
+ .trow.risk-danger{border-left-color:#ff5470;background:#1e1015}
+ .trow.risk-warn{border-left-color:#ffb454;background:#1c1710}
+ .trow.risk-ok{border-left-color:#2c6b4f}
+ .tk{color:#7f8ea3;min-width:46px}
+ .badge{font-size:11px;padding:2px 8px;border-radius:6px;font-weight:bold;white-space:nowrap}
+ .b-Red{background:#ff5470;color:#1a0a0e}
+ .b-Yellow{background:#ffb454;color:#1a1204}
+ .b-Green{background:#3ecf8e;color:#06130d}
+ .b-unknown{background:#33425c;color:#cdd}
+ .dec{color:#e3ebf5;flex:1;min-width:130px;overflow:hidden;text-overflow:ellipsis}
+ .enf{color:#9fb4cc}
+ .inc{color:#c9a0ff}
+ .led{color:#6f8296}
+ .ver.ok{color:#7fe0a8}
+ .ver.div{color:#ff8ea3;font-weight:bold}
+ .tdetail{padding:8px 12px;font-size:11px;color:#9fb0c4;border-top:1px solid #17222f;line-height:1.8}
+ .tdetail b{color:#7fb4d0}
+ .tamper{color:#ff8ea3;font-weight:bold}
 </style></head><body>
-<h1>MDG 방어 뷰어 — 3패널 (동작 · 통신 · 검증) · 실시간 자동갱신</h1>
-<div id="banner"></div>
-<div class="grid">
- <div class="panel"><h2>① 동작 (decision JSONL)</h2><div id="p-action"></div></div>
- <div class="panel"><h2>② 통신 (14560/14550 telemetry)</h2><div id="p-comm"></div></div>
- <div class="panel"><h2>③ 검증 (Verifier 대조 · agent≠truth)</h2><div id="p-verify"></div></div>
+<header id="hdr"></header>
+<div class="legend">
+ <span><span class="sw" style="background:#ff5470"></span>위험(Red)</span>
+ <span><span class="sw" style="background:#ffb454"></span>주의(Yellow)</span>
+ <span><span class="sw" style="background:#3ecf8e"></span>평시(Green)</span>
+ <span><span class="sw" style="background:#ff8ea3"></span>에이전트≠진실 불일치</span>
+ <span class="muted">· 묶음/행 클릭 시 펼침 · 3초 실시간 자동갱신</span>
 </div>
+<div id="body"></div>
 <script>
 const TOKEN=new URLSearchParams(location.search).get('token')||'';
 const H={headers:{'Authorization':'Bearer '+TOKEN}};
-const LBL={tick:'틱',impact_band:'영향밴드',decision:'결정',enforcement:'집행',incidents:'사건수',ledger:'원장',
-  metric:'지표',value:'값',band:'밴드',src:'소스',agent:'에이전트판단',truth:'진실판정','≠':'≠',reason:'사유'};
+const openBatches=new Set(), openTicks=new Set(), seenBatch=new Set();
+let firstLoad=true;
+const BANDLBL={Red:'🔴 위험',Yellow:'🟡 주의',Green:'🟢 평시'};
 function esc(s){return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
-function tbl(rows,cols){let h='<table><tr>'+cols.map(c=>'<th>'+(LBL[c]||c)+'</th>').join('')+'</tr>';
- for(const r of rows){h+='<tr>'+cols.map(c=>'<td>'+esc(r[c])+'</td>').join('')+'</tr>';}return h+'</table>';}
+function riskOf(a,v){
+ if(a.impact_band==='Red'||(v&&v.agent_truth_divergence))return 'danger';
+ if(a.impact_band==='Yellow')return 'warn';
+ return 'ok';
+}
+function tickRow(t){
+ const a=t.a, v=t.v||{}, c=t.c||{telemetry:[]};
+ const band=a.impact_band||'unknown';
+ const open=openTicks.has(a.tick)?' open':'';
+ const ver=v.agent_truth_divergence?'<span class="ver div">⚠ 불일치</span>':'<span class="ver ok">✓ 일치</span>';
+ const tele=(c.telemetry||[]);
+ const teleHtml=tele.length?tele.map(e=>esc(e.metric)+'=<b>'+esc(e.value)+'</b> ['+esc(e.band)+'] ('+esc(e.source_id)+')'+(e.tamper?' <span class="tamper">TAMPER</span>':'')).join(' · '):'없음';
+ const det='<div class="tdetail">'
+   +'<div><b>노드</b> '+((a.nodes||[]).map(esc).join(' → ')||'—')+'</div>'
+   +'<div><b>검증</b> 진실판정='+esc(v.truth_verdict)+' · 텔레메트리생존='+esc(v.telemetry_alive)+' · GCS프록시='+esc(v.gcs_proxy_alive)+' · 교차루트='+esc(v.cross_root_consistent)+' · 침묵연속='+esc(v.silence_streak)+(v.reason?(' · 사유: '+esc(v.reason)):'')+'</div>'
+   +'<div><b>통신</b> '+teleHtml+'</div></div>';
+ return '<details class="trow risk-'+riskOf(a,v)+'" data-tick="'+a.tick+'"'+open+'>'
+   +'<summary><span class="arrow">▸</span><span class="tk">#'+a.tick+'</span>'
+   +'<span class="badge b-'+band+'">'+(BANDLBL[band]||'⚪ ?')+'</span>'
+   +'<span class="dec">'+(esc(a.decision)||'<span class="muted">결정 없음</span>')+'</span>'
+   +'<span class="enf">집행:'+(esc(a.enforcement)||'—')+'</span>'
+   +'<span class="inc">사건 '+esc(a.incidents)+'</span>'
+   +'<span class="led">원장 '+esc(a.ledger)+'</span>'
+   +ver+'</summary>'+det+'</details>';
+}
+function batchBlock(id,list){
+ const reds=list.filter(t=>t.a.impact_band==='Red').length;
+ const ambs=list.filter(t=>t.a.impact_band==='Yellow').length;
+ const divs=list.filter(t=>t.v&&t.v.agent_truth_divergence).length;
+ let ind='';
+ if(reds)ind+='<span class="chip red">🔴 위험 '+reds+'</span>';
+ if(ambs)ind+='<span class="chip amber">🟡 주의 '+ambs+'</span>';
+ if(divs)ind+='<span class="chip red">⚠ 불일치 '+divs+'</span>';
+ if(!ind)ind='<span class="chip green">🟢 평시</span>';
+ const open=openBatches.has(id)?' open':'';
+ return '<details class="batch" data-batch="'+id+'"'+open+'>'
+  +'<summary><span class="arrow">▸</span><b>틱 '+(id*10)+'–'+(id*10+9)+'</b>'
+  +'<span class="muted">('+list.length+'개)</span>'+ind+'</summary>'
+  +'<div class="brows">'+list.map(tickRow).join('')+'</div></details>';
+}
+function render(d){
+ const A=d.panels.action||[], C=d.panels.communication||[], Vv=d.panels.verification||[];
+ const cmap={},vmap={}; C.forEach(c=>cmap[c.tick]=c); Vv.forEach(x=>vmap[x.tick]=x);
+ const ticks=A.map(a=>({a:a,c:cmap[a.tick],v:vmap[a.tick]}));
+ const total=A.length, reds=A.filter(a=>a.impact_band==='Red').length;
+ const divs=(d.banner&&d.banner.divergences!=null)?d.banner.divergences:Vv.filter(v=>v.agent_truth_divergence).length;
+ const last=A.length?A[A.length-1]:null;
+ const byBatch=new Map();
+ ticks.forEach(t=>{const id=Math.floor(t.a.tick/10); if(!byBatch.has(id))byBatch.set(id,[]); byBatch.get(id).push(t);});
+ const ids=[...byBatch.keys()].sort((x,y)=>y-x);      // 최신 묶음 위로
+ const maxId=ids.length?ids[0]:0;
+ ids.forEach(id=>{ if(!seenBatch.has(id)){ seenBatch.add(id); if(id===maxId) openBatches.add(id);} });  // 새 최신묶음 자동펼침
+ if(firstLoad){ if(ids.length) openBatches.add(maxId); firstLoad=false; }
+ ids.forEach(id=>byBatch.get(id).sort((p,q)=>q.a.tick-p.a.tick));   // 묶음 내부도 최신 위로
+ document.getElementById('hdr').innerHTML=
+   '<h1>MDG 방어 로그 뷰어 · 실시간</h1>'
+  +'<span class="chip"><b>총 틱</b> '+total+'</span>'
+  +'<span class="chip '+(reds?'red':'green')+'">🔴 위험(Red) <b>'+reds+'</b></span>'
+  +'<span class="chip '+(divs?'red':'green')+'">⚠ 불일치 <b>'+divs+'</b></span>'
+  +'<span class="chip"><b>최종</b> '+(last?(esc(last.decision||'—')+' / '+esc(last.impact_band)):'—')+'</span>'
+  +'<span class="muted">갱신 '+new Date().toLocaleTimeString('ko-KR')+' · 읽기전용 · 기록시점 마스킹 on · 신뢰근원 '+esc((d.banner&&d.banner.trust_root)||'mdg.verifier')+'</span>';
+ document.getElementById('body').innerHTML= ids.length? ids.map(id=>batchBlock(id,byBatch.get(id))).join('') : '<div class="muted">로그 없음 — 감시(monitor) 실행을 확인하세요.</div>';
+ document.querySelectorAll('details.batch').forEach(el=>el.addEventListener('toggle',()=>{const id=+el.dataset.batch; el.open?openBatches.add(id):openBatches.delete(id);}));
+ document.querySelectorAll('details.trow').forEach(el=>el.addEventListener('toggle',()=>{const tk=+el.dataset.tick; el.open?openTicks.add(tk):openTicks.delete(tk);}));
+}
 function load(){
  fetch('api/panels',H).then(r=>r.json()).then(d=>{
-  if(d.detail){document.getElementById('banner').innerHTML='<div class="banner"><b>오류:</b> '+esc(d.detail)+'</div>';return;}
-  document.getElementById('banner').innerHTML='<div class="banner"><b>⚠ '+esc(d.banner.text)+'</b>'
-   +'<div class="root">신뢰근원(trust root): '+esc(d.banner.trust_root)+' · 에이전트≠진실 불일치: '
-   +'<span class="'+(d.banner.divergences?'bad':'ok')+'">'+d.banner.divergences+'</span>'
-   +' · 기록시점 마스킹: on · 읽기전용 · 마지막 갱신 '+new Date().toLocaleTimeString('ko-KR')+'</div></div>';
-  document.getElementById('p-action').innerHTML=tbl(d.panels.action,['tick','impact_band','decision','enforcement','incidents','ledger']);
-  const comm=[];for(const t of d.panels.communication){for(const e of t.telemetry){comm.push({tick:t.tick,metric:e.metric,value:e.value,band:e.band,src:e.source_id});}}
-  document.getElementById('p-comm').innerHTML=comm.length?tbl(comm,['tick','metric','value','band','src']):'<i>텔레메트리 행 없음</i>';
-  const vr=d.panels.verification.map(v=>({tick:v.tick,agent:v.agent_decision,truth:v.truth_verdict,'≠':v.agent_truth_divergence?'⚠':'',reason:v.reason}));
-  document.getElementById('p-verify').innerHTML=tbl(vr,['tick','agent','truth','≠','reason']);
- }).catch(e=>{document.getElementById('banner').innerHTML='<div class="banner"><b>연결 오류:</b> '+esc(e)+' (감시/뷰어 실행 확인)</div>';});
+  if(d.detail){document.getElementById('hdr').innerHTML='<h1>오류</h1>';document.getElementById('body').innerHTML='<div class="chip red">'+esc(d.detail)+'</div>';return;}
+  render(d);
+ }).catch(e=>{document.getElementById('hdr').innerHTML='<h1>연결 오류</h1>';document.getElementById('body').innerHTML='<div class="muted">'+esc(e)+' — 감시/뷰어 실행을 확인하세요.</div>';});
 }
-load(); setInterval(load, 3000);   // ★ 3초마다 실시간 자동 갱신 (run.jsonl 성장 반영)
+load(); setInterval(load, 3000);   // ★ 3초마다 실시간 자동 갱신 (run.jsonl 성장 반영, 펼침 상태 유지)
 </script></body></html>"""
 
 
