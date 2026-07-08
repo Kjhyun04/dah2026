@@ -311,6 +311,36 @@ def test_viewer_panels_and_failclosed():
             pass
 
 
+def test_classify_view_standing_vs_attack():
+    """표현계층 분류(2026-07): 상시(구조적) 시그니처는 로그 밴드에서 제외 → 평시,
+    비-상시 공격 시그니처만 위험/주의를 유발. (탐지 엔진 출력은 불변; 순수 표현계층)"""
+    # 상시조건만 → 평시(Green), attack_signals 비어있음
+    assert viewer._classify_view(["Unauthorized_Command"]) == ([], "Green")
+    assert viewer._classify_view(["Port_5762_State", "BACKDOOR_5762"]) == ([], "Green")
+    assert viewer._classify_view([]) == ([], "Green")
+    # 상시 + 실제 공격 → 위험(Red), attack_signals 는 공격만 남김
+    atk, band = viewer._classify_view(["Unauthorized_Command", "PFCP_Delete_Attempt"])
+    assert band == "Red" and atk == ["PFCP_Delete_Attempt"]
+    # 저심각(정찰) 단독 → 주의(Yellow)
+    assert viewer._classify_view(["Recon"]) == (["Recon"], "Yellow")
+    # 저심각 + 상시 → 주의 (상시 제거 후 저심각만 남으므로)
+    assert viewer._classify_view(["Recon", "Port_5762_State"]) == (["Recon"], "Yellow")
+
+
+def test_viewer_standing_panel_and_view_band():
+    """load_panels 가 상시 취약 노드 상태(standing)와 틱별 view_band/attack_signals 를 노출한다."""
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "run.jsonl")
+        _record_to(p)
+        panels = viewer.load_panels(p)
+        assert "standing" in panels                       # 우측 상태 패널 데이터
+        for row in panels["panels"]["action"]:
+            assert row["view_band"] in ("Red", "Yellow", "Green")
+            assert isinstance(row["attack_signals"], list)
+            # attack_signals 는 상시 시그니처를 포함하지 않는다
+            assert not (set(row["attack_signals"]) & set(viewer.STANDING_SIGNALS))
+
+
 def test_viewer_bind_loopback_only():
     """PS-8: serve() refuses 0.0.0.0 / public binds (attacker UE must not reach mgmt plane)."""
     for bad in ("0.0.0.0", "::", "", "8.8.8.8", "203.0.113.5"):

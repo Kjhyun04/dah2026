@@ -66,6 +66,49 @@ def scan_secrets(text: str) -> list[str]:
 
 
 # --------------------------------------------------------------------------- #
+# 상시(구조적) 취약점 분류 — PRESENTATION ONLY (탐지 엔진·run.jsonl·Verifier 불변)
+# --------------------------------------------------------------------------- #
+# 테스트베드 환경 자체의 조건(고치지 않으면 상존): 로그/위험밴드 산정에서 분리하고
+# 우측 "취약 노드 상태"로만 표시한다. 이건 순수 표현계층 필터이며 코어 탐지 출력은 그대로다
+# (run.jsonl 원본에는 모든 incident 가 기록되고, Verifier 진실판정도 무관하게 동작).
+STANDING_SIGNALS = {
+    "Unauthorized_Command": {
+        "node": "업링크 서명 (uav_proxy)", "kind": "unsigned_uplink",
+        "detail": "signing=unknown — 미서명 MAVLink 명령이 통과(§9-B 서명 미확정). "
+                  "테스트베드에서 서명 강제(드롭로그 생성)해야 해소.",
+    },
+    "Port_5762_State": {
+        "node": "SITL 5762 백도어", "kind": "sitl_backdoor",
+        "detail": "5762 시리얼 노출(LISTEN 0.0.0.0:5762) — ARIA/서명 우회 직결 가능. "
+                  "테스트베드에서 포트 차단해야 해소.",
+    },
+    "BACKDOOR_5762": {
+        "node": "SITL 5762 백도어", "kind": "sitl_backdoor",
+        "detail": "5762 백도어 프로브 탐지 — 노출 상태 지속.",
+    },
+    "Port_5762_Probe": {
+        "node": "SITL 5762 백도어", "kind": "sitl_backdoor",
+        "detail": "5762 백도어 프로브 탐지 — 노출 상태 지속.",
+    },
+}
+# 주의(Yellow)로 볼 저심각(정찰/열화) 공격 시그니처. 그 외 비-상시 시그니처는 위험(Red).
+WARN_SIGNALS = {"Recon", "Port_Scan", "Telemetry_Degraded", "GPS_Jitter", "Rogue_Probe"}
+
+
+def _classify_view(signals: list[str]) -> tuple[list[str], str]:
+    """표현계층 재분류: 상시 시그니처를 제외한 '공격 시그니처'와 로그용 밴드(위험/주의/평시).
+
+    상시(구조적) 조건만 있는 틱 → 평시(Green): 로그 타임라인이 신규 공격만 부각하도록.
+    비-상시 시그니처가 있으면 → 저심각(WARN)만이면 주의(Yellow), 그 외/미지 → 위험(Red, fail-alert)."""
+    attack = [s for s in signals if s not in STANDING_SIGNALS]
+    if not attack:
+        return attack, "Green"
+    if all(s in WARN_SIGNALS for s in attack):
+        return attack, "Yellow"
+    return attack, "Red"
+
+
+# --------------------------------------------------------------------------- #
 # Pure panel builders (no web deps) — testable directly
 # --------------------------------------------------------------------------- #
 def _telemetry_rows(tick: play.TickView) -> list[dict]:
@@ -108,14 +151,17 @@ def load_panels(run_path: str) -> dict:
         # 이 틱을 위험으로 만든 실제 시그니처(distinct) — 뷰어가 "무엇이 위험한지" 전면 표시하도록 노출.
         # (중복 제거: correlate 가 동일 시그니처를 다수 누적해도 원인 종류만 보여준다.)
         signals = sorted({m for inc in (t.incidents or []) for m in (inc.get("members") or [])})
+        attack_signals, view_band = _classify_view(signals)     # 상시조건 제외한 공격밴드(표현계층)
         action_panel.append({
             "tick": t.index, "tick_i": t.tick_i,
-            "impact_band": (t.impact or {}).get("band"),
+            "impact_band": (t.impact or {}).get("band"),        # 엔진 원출력(불변, 상세용)
             "impact_score": (t.impact or {}).get("score"),
+            "view_band": view_band,                             # 로그 타임라인 색: 위험/주의/평시
             "decision": dec.get("decision") if dec else None,
             "enforcement": dec.get("enforcement") if dec else None,
             "incidents": len(t.incidents), "ledger": len(t.ledger),
-            "signals": signals,
+            "signals": signals,                                 # 원본 시그니처 전체
+            "attack_signals": attack_signals,                   # 상시조건 제외(로그에 표시)
             "nodes": t.nodes,
         })
         comm_panel.append({"tick": t.index, "telemetry": _telemetry_rows(t)})
@@ -132,6 +178,33 @@ def load_panels(run_path: str) -> dict:
         })
 
     summary = V.summarize(verdicts)
+
+    # 상시(구조적) 취약 노드 상태 — 우측 패널용. run 전체에서 관측된 상시 시그니처를 노드로 묶어
+    # 활성/틱수/최근틱을 집계(로그가 아닌 '상태'). recent = 마지막 tick 에 존재하면 현재 활성.
+    last_tick = action_panel[-1]["tick"] if action_panel else None
+    nodes: dict[str, dict] = {}
+    for row in action_panel:
+        is_last = row["tick"] == last_tick
+        for s in row["signals"]:
+            meta = STANDING_SIGNALS.get(s)
+            if not meta:
+                continue
+            n = nodes.setdefault(meta["node"], {
+                "node": meta["node"], "kind": meta["kind"], "detail": meta["detail"],
+                "signatures": set(), "ticks": 0, "active": False,
+            })
+            n["signatures"].add(s)
+            n["ticks"] += 1
+            if is_last:
+                n["active"] = True
+    standing = [
+        {"node": n["node"], "kind": n["kind"], "detail": n["detail"],
+         "signatures": sorted(n["signatures"]), "ticks": n["ticks"],
+         # 마지막 틱에 없더라도 최근 관측이면 노출 유지(구조적 조건은 상존): active=마지막틱 존재
+         "state": "노출/활성" if n["active"] else "관측됨(최근)"}
+        for n in nodes.values()
+    ]
+
     return {
         # 헤더 메타(경고 문구 없음). 신뢰근원·불일치 수만 콤팩트 칩으로 노출.
         "banner": {
@@ -139,6 +212,7 @@ def load_panels(run_path: str) -> dict:
             "trust_root": "mdg.verifier (out-of-graph, replay-only, deterministic)",
         },
         "summary": summary,
+        "standing": standing,              # 우측 취약 노드 상태(상시조건 — 로그 아님)
         "panels": {"action": action_panel, "communication": comm_panel, "verification": verify_panel},
         "record_time_redact": True,        # display-time redaction is intentionally OFF (PS-3)
         "read_only": True,
@@ -196,6 +270,20 @@ _HTML = """<!doctype html><html><head><meta charset="utf-8"><title>MDG 방어 �
  .tdetail{padding:8px 12px;font-size:11px;color:#9fb0c4;border-top:1px solid #17222f;line-height:1.8}
  .tdetail b{color:#7fb4d0}
  .tamper{color:#ff8ea3;font-weight:bold}
+ /* 2단 레이아웃: 좌=공격 로그 · 우=상시 취약 노드 상태 */
+ .wrap{display:flex;gap:14px;align-items:flex-start}
+ .main{flex:1;min-width:0}
+ .aside{width:330px;flex-shrink:0;position:sticky;top:16px}
+ .aside h3{font-size:12px;color:#9fd7e6;margin:0 0 8px;border-bottom:1px solid #1f2c3e;padding-bottom:6px}
+ .vnode{border:1px solid #7a2b3e;border-left:4px solid #ff5470;background:#1b1013;border-radius:9px;padding:10px 12px;margin-bottom:9px}
+ .vnode.calm{border-color:#2e7d5b;border-left-color:#3ecf8e;background:#0f1a17}
+ .vnode .vt{font-size:13px;color:#ffd0d8;font-weight:bold;display:flex;justify-content:space-between;gap:8px}
+ .vnode.calm .vt{color:#bfe9d4}
+ .vnode .vstate{font-size:11px;color:#ff9fb0;margin-top:3px}
+ .vnode.calm .vstate{color:#8fe6bf}
+ .vnode .vdetail{font-size:11px;color:#9fb0c4;margin-top:6px;line-height:1.6}
+ .vnode .vsig{font-size:10px;color:#c98fa0;margin-top:5px}
+ @media(max-width:820px){.wrap{flex-direction:column}.aside{width:auto;position:static}}
 </style></head><body>
 <header id="hdr"></header>
 <div class="legend">
@@ -203,47 +291,46 @@ _HTML = """<!doctype html><html><head><meta charset="utf-8"><title>MDG 방어 �
  <span><span class="sw" style="background:#ffb454"></span>주의(Yellow)</span>
  <span><span class="sw" style="background:#3ecf8e"></span>평시(Green)</span>
  <span><span class="sw" style="background:#ff8ea3"></span>에이전트≠진실 불일치</span>
- <span class="muted">· 묶음/행 클릭 시 펼침 · 3초 실시간 자동갱신</span>
+ <span class="muted">· 좌=공격 트래픽 로그(상시조건 제외) · 우=상시 취약 노드 상태 · 묶음/행 클릭 시 펼침 · 3초 자동갱신</span>
 </div>
-<div id="body"></div>
+<div class="wrap"><div id="body" class="main"></div><aside id="aside" class="aside"></aside></div>
 <script>
 const TOKEN=new URLSearchParams(location.search).get('token')||'';
 const H={headers:{'Authorization':'Bearer '+TOKEN}};
 const openBatches=new Set(), openTicks=new Set(), seenBatch=new Set();
 let firstLoad=true;
 const BANDLBL={Red:'🔴 위험',Yellow:'🟡 주의',Green:'🟢 평시'};
+const RISK={Red:'danger',Yellow:'warn',Green:'ok'};
 function esc(s){return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
-function riskOf(a,v){
- if(a.impact_band==='Red'||(v&&v.agent_truth_divergence))return 'danger';
- if(a.impact_band==='Yellow')return 'warn';
- return 'ok';
-}
 function tickRow(t){
  const a=t.a, v=t.v||{}, c=t.c||{telemetry:[]};
- const band=a.impact_band||'unknown';
+ const vb=a.view_band||'Green';                          // 로그 밴드 = 상시조건 제외한 공격밴드
  const open=openTicks.has(a.tick)?' open':'';
  const ver=v.agent_truth_divergence?'<span class="ver div">⚠ 불일치</span>':'<span class="ver ok">✓ 일치</span>';
- const score=(a.impact_score!=null)?(' <b>'+esc(a.impact_score)+'</b>'):'';
- const sigs=(a.signals||[]);
- const sigHtml=sigs.length?('<span class="sigs">'+sigs.map(s=>'<span class="sig">'+esc(s)+'</span>').join('')+'</span>')
-                          :'<span class="sigs"><span class="sig calm">위험 시그니처 없음</span></span>';
+ const atk=(a.attack_signals||[]);
+ const sigHtml=atk.length?('<span class="sigs">'+atk.map(s=>'<span class="sig">'+esc(s)+'</span>').join('')+'</span>')
+                         :'<span class="sigs"><span class="sig calm">공격 시그니처 없음 · 평시</span></span>';
+ const standingHere=(a.signals||[]).filter(s=>!atk.includes(s));
  const tele=(c.telemetry||[]);
  const teleHtml=tele.length?tele.map(e=>esc(e.metric)+'=<b>'+esc(e.value)+'</b> ['+esc(e.band)+'] ('+esc(e.source_id)+')'+(e.tamper?' <span class="tamper">TAMPER</span>':'')).join(' · '):'없음';
  const det='<div class="tdetail">'
    +'<div><b>결정</b> '+(esc(a.decision)||'—')+' · 집행:'+(esc(a.enforcement)||'—')+' · 사건 '+esc(a.incidents)+' · 원장 '+esc(a.ledger)+'</div>'
+   +'<div><b>엔진 원출력</b> impact_band='+esc(a.impact_band)+' · score='+esc(a.impact_score)+' <span class="muted">(상시조건 포함 원값 — 로그밴드는 상시 제외)</span></div>'
+   +(standingHere.length?('<div><b>상시조건</b> '+standingHere.map(esc).join(', ')+' <span class="muted">→ 우측 취약노드 상태로 분류</span></div>'):'')
    +'<div><b>노드</b> '+((a.nodes||[]).map(esc).join(' → ')||'—')+'</div>'
    +'<div><b>검증</b> 진실판정='+esc(v.truth_verdict)+' · 텔레메트리생존='+esc(v.telemetry_alive)+' · GCS프록시='+esc(v.gcs_proxy_alive)+' · 교차루트='+esc(v.cross_root_consistent)+' · 침묵연속='+esc(v.silence_streak)+(v.reason?(' · 사유: '+esc(v.reason)):'')+'</div>'
    +'<div><b>통신</b> '+teleHtml+'</div></div>';
- return '<details class="trow risk-'+riskOf(a,v)+'" data-tick="'+a.tick+'"'+open+'>'
+ const risk=(v.agent_truth_divergence&&vb==='Green')?'warn':(RISK[vb]||'ok');
+ return '<details class="trow risk-'+risk+'" data-tick="'+a.tick+'"'+open+'>'
    +'<summary><span class="arrow">▸</span><span class="tk">#'+a.tick+'</span>'
-   +'<span class="badge b-'+band+'">'+(BANDLBL[band]||'⚪ ?')+score+'</span>'
+   +'<span class="badge b-'+vb+'">'+(BANDLBL[vb]||'⚪ ?')+'</span>'
    +sigHtml
    +'<span class="dec muted">'+(esc(a.decision)||'—')+'</span>'
    +ver+'</summary>'+det+'</details>';
 }
 function batchBlock(id,list){
- const reds=list.filter(t=>t.a.impact_band==='Red').length;
- const ambs=list.filter(t=>t.a.impact_band==='Yellow').length;
+ const reds=list.filter(t=>t.a.view_band==='Red').length;
+ const ambs=list.filter(t=>t.a.view_band==='Yellow').length;
  const divs=list.filter(t=>t.v&&t.v.agent_truth_divergence).length;
  let ind='';
  if(reds)ind+='<span class="chip red">🔴 위험 '+reds+'</span>';
@@ -256,16 +343,35 @@ function batchBlock(id,list){
   +'<span class="muted">('+list.length+'개)</span>'+ind+'</summary>'
   +'<div class="brows">'+list.map(tickRow).join('')+'</div></details>';
 }
+function renderStanding(standing){
+ const el=document.getElementById('aside');
+ let h='<h3>상시 취약 노드 상태</h3>';
+ if(!standing||!standing.length){
+  el.innerHTML=h+'<div class="vnode calm"><div class="vt"><span>🟢 취약 노드 없음</span></div><div class="vstate">관측된 상시 취약점 없음</div></div>';
+  return;
+ }
+ for(const n of standing){
+  h+='<div class="vnode"><div class="vt"><span>🔴 '+esc(n.node)+'</span><span class="muted">'+esc(n.ticks)+'틱</span></div>'
+    +'<div class="vstate">상태: '+esc(n.state)+'</div>'
+    +'<div class="vdetail">'+esc(n.detail)+'</div>'
+    +'<div class="vsig">시그니처: '+((n.signatures||[]).map(esc).join(', ')||'—')+'</div></div>';
+ }
+ h+='<div class="muted" style="margin-top:6px">테스트베드 환경 자체의 상시 취약점 — 환경을 고쳐야 해소되며 좌측 공격 로그의 위험/주의/평시 산정에서는 제외됩니다.</div>';
+ el.innerHTML=h;
+}
 function render(d){
  const A=d.panels.action||[], C=d.panels.communication||[], Vv=d.panels.verification||[];
  const cmap={},vmap={}; C.forEach(c=>cmap[c.tick]=c); Vv.forEach(x=>vmap[x.tick]=x);
  const ticks=A.map(a=>({a:a,c:cmap[a.tick],v:vmap[a.tick]}));
- const total=A.length, reds=A.filter(a=>a.impact_band==='Red').length;
+ const total=A.length;
+ const reds=A.filter(a=>a.view_band==='Red').length;
+ const ambs=A.filter(a=>a.view_band==='Yellow').length;
+ const calm=A.filter(a=>a.view_band==='Green').length;
  const divs=(d.banner&&d.banner.divergences!=null)?d.banner.divergences:Vv.filter(v=>v.agent_truth_divergence).length;
  const last=A.length?A[A.length-1]:null;
- // 위험 원인 집계: 어떤 시그니처가 몇 틱에서 위험을 유발했는지 (상시조건 vs 신규 구분에 핵심)
+ // 공격 원인 집계(상시조건 제외한 attack_signals 만)
  const sigCount={};
- A.forEach(a=>(a.signals||[]).forEach(s=>{sigCount[s]=(sigCount[s]||0)+1;}));
+ A.forEach(a=>(a.attack_signals||[]).forEach(s=>{sigCount[s]=(sigCount[s]||0)+1;}));
  const causes=Object.entries(sigCount).sort((x,y)=>y[1]-x[1]);
  const byBatch=new Map();
  ticks.forEach(t=>{const id=Math.floor(t.a.tick/10); if(!byBatch.has(id))byBatch.set(id,[]); byBatch.get(id).push(t);});
@@ -277,12 +383,15 @@ function render(d){
  document.getElementById('hdr').innerHTML=
    '<h1>MDG 방어 로그 뷰어 · 실시간</h1>'
   +'<span class="chip"><b>총 틱</b> '+total+'</span>'
-  +'<span class="chip '+(reds?'red':'green')+'">🔴 위험(Red) <b>'+reds+'</b></span>'
+  +'<span class="chip '+(reds?'red':'green')+'">🔴 위험 <b>'+reds+'</b></span>'
+  +'<span class="chip '+(ambs?'amber':'green')+'">🟡 주의 <b>'+ambs+'</b></span>'
+  +'<span class="chip green">🟢 평시 <b>'+calm+'</b></span>'
   +'<span class="chip '+(divs?'red':'green')+'">⚠ 불일치 <b>'+divs+'</b></span>'
-  +'<span class="chip"><b>최종</b> '+(last?(esc(last.decision||'—')+' / '+esc(last.impact_band)):'—')+'</span>'
-  +'<span class="muted">갱신 '+new Date().toLocaleTimeString('ko-KR')+' · 읽기전용 · 기록시점 마스킹 on · 신뢰근원 '+esc((d.banner&&d.banner.trust_root)||'mdg.verifier')+'</span>'
-  +(causes.length?('<div class="causes"><span class="lbl">위험 원인</span>'+causes.map(c=>'<span class="sig">'+esc(c[0])+' <b>'+c[1]+'틱</b></span>').join('')+'<span class="muted">← 매 틱 반복되면 상시조건(테스트베드 취약점), 특정 구간만이면 신규 공격</span></div>'):'<div class="causes"><span class="sig calm">위험 시그니처 없음 · 평시</span></div>');
+  +'<span class="chip"><b>최종</b> '+(last?(esc(last.decision||'—')+' / '+esc(last.view_band||last.impact_band)):'—')+'</span>'
+  +'<span class="muted">갱신 '+new Date().toLocaleTimeString('ko-KR')+' · 읽기전용 · 신뢰근원 '+esc((d.banner&&d.banner.trust_root)||'mdg.verifier')+'</span>'
+  +(causes.length?('<div class="causes"><span class="lbl">공격 원인</span>'+causes.map(c=>'<span class="sig">'+esc(c[0])+' <b>'+c[1]+'틱</b></span>').join('')+'</div>'):'<div class="causes"><span class="sig calm">공격 시그니처 없음 · 상시조건만(우측 상태 참조)</span></div>');
  document.getElementById('body').innerHTML= ids.length? ids.map(id=>batchBlock(id,byBatch.get(id))).join('') : '<div class="muted">로그 없음 — 감시(monitor) 실행을 확인하세요.</div>';
+ renderStanding(d.standing);
  document.querySelectorAll('details.batch').forEach(el=>el.addEventListener('toggle',()=>{const id=+el.dataset.batch; el.open?openBatches.add(id):openBatches.delete(id);}));
  document.querySelectorAll('details.trow').forEach(el=>el.addEventListener('toggle',()=>{const tk=+el.dataset.tick; el.open?openTicks.add(tk):openTicks.delete(tk);}));
 }
