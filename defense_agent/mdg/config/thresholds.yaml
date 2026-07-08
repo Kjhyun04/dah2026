@@ -1,0 +1,49 @@
+# thresholds.yaml — FIXED constants (prototype §5 FIX E7 · DESIGN_DECISIONS PS-6/P4-6)
+# band -> (severity, dev) mapping; dev is the in-band scale (E7). obs>0 blanket dev=1.0 폐기.
+severity_factor: {info: 0.0, low: 0.1, medium: 0.3, high: 0.6, critical: 1.0}
+
+band_map:
+  normal:   {severity: info,     dev: 0.0}
+  warning:  {severity: medium,   dev: 0.4}
+  critical: {severity: high,     dev: 0.7}
+  danger:   {severity: critical, dev: 1.0}
+
+# weight is per-domain sum <= 1 (E6, no renormalization)
+metrics:
+  PFCP_Delete_Attempt:   {domain: session_network, normal: [0, 0], warning: [1, 1], critical: [2, 3], danger: [4, .inf], weight: 0.40}
+  Unauthorized_Command:  {domain: command,         normal: [0, 0], warning: [1, 1], critical: [2, .inf], weight: 0.35}
+  Signature_Verify_Fail: {domain: command,         warning: [1, 3], critical: [4, .inf], weight: 0.20}
+  Port_5762_State:       {domain: command,         normal: "LISTEN_NO_ESTAB", danger: "ESTAB_PRESENT", weight: 0.45}
+  DB_Access:             {domain: identity_access, normal: [0, 0], warning: [1, 2], critical: [3, .inf], weight: 0.35}
+  Packet_Loss:           {domain: communication,   normal: [0, 1], warning: [2, 5], critical: [6, 20], danger: [21, 100], weight: 0.30}
+  RTT:                   {domain: communication,   normal: [0, 40], warning: [41, 80], critical: [81, 150], weight: 0.20}
+  NAS_Cipher_Order:      {domain: communication,   danger_if: "EEA0 first", weight: 0.15, once: true}
+
+trust_bands: {very_high: [90, 100], high: [70, 89], moderate: [50, 69], low: [30, 49], very_low: [0, 29]}
+impact_bands: {Green: [0, 30], Yellow: [31, 70], Red: [71, 100]}
+low_confidence_threshold: 0.5           # E8: below this, mission_risk band +1 (conservative), once
+
+debounce: {physical_action_min_ticks: 3}                                    # X5
+deescalation: {revert_reversible_after_quiet_s: 120, flight_action_auto_revert: false}  # E15
+
+correlation_rules:
+  CR01: {metrics: [PFCP_Delete_Attempt, Unauthorized_Command], max_time_diff_s: 5, join: time_only, weight: 1.0, min_members: 2}
+
+# evidence TTL freshness (E7/PP-3 present-set staleness classifier; core/evidence.py)
+evidence_ttl_s: 60
+
+# P3-Q6: hard byte cap on the raw LLM response before model_validate_json (parse-side DoS
+# bound; pydantic field limits run after the parse). FIXED constant.
+llm_response_max_bytes: 16384
+
+# PS-6 anti-replay (FIXED)
+seq_window: 1024
+ts_skew_s: 5
+
+# P4-6 RTT baseline (live uav_ue->gcs_proxy 14.5/30.2/38.6ms, mdev~11ms) — 문서 21~28ms 폐기
+rtt_baseline_ms: 27.7
+rtt_mdev_ms: 11.0
+rtt_k: 3.0
+
+# PA-1 driver budgets
+driver: {max_iters: 64, max_pivots: 8, k_dry: 4, recursion_limit: 16}

@@ -1,0 +1,636 @@
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mission‑Centric Defense Architecture Additive Design Models</title>
+  <!--
+    This document defines additional models that complement the Core Architecture Model.
+    It retains the existing chapters, objects, descriptions and HTML structure defined in
+    the Core Architecture Model, and only introduces new models to improve the completeness
+    of the Mission‑Centric Defense Architecture.  Each model is defined concretely:
+    the purpose, necessity, inputs, internal fields, relationships, processing logic,
+    outputs, design considerations, and an example structure are described.  These models
+    draw only on data that can be collected from the testbed and validated attack scenarios.
+  -->
+  <style>
+    :root{
+      --bg:#0d1117; --panel:#161b22; --panel2:#1c2430; --line:#30363d;
+      --ink:#e6edf3; --sub:#9da7b3; --muted:#6e7681;
+      --cell:#3b82f6; --core:#a855f7; --sgi:#22c55e; --ran:#f59e0b; --air:#ef4444; --atk:#f43f5e;
+      --accent:#58a6ff; --ok:#3fb950; --warn:#d29922; --bad:#f85149; --plain:#f59e0b; --ct:#22c55e;
+      --code:#0b0f14;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);
+      font-family:"Segoe UI","Malgun Gothic",-apple-system,system-ui,sans-serif;line-height:1.65;font-size:15px}
+    .wrap{max-width:1080px;margin:0 auto;padding:32px 22px 90px}
+    header.doc{border:1px solid var(--line);border-radius:14px;overflow:hidden;
+      background:linear-gradient(135deg,#12203a 0%,#161b22 55%,#101a2c 100%);
+      padding:26px 28px;margin-bottom:24px}
+    header.doc h1{margin:14px 0 6px;font-size:25px;line-height:1.3}
+    header.doc .sub{color:var(--sub);font-size:14px}
+    header.doc .meta{display:flex;flex-wrap:wrap;gap:8px 10px;margin-top:16px}
+    .pill{display:inline-block;font-size:12.5px;font-weight:700;padding:6px 11px;border-radius:8px;background:var(--panel2);
+      border:1px solid var(--line);color:var(--sub)}
+    .pill b{color:var(--ink);font-weight:600}
+    h2{margin:46px 0 14px;font-size:20px;border-bottom:1px solid var(--line);padding-bottom:8px;scroll-margin-top:16px}
+    h2 .num{color:var(--accent);font-variant-numeric:tabular-nums;margin-right:10px}
+    h3{margin:32px 0 14px;font-size:17px;color:#dbe6f2}
+    h4{margin:18px 0 8px;font-size:15px;color:#9fd0ff;font-weight:600}
+    p{margin:10px 0}
+    .lede{color:var(--sub);font-size:15px}
+    ul{margin:8px 0 12px 20px}
+    ul li{margin:5px 0}
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:16px 0}
+    table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+    th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+    th{background:var(--panel2);color:#cbd5e1;font-weight:600;font-size:12.5px}
+    tr:nth-child(even) td{background:rgba(255,255,255,.015)}
+    pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto;
+      font-size:12.5px;color:#cdd9e5;margin:10px 0}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header class="doc">
+    <h1>Mission‑Centric Defense Architecture Additive Design Models</h1>
+    <div class="sub">LTE/5G 기반 UAV C2 환경을 위한 임무 중심 방어 아키텍처 Additive Design Model 설계 (2026‑07‑05)</div>
+    <div class="meta">
+      <span class="pill">프로젝트 <b>Mission‑Centric Defense Architecture</b></span>
+      <span class="pill">환경 <b>4G/5G UAV C2 Testbed</b></span>
+      <span class="pill">버전 <b>Additive Models Stage</b></span>
+      <span class="pill">철학 <b>Capability‑Driven, Mission‑Aware</b></span>
+    </div>
+  </header>
+
+  <!-- Overview -->
+  <h2 id="additive-overview"><span class="num">1.</span> Additive Model Overview</h2>
+  <p class="lede">본 문서는 Core Architecture Model을 보완하는 추가 모델을 정의한다. 기존 Chapter와 객체, 구조를 변경하지 않고, Mission‑Centric Defense Architecture의 완성도를 높이기 위한 데이터 모델과 평가 구조를 추가한다. 다음에 제시되는 모델들은 테스트베드에서 측정 가능한 지표와 실증된 공격 시나리오의 특성을 기반으로 설계되며, 모든 Chapter에서 공통적으로 사용될 수 있도록 표준화되어 있다.</p>
+  <p>추가 모델은 <strong>Threshold Policy</strong>, <strong>Time Window</strong>, <strong>Evidence Correlation</strong>, <strong>Recovery Feasibility</strong>, <strong>Decision Trace</strong>, <strong>Core Data Flow</strong>, 그리고 <strong>Mission Decision (Revision)</strong>의 7가지로 구성된다. 각각의 모델은 명확한 입력·출력·관계를 규정하여 방어 에이전트 설계 시 추가 데이터 구조 정의가 필요 없도록 한다.</p>
+
+  <!-- Threshold Policy Model -->
+  <h2 id="threshold-policy-model"><span class="num">2.</span> Threshold&nbsp;Policy&nbsp;Model</h2>
+  <div class="panel">
+    <h4>Purpose</h4>
+    <p>Threshold&nbsp;Policy&nbsp;Model은 아키텍처 전반에서 사용하는 모든 메트릭의 판단 기준을 통일하기 위해 설계된다. 각 메트릭에 대해 정상(Normal), 경고(Warning), 심각(Critical), 위험(Danger)의 범위를 정의하여 Evidence 생성, Trust 계산, Policy 평가 및 Recovery 판단이 일관된 기준을 따르도록 한다.</p>
+
+    <h4>Why Required</h4>
+    <p>테스트베드와 공격 시나리오 분석에 따르면 PFCP 세션 삭제, 웹 API 무인증 요청, MongoDB 접근, NAS 암호 설정 등 다양한 메트릭이 방어 판단에 직접 영향을 미친다【208159606947672†L279-L293】. 각 Capability가 개별적으로 임계치를 정의하면 도메인 간 비교가 어렵기 때문에, 모든 메트릭을 하나의 정책 표준으로 관리할 필요가 있다.</p>
+
+    <h4>Inputs</h4>
+    <ul>
+      <li><strong>Metric Definitions:</strong> 테스트베드에서 측정 가능한 메트릭 이름과 단위(예: Packet&nbsp;Loss(%), RTT(ms), PFCP_Delete_Attempt(건), NAS_Cipher_Order, Auth_Failure(횟수), DB_Access(횟수), Unauthorized_Command(건), Session_Reset(건)).</li>
+      <li><strong>Baseline Values:</strong> 각 메트릭에 대한 정상(expected) 값과 설계상 허용되는 변동 폭. 예를 들어 PFCP 세션 삭제 시도는 0이 정상이고, NAS 암호 설정은 EEA2 우선 순위가 정상이다【208159606947672†L279-L293】.</li>
+      <li><strong>Mission Weight and Severity Mapping:</strong> Mission&nbsp;Weight&nbsp;Model에서 정의한 가중치와 각 메트릭의 공격 영향도를 나타내는 severity&nbsp;factor.</li>
+      <li><strong>Time Window Parameters:</strong> 평가 시 사용할 관찰 창, 롤링 창 등의 시간 매개변수. 이는 Time&nbsp;Window&nbsp;Model과 연계된다.</li>
+    </ul>
+
+    <h4>Internal&nbsp;Fields</h4>
+    <p>Threshold&nbsp;Policy&nbsp;Model은 각 메트릭에 대해 다음 필드를 정의한다. 모델은 표 형식으로 관리되며, 새로운 메트릭이 추가될 경우 동일한 구조를 확장한다.</p>
+    <table>
+      <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>metric</code></td><td>string</td><td>메트릭 이름. 예: <code>PFCP_Delete_Attempt</code>, <code>DB_Access</code>, <code>Unauthorized_Command</code>.</td></tr>
+        <tr><td><code>unit</code></td><td>string</td><td>측정 단위(건/초, %, ms 등).</td></tr>
+        <tr><td><code>normal_range</code></td><td>range/any</td><td>정상 상태로 간주되는 값 또는 값의 범위. 예: 0 PFCP_Delete_Attempt.</td></tr>
+        <tr><td><code>warning_range</code></td><td>range/any</td><td>경고로 분류되는 값의 범위. 예: PFCP_Delete_Attempt가 1 건일 때.</td></tr>
+        <tr><td><code>critical_range</code></td><td>range/any</td><td>심각으로 분류되는 값의 범위. 예: MongoDB Access가 인증 없이 1 회 이상 발생.</td></tr>
+        <tr><td><code>danger_range</code></td><td>range/any</td><td>위험으로 분류되는 값의 범위. 예: NAS_Cipher_Order가 EEA0로 설정되거나 키 유출이 탐지된 경우.</td></tr>
+        <tr><td><code>description</code></td><td>string</td><td>메트릭과 각 구간이 왜 정의되었는지 설명. 공격 시나리오나 노출면 분석을 근거로 한다.</td></tr>
+        <tr><td><code>reason</code></td><td>string</td><td>해당 임계치가 필요한 이유. 예: PFCP Delete는 제어 평면 세션 자체를 파괴하여 C2를 두절하므로 0 보다 큰 시도는 즉시 경보【574666281232364†L162-L176】.</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Relationships</h4>
+    <p>Threshold 값은 Evidence&nbsp;Object가 관측값과 비교하여 <em>severity</em>를 결정하는 데 사용된다. Trust Score Model은 severity와 weight를 사용하여 각 도메인의 신뢰 점수를 계산하고, Policy와 Recovery 단계는 동일한 임계치를 참조하여 경보 수준에 따른 대응을 결정한다. Threshold Policy Model은 Time Window Model에서 정의한 평가 구간과 연계되어 실시간 또는 롤링 기준으로 판단한다.</p>
+
+    <h4>Processing&nbsp;Logic</h4>
+    <ul>
+      <li>메트릭이 발생하면 Threshold Repository에서 해당 메트릭의 정의를 조회한다.</li>
+      <li>Observation Window 또는 Current Snapshot에서 관측된 값이 각 범위에 속하는지 비교하고 <em>severity</em>를 지정한다.</li>
+      <li>지정된 severity에 따라 Evidence Object의 <code>severity</code> 필드가 설정되고, Trust 평가와 Policy 판단에서 가중치를 적용한다.</li>
+      <li>Threshold 표는 주기적으로 테스트베드에서 측정한 정상값을 기반으로 조정될 수 있으며, 임무 유형 또는 환경에 따라 Mission Weight Model과 연계하여 동적으로 재설정된다.</li>
+    </ul>
+
+    <h4>Outputs</h4>
+    <p>각 메트릭에 대한 severity classification과 해당 임계치 설명을 포함한 결과. 이 결과는 Evidence Object와 Trust Architecture에 전달된다.</p>
+
+    <h4>Design Considerations</h4>
+    <ul>
+      <li>모든 임계치는 테스트베드 실측 값과 공격 시나리오 결과를 기반으로 설정한다. 예를 들어 PFCP Delete, DB Access, Unauthorized Command 등은 실제 공격에서 단일 시도만으로 치명적 영향을 미치므로 위협 범위를 매우 낮게 설정한다【574666281232364†L162-L176】.</li>
+      <li>Mission 유형, 우선순위에 따라 메트릭의 중요도가 달라질 수 있다. Mission Weight Model과 연계하여 임계치를 조정한다.</li>
+      <li>Threshold 설정은 과도한 false positive를 방지하기 위해 시간 창과 함께 사용된다(Time Window Model 참조).</li>
+      <li>정상(Normal) 범위를 명확히 정의하지 않으면 경보 폭주가 발생할 수 있으므로, 테스트베드 데이터로 학습된 기대값을 사용한다.</li>
+    </ul>
+
+    <h4>Example Structure</h4>
+    <pre>{
+  "metric": "PFCP_Delete_Attempt",
+  "unit": "count",
+  "normal_range": [0],
+  "warning_range": [1],
+  "critical_range": [2, 3],
+  "danger_range": [4, "inf"],
+  "description": "Number of PFCP session deletion attempts observed within the observation window.",
+  "reason": "Any deletion attempt compromises C2 availability; repeated attempts may indicate an ongoing DoS or lateral movement【574666281232364†L162-L176】."
+}</pre>
+    <pre>{
+  "metric": "DB_Access",
+  "unit": "count",
+  "normal_range": [0, 5],
+  "warning_range": [6, 10],
+  "critical_range": [11, 20],
+  "danger_range": [21, "inf"],
+  "description": "Number of unauthenticated access attempts to the subscriber MongoDB within the rolling window.",
+  "reason": "The subscriber DB stores K/OPc secrets; unauthorized access leads to UE impersonation【208159606947672†L279-L293】."
+}</pre>
+  </div>
+
+  <!-- Time Window Model -->
+  <h2 id="time-window-model"><span class="num">3.</span> Time&nbsp;Window&nbsp;Model</h2>
+  <div class="panel">
+    <h4>Purpose</h4>
+    <p>Time&nbsp;Window&nbsp;Model은 단일 이벤트뿐 아니라 일정 기간 동안의 변화와 패턴을 평가할 수 있도록 시간 창을 정의한다. 평가 시점의 현재 상태와 최근 변동을 함께 고려하여 보다 정확한 신뢰 평가와 임팩트 분석을 가능하게 한다.</p>
+
+    <h4>Why Required</h4>
+    <p>다수의 공격은 짧은 기간 동안 연속적으로 발생하거나 서서히 악화되는 패턴을 보인다. PFCP 세션 삭제, 불법 명령 주입, DB 스캔 등은 일정 시간 내 반복적인 시도가 탐지되어야 한다【574666281232364†L162-L176】. Time Window Model을 사용하면 Evidence Object와 Trust Architecture에서 이러한 패턴을 인식하고 false positive를 줄일 수 있다.</p>
+
+    <h4>Inputs</h4>
+    <ul>
+      <li><strong>Event Timestamps:</strong> Capability Monitor가 생성한 원시 이벤트의 시간 정보.</li>
+      <li><strong>Window Parameters:</strong> Mission 정책과 각 메트릭의 특성에 따라 정의된 관찰 창(Observation&nbsp;Window), 롤링 창(Rolling&nbsp;Window), 집계 창(Aggregation&nbsp;Window), TTL(Time‑to‑Live) 값.</li>
+      <li><strong>Sampling Interval:</strong> 데이터 수집 주기. 예를 들어 Packet Loss와 RTT는 밀리초 단위, DB Access는 초 단위로 샘플링한다.</li>
+      <li><strong>Threshold Policy:</strong> 임계치 모델에서 정의한 값과 함께 사용하여 시간적 변동을 평가한다.</li>
+    </ul>
+
+    <h4>Internal&nbsp;Fields</h4>
+    <table>
+      <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>window_type</code></td><td>enum</td><td><code>current_snapshot</code>, <code>rolling_window</code>, <code>observation_window</code>, <code>aggregation_window</code> 중 하나.</td></tr>
+        <tr><td><code>window_size</code></td><td>integer</td><td>시간 창의 크기(초). 예: rolling_window=10초.</td></tr>
+        <tr><td><code>sampling_interval</code></td><td>integer</td><td>데이터 수집 주기(초 또는 ms). 예: RTT=100 ms, DB_Access=1 s.</td></tr>
+        <tr><td><code>ttl</code></td><td>integer</td><td>Evidence나 지표가 유효한 기간(초). TTL이 경과하면 평가에서 제외한다.</td></tr>
+        <tr><td><code>start_time</code></td><td>datetime</td><td>창의 시작 시각(ISO 8601).</td></tr>
+        <tr><td><code>end_time</code></td><td>datetime</td><td>창의 종료 시각.</td></tr>
+        <tr><td><code>aggregated_value</code></td><td>any</td><td>창 내에서 계산된 집계 값(평균, 최대, 합 등). Trust 계산과 Threshold 평가에서 사용한다.</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Relationships</h4>
+    <p>Time Window Model은 Evidence Object 생성 시 이벤트를 어느 창에 속하는지 지정하고, Threshold Policy Model과 연계하여 severity를 판정한다. Rolling Window와 Observation Window는 Evidence Correlation Model에서 여러 이벤트를 하나의 Incident로 묶을 때 사용되며, Aggregation Window는 Trust Architecture와 Mission Impact 계산 시 신뢰 벡터를 도출하는 데 활용된다. TTL 값은 Evidence가 만료되는 시점을 정의하여 과거 데이터가 과도하게 영향을 미치지 않도록 한다.</p>
+
+    <h4>Processing&nbsp;Logic</h4>
+    <ul>
+      <li><strong>Current Snapshot:</strong> 단일 이벤트나 메트릭의 현재 값을 평가한다. 주로 즉각적인 경보에 사용된다.</li>
+      <li><strong>Rolling Window:</strong> 길이 <code>window_size</code>의 슬라이딩 창에서 이벤트를 누적하고 평균이나 최대값을 계산한다. 예: 10 초 동안 PFCP Delete Attempt의 횟수.</li>
+      <li><strong>Observation Window:</strong> Correlation Model에서 여러 Evidence를 동일 Incident로 묶기 위해 사용하는 시간 범위. 예: 5 초 내 PFCP Delete와 Unauthorized Command가 발생하면 동일 Incident로 처리.</li>
+      <li><strong>Aggregation Window:</strong> Trust Architecture에서 신뢰 벡터를 산출하기 위해 사용. 예: 최근 60 초 동안의 평균 Packet Loss와 RTT를 기반으로 신뢰 점수 계산.</li>
+      <li>모든 창은 <code>sampling_interval</code>에 따라 데이터를 수집하며, TTL이 초과하면 이전 데이터는 평가에서 제외된다.</li>
+    </ul>
+
+    <h4>Outputs</h4>
+    <p>각 시간 창에 대해 집계된 메트릭 값과 해당 창에 속한 Evidence 목록. 이러한 출력은 Threshold Policy Model, Evidence Correlation Model, Trust Architecture 및 Mission Impact 계산에 사용된다.</p>
+
+    <h4>Design Considerations</h4>
+    <ul>
+      <li>창의 크기와 샘플링 간격은 메트릭의 특성에 따라 다르게 설정해야 한다. 예: PFCP Delete는 짧은 창(5–10 초)이 적합하고, Packet Loss는 긴 창(1–5 분)이 적합하다.</li>
+      <li>Observation Window가 너무 길면 연관 없는 이벤트가 묶여 false correlation이 발생할 수 있고, 너무 짧으면 멀티스텝 공격을 인지하지 못한다.</li>
+      <li>TTL은 Evidence의 수명을 제어하는 핵심 값이며, 임무 단계나 임무 우선순위에 따라 조정될 수 있다.</li>
+      <li>시간 창은 시스템 리소스에 영향을 미치므로, 실시간 감시와 히스토리컬 분석 사이에서 균형을 맞춰야 한다.</li>
+    </ul>
+
+    <h4>Example Structure</h4>
+    <pre>{
+  "window_type": "rolling_window",
+  "window_size": 10,
+  "sampling_interval": 1,
+  "ttl": 60,
+  "start_time": "2026-07-05T15:30:00Z",
+  "end_time": "2026-07-05T15:30:10Z",
+  "aggregated_value": 2
+}</pre>
+  </div>
+
+  <!-- Evidence Correlation Model -->
+  <h2 id="evidence-correlation-model"><span class="num">4.</span> Evidence&nbsp;Correlation&nbsp;Model</h2>
+  <div class="panel">
+    <h4>Purpose</h4>
+    <p>Evidence&nbsp;Correlation&nbsp;Model은 서로 연관된 여러 Evidence를 하나의 Incident로 묶어 공격 패턴을 더 잘 이해할 수 있도록 한다. 단일 이벤트로는 파악하기 어려운 다단계 공격과 사이드 이펙트를 식별하기 위해 상관 분석 규칙과 Incident 객체 구조를 정의한다.</p>
+
+    <h4>Why Required</h4>
+    <p>공격 시나리오에서는 PFCP 세션 삭제와 MAVLink 명령 주입이 짧은 시간 안에 연속해서 발생하거나, 동일한 IP에서 여러 Capability 이벤트가 발생하는 경우가 있다【574666281232364†L162-L176】. 이러한 증거를 개별적으로 처리하면 공격의 맥락을 놓칠 수 있으므로, 공통된 속성 및 시간 조건에 따라 사건을 묶어야 한다.</p>
+
+    <h4>Inputs</h4>
+    <ul>
+      <li><strong>Evidence Records:</strong> Evidence Object에서 생성된 레코드 목록. 각 레코드는 <code>evidence_id</code>, <code>timestamp</code>, <code>capability</code>, <code>source</code>, <code>entity</code>, <code>metric</code>, <code>severity</code>를 포함한다.</li>
+      <li><strong>Correlation Rules:</strong> 상관 규칙 정의. 각 규칙에는 조건(예: 시간 간격, 동일 IP, 동일 Capability, 특정 메트릭 조합)과 상관 점수 계산 방법이 포함된다.</li>
+      <li><strong>Time Window Parameters:</strong> Observation Window와 Rolling Window 크기. 규칙 평가 시 사용된다.</li>
+      <li><strong>Threshold Policy:</strong> 중복된 증거를 필터링하기 위한 severity 임계값. 매우 낮은 심각도의 이벤트는 상관에서 제외할 수 있다.</li>
+    </ul>
+
+    <h4>Internal&nbsp;Fields</h4>
+    <p>Evidence Correlation Model은 두 개의 주요 구조를 정의한다: Correlation Rule과 Incident Object.</p>
+    <table>
+      <thead><tr><th>Structure</th><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td rowspan="5"><strong>Correlation&nbsp;Rule</strong></td><td><code>rule_id</code></td><td>string</td><td>규칙 식별자(ID).</td></tr>
+        <tr><td><code>description</code></td><td>string</td><td>규칙 목적과 상관 기준을 설명.</td></tr>
+        <tr><td><code>conditions</code></td><td>object</td><td>상관 조건: <code>capabilities</code>(list), <code>metrics</code>(list), <code>max_time_diff</code>(초), <code>attribute_match</code>(예: 동일 IP).</td></tr>
+        <tr><td><code>correlation_score_weight</code></td><td>float</td><td>이 규칙이 Incident 점수에 기여하는 비율(0–1).</td></tr>
+        <tr><td><code>severity_threshold</code></td><td>string</td><td>해당 규칙을 적용하기 위한 최소 Evidence severity (e.g., warning).</td></tr>
+        <tr><td rowspan="9"><strong>Incident&nbsp;Object</strong></td><td><code>incident_id</code></td><td>string</td><td>Incident의 고유 식별자.</td></tr>
+        <tr><td><code>rule_id</code></td><td>string</td><td>적용된 Correlation&nbsp;Rule.</td></tr>
+        <tr><td><code>evidence_ids</code></td><td>list&lt;string&gt;</td><td>Incident를 구성하는 Evidence ID 목록.</td></tr>
+        <tr><td><code>source</code></td><td>string</td><td>공통 Source(IP/컨테이너/UE) 등 연관 키.</td></tr>
+        <tr><td><code>target</code></td><td>string</td><td>공통 Target(서비스/포트/엔티티) 등 연관 키.</td></tr>
+        <tr><td><code>capability</code></td><td>enum</td><td>상관된 Evidence 중 주요 Capability 도메인.</td></tr>
+        <tr><td><code>start_time</code></td><td>datetime</td><td>Incident가 시작된 시간(가장 이른 Evidence).</td></tr>
+        <tr><td><code>end_time</code></td><td>datetime</td><td>Incident가 종료된 시간(가장 늦은 Evidence).</td></tr>
+        <tr><td><code>correlation_score</code></td><td>float</td><td>규칙에 따라 계산된 상관 점수(0–1). 여러 규칙을 적용해 누적 가능.</td></tr>
+        <tr><td><code>description</code></td><td>string</td><td>Incident 내용 요약.</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Relationships</h4>
+    <p>Evidence Correlation Model은 Evidence Object에서 상관&nbsp;ID를 채워 Incident와 연결하고, Incident&nbsp;Object는 Trust Architecture에서 도메인별 신뢰 점수를 계산할 때 입력으로 사용된다. Incident 정보는 Decision Trace Model에서도 기록되어 최종 판단의 근거가 된다. Correlation Rules는 Threshold Policy Model과 Time Window Model을 참고하여 평가된다.</p>
+
+    <h4>Processing&nbsp;Logic</h4>
+    <ul>
+      <li>Correlation 엔진은 Observation Window 내에서 Evidence를 수집한다.</li>
+      <li>각 Correlation Rule에 대해 규칙의 조건을 만족하는 Evidence 집합을 찾는다. 예: 동일한 <code>source</code>와 <code>target</code>을 가진 PFCP_Delete_Attempt와 Unauthorized_Command가 5 초 이내에 발생하면 규칙 ID = CR01이 성립한다.</li>
+      <li>집합이 조건을 만족하면 Incident를 생성하고, 해당 Evidence의 <code>correlation_id</code>를 Incident ID로 업데이트한다.</li>
+      <li>Incident의 <code>correlation_score</code>는 규칙의 <code>correlation_score_weight</code>와 Evidence의 severity를 바탕으로 계산한다. 여러 규칙이 적용될 경우 합산한다.</li>
+      <li>생성된 Incident는 Incident Repository에 저장되고 Trust Architecture가 이를 조회한다.</li>
+    </ul>
+
+    <h4>Outputs</h4>
+    <p>Incident Object 리스트와 각 Incident의 <code>correlation_score</code>. 증거 간의 연관성을 설명하는 메타데이터는 Trust Architecture와 Decision Trace Model로 전달된다.</p>
+
+    <h4>Design Considerations</h4>
+    <ul>
+      <li>상관 규칙은 테스트베드에서 관측된 패턴과 공격 시나리오를 기반으로 정의한다. 예: PFCP Delete와 Unauthorized Command의 연계는 TM2·NF‑4 시나리오에서 반복 관측되었다【574666281232364†L162-L176】.</li>
+      <li>Incident의 크기가 너무 크면 공격 단계가 분리되지 않고, 너무 작으면 매 단계의 연계가 놓칠 수 있다. 상관 점수는 정책과 회복 판단에서 가중치로 사용되므로 적절한 스케일링이 필요하다.</li>
+      <li>Correlation Score는 정규화(0–1)하여 다른 평가 모델과 결합하기 쉽게 한다.</li>
+      <li>증거의 심각도가 낮거나 시간이 많이 지난 경우 상관에서 제외하거나 가중치를 낮출 수 있다.</li>
+    </ul>
+
+    <h4>Example Structure</h4>
+    <pre>{
+  "rule_id": "CR01",
+  "description": "PFCP deletion and unauthorized command within 5 seconds from same source",
+  "conditions": {
+    "capabilities": ["session_network", "command"],
+    "metrics": ["PFCP_Delete_Attempt", "Unauthorized_Command"],
+    "max_time_diff": 5,
+    "attribute_match": "source_ip"
+  },
+  "correlation_score_weight": 0.7,
+  "severity_threshold": "warning"
+}</pre>
+    <pre>{
+  "incident_id": "INC20260705-0003",
+  "rule_id": "CR01",
+  "evidence_ids": ["EV20260705-0001", "EV20260705-0007"],
+  "source": "10.44.0.17",
+  "target": "net_core_UPF",
+  "capability": "session_network",
+  "start_time": "2026-07-05T15:30:05Z",
+  "end_time": "2026-07-05T15:30:09Z",
+  "correlation_score": 0.85,
+  "description": "PFCP session deletion followed by an unauthorized command to web_backend within 4 seconds."
+}</pre>
+  </div>
+
+  <!-- Recovery Feasibility Model -->
+  <h2 id="recovery-feasibility-model"><span class="num">5.</span> Recovery&nbsp;Feasibility&nbsp;Model</h2>
+  <div class="panel">
+    <h4>Purpose</h4>
+    <p>Recovery&nbsp;Feasibility&nbsp;Model은 복구 후보의 실행 가능성을 정량적으로 평가하여 Mission Decision 단계에서 우선순위를 결정할 수 있도록 한다. 단순히 복구 옵션을 나열하는 것이 아니라, 실행 시간, 자원 비용, 신뢰 회복 효과, 임무 회복 효과, 성공 확률, 위험도를 종합하여 Recovery Score를 산출한다.</p>
+
+    <h4>Why Required</h4>
+    <p>PFCP 세션 재생성, 세션 재attach, 서명 키 회전, 임무 재구성 등 다양한 복구 방법이 존재하지만, 실제로는 임무 시간과 자원이 한정되어 있다. 테스트베드와 공격 시나리오 분석 결과, 일부 복구는 시간이 오래 걸리거나 임무를 방해할 수 있다【574666281232364†L162-L176】. Recovery Feasibility Model은 이러한 요소를 체계적으로 비교하여 가장 적절한 복구를 선택하기 위해 필요하다.</p>
+
+    <h4>Inputs</h4>
+    <ul>
+      <li><strong>Candidate Recovery Actions:</strong> Policy 단계에서 생성된 복구 후보. 각 후보에는 <code>recovery_id</code>와 <code>recovery_type</code>이 포함된다.</li>
+      <li><strong>Trust and Mission Impact:</strong> 현재 신뢰 벡터와 임무 영향 평가 결과. 회복이 어느 도메인에 어떤 영향을 줄지 예측하기 위해 사용된다.</li>
+      <li><strong>Resource Availability:</strong> 네트워크 대역폭, 프로세싱 파워, 배터리 잔량 등 현재 시스템 자원 상태.</li>
+      <li><strong>Mission Constraints:</strong> 임무의 우선순위, 종료 시각, 환경 제약 등 Mission Context Object의 요소.</li>
+      <li><strong>Historical Success Data:</strong> 과거 복구 실행의 성공/실패 이력과 평균 소요 시간 등. 성공 확률 추정에 사용한다.</li>
+    </ul>
+
+    <h4>Internal&nbsp;Fields</h4>
+    <p>Recovery Feasibility Model은 각 복구 후보에 대해 다음 필드를 계산하여 Recovery Object를 확장한다.</p>
+    <table>
+      <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>recovery_id</code></td><td>string</td><td>복구 후보 식별자. Policy 단계에서 생성.</td></tr>
+        <tr><td><code>recovery_type</code></td><td>string</td><td>복구 유형. 예: session_reconnect, key_rotation, command_filtering, mission_replan, safe_landing.</td></tr>
+        <tr><td><code>execution_time</code></td><td>float</td><td>복구 작업을 수행하는 데 걸리는 예상 시간(초).</td></tr>
+        <tr><td><code>mission_delay</code></td><td>float</td><td>임무 일정에 미치는 지연(초 또는 %).</td></tr>
+        <tr><td><code>resource_cost</code></td><td>float</td><td>복구 실행에 필요한 자원 비용(정규화 0–1). 예: CPU/메모리/배터리 소모.</td></tr>
+        <tr><td><code>expected_trust_recovery</code></td><td>dict</td><td>도메인별 신뢰 회복 예상치. 예: {"session_network": +20, "command": +10}.</td></tr>
+        <tr><td><code>expected_mission_recovery</code></td><td>float</td><td>Mission Impact 점수 감소량 또는 향상 예상치.</td></tr>
+        <tr><td><code>success_probability</code></td><td>float</td><td>복구가 성공할 확률(0–1). 경험적 데이터와 조건 기반 추정.</td></tr>
+        <tr><td><code>recovery_risk</code></td><td>float</td><td>복구 중 발생 가능한 부작용 위험(0–1). 예: 실행 실패시 추가 장애 발생 가능성.</td></tr>
+        <tr><td><code>recovery_score</code></td><td>float</td><td>위 요소를 가중합하여 계산한 종합 점수(0–1). 값이 높을수록 우선순위가 높다.</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Relationships</h4>
+    <p>Recovery Feasibility Model은 Policy Rule Object에서 정의된 조치들과 Mission Impact 결과를 받아 Recovery Object를 확장한다. 계산된 <code>recovery_score</code>는 Mission Decision Model에서 선택 순서를 결정하는 데 사용된다. Execution Time과 Mission Delay는 Time Window Model과 Mission Context Object에 정의된 제한과 연계된다. Expected Trust Recovery는 Trust Object와 Mission Impact Model의 연동을 통해 추정한다.</p>
+
+    <h4>Processing&nbsp;Logic</h4>
+    <ul>
+      <li>각 복구 후보에 대해 Execution Time, Mission Delay, Resource Cost를 파악한다. 테스트베드에서 측정된 평균값과 시스템 상태를 기반으로 추정한다.</li>
+      <li>Trust Object와 Mission Impact Object를 분석하여 해당 복구가 도메인 신뢰 및 임무 임팩트에 미치는 예상 회복량을 산출한다.</li>
+      <li>Success Probability와 Recovery Risk를 과거 실행 데이터와 환경 요인(예: 네트워크 혼잡, 서명 키 배포 현황)을 통해 추정한다.</li>
+      <li>Recovery Score = f(expected_trust_recovery, expected_mission_recovery, success_probability, 1-recovery_risk, 1-mission_delay, 1-resource_cost). 가중치는 임무 중요도와 Mission Weight에 따라 조정된다.</li>
+      <li>모든 후보에 대해 Recovery Score를 계산하여 우선순위 목록을 생성한다.</li>
+    </ul>
+
+    <h4>Outputs</h4>
+    <p>각 복구 후보에 대해 계산된 <code>recovery_score</code>와 확장된 Recovery Object. 이 정보는 Mission Decision Model에서 가장 적합한 복구를 선택하는 데 사용된다.</p>
+
+    <h4>Design Considerations</h4>
+    <ul>
+      <li>복구가 장시간 임무에 끼치는 영향은 단순한 지연 이상의 의미를 갖는다. 예: 정찰 임무에서는 짧은 지연도 기회를 놓칠 수 있으므로 mission_delay 가중치를 높게 설정한다.</li>
+      <li>Expected Trust Recovery와 Expected Mission Recovery는 모델링에 기반하며, 실제 결과와 차이가 발생할 수 있다. Decision Trace Model에서 결과를 기록해 향후 조정을 가능하게 한다.</li>
+      <li>Recovery Risk는 복구 자체가 새로운 취약점을 만들 수 있음을 고려한다. 예: 키 회전은 잠재적으로 재발급 과정에서 키 유출 위험을 증가시킬 수 있다.</li>
+    </ul>
+
+    <h4>Example Structure</h4>
+    <pre>{
+  "recovery_id": "RC20260705-01",
+  "recovery_type": "session_reconnect",
+  "execution_time": 30.0,
+  "mission_delay": 30.0,
+  "resource_cost": 0.2,
+  "expected_trust_recovery": {"session_network": 25, "command": 10},
+  "expected_mission_recovery": 0.6,
+  "success_probability": 0.8,
+  "recovery_risk": 0.1,
+  "recovery_score": 0.78
+}</pre>
+  </div>
+
+  <!-- Decision Trace Model -->
+  <h2 id="decision-trace-model"><span class="num">6.</span> Decision&nbsp;Trace&nbsp;Model</h2>
+  <div class="panel">
+    <h4>Purpose</h4>
+    <p>Decision&nbsp;Trace&nbsp;Model은 각 Mission Decision이 어떤 근거와 과정을 통해 도출되었는지 추적하기 위해 설계된다. Evidence부터 최종 결정까지의 모든 단계와 데이터를 기록하여, 의사 결정의 투명성과 감사 가능성을 확보한다.</p>
+
+    <h4>Why Required</h4>
+    <p>방어 시스템의 신뢰성과 책임성을 확보하려면, 각 결정에 대한 설명 가능한 근거를 제공해야 한다. 공격 대응이나 임무 중단과 같은 중대한 결정을 다시 검토하거나 감독 기관에 보고할 때 Decision Trace가 필요하다. 또한 추후 Threshold와 Policy 조정에 활용된다.</p>
+
+    <h4>Inputs</h4>
+    <ul>
+      <li><strong>Evidence Chain:</strong> 사건에 사용된 Evidence ID 목록과 각각의 severity, timestamp.</li>
+      <li><strong>Trust Chain:</strong> 도메인별 Trust Object와 신뢰 점수, Confidence.</li>
+      <li><strong>Mission Context:</strong> Mission Context Object의 전체 필드.</li>
+      <li><strong>Mission Impact:</strong> Mission Impact Object와 임무 리스크 평가.</li>
+      <li><strong>Policy Rule:</strong> 적용된 Policy Rule ID와 선택된 Action, 예외 항목.</li>
+      <li><strong>Recovery Plan:</strong> 선택된 Recovery Object와 Recovery Score, 이유.</li>
+      <li><strong>Decision Metadata:</strong> 최종 Mission Decision 카테고리, Confidence, Timestamp.</li>
+    </ul>
+
+    <h4>Internal&nbsp;Fields</h4>
+    <table>
+      <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>decision_id</code></td><td>string</td><td>결정 기록의 고유 ID.</td></tr>
+        <tr><td><code>mission_id</code></td><td>string</td><td>해당 임무의 식별자.</td></tr>
+        <tr><td><code>timestamp</code></td><td>datetime</td><td>결정이 내려진 시각.</td></tr>
+        <tr><td><code>evidence_chain</code></td><td>list&lt;string&gt;</td><td>Decision에서 고려된 Evidence ID 목록.</td></tr>
+        <tr><td><code>trust_chain</code></td><td>dict</td><td>도메인별 Trust Score, Confidence, Reason.</td></tr>
+        <tr><td><code>mission_context</code></td><td>object</td><td>Mission Context Object의 스냅샷.</td></tr>
+        <tr><td><code>mission_impact</code></td><td>object</td><td>Mission Impact Object와 Mission Risk 값.</td></tr>
+        <tr><td><code>policy_rule</code></td><td>object</td><td>적용된 Policy Rule: <code>rule_id</code>, <code>priority</code>, <code>condition</code>, <code>action</code>.</td></tr>
+        <tr><td><code>recovery_plan</code></td><td>object</td><td>선택된 Recovery Object와 Recovery Score, 이유.</td></tr>
+        <tr><td><code>decision</code></td><td>string</td><td>최종 Mission Decision 카테고리.</td></tr>
+        <tr><td><code>confidence</code></td><td>float</td><td>해당 결정에 대한 신뢰도(0–1).</td></tr>
+        <tr><td><code>trace_steps</code></td><td>list&lt;string&gt;</td><td>Evidence→Trust→Mission Context→Impact→Policy→Recovery→Decision의 서술적 설명.</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Relationships</h4>
+    <p>Decision Trace Model은 Mission Decision Model의 부수 산출물로 생성되며, 모든 앞 단계 모델과 연결된다. Evidence Correlation으로부터 Incident 정보를 포함하고, Trust Object와 Mission Impact Object를 요약한 내용, Policy Rule과 Recovery 후보 평가를 포함하여 하나의 기록으로 보존한다. 이는 감사 로그로 저장되며, Threshold와 Policy 조정 시 참조된다.</p>
+
+    <h4>Processing&nbsp;Logic</h4>
+    <ul>
+      <li>Mission Decision 단계에서 Decision Trace Object를 초기화하고 <code>decision_id</code>와 <code>timestamp</code>를 생성한다.</li>
+      <li>해당 결정에 사용된 Evidence 목록과 Incident 정보를 <code>evidence_chain</code>에 기록하고, 도메인별 Trust Score와 Reason을 <code>trust_chain</code>에 기록한다.</li>
+      <li>Mission Context와 Mission Impact를 스냅샷으로 저장한다.</li>
+      <li>적용된 Policy Rule과 선택된 Recovery Plan을 기록하고, Trace Steps 배열에 각 단계와 이유를 서술한다.</li>
+      <li>Confidence 값은 Trust Score Confidence와 Recovery Feasibility Success Probability 등을 종합하여 계산한다.</li>
+      <li>결정 기록은 무결성 보호를 위해 해시 또는 서명하여 저장하며, 향후 분석과 감사에서 사용된다.</li>
+    </ul>
+
+    <h4>Outputs</h4>
+    <p>Decision Trace Object. 이 객체는 감사 로그 시스템이나 비행 기록과 함께 저장되어, 나중에 의사 결정 과정의 검증에 사용된다.</p>
+
+    <h4>Design Considerations</h4>
+    <ul>
+      <li>Trace Object는 데이터 크기가 커질 수 있으므로, 요약 버전과 상세 버전을 구분하여 저장할 수 있다.</li>
+      <li>민감 정보(예: K/OPc 등)는 암호화하거나 마스킹하여 기록하며, 접근 권한을 제한한다.</li>
+      <li>Trace Steps는 사람이 이해할 수 있도록 서술형 문장으로 작성하되, 자동 생성이 가능한 구조를 고려한다.</li>
+      <li>의사 결정 투명성을 보장하기 위해 모든 결정에 대해 Trace 생성이 필수이며, 실패 시 경고를 발생시킨다.</li>
+    </ul>
+
+    <h4>Example Structure</h4>
+    <pre>{
+  "decision_id": "DEC20260705-0001",
+  "mission_id": "M20260705-01",
+  "timestamp": "2026-07-05T15:31:00Z",
+  "evidence_chain": ["EV20260705-0001", "EV20260705-0007"],
+  "trust_chain": {
+    "communication": {"score": 85, "confidence": 0.9, "reason": "Stable packet loss"},
+    "session_network": {"score": 40, "confidence": 0.7, "reason": "PFCP deletion detected"},
+    "command": {"score": 50, "confidence": 0.8, "reason": "Unauthorized command attempt"}
+  },
+  "mission_context": {
+    "mission_type": "Recon",
+    "mission_phase": "Execution",
+    "mission_priority": "High",
+    "mission_weight": {"communication": 30,"identity":10,"session_network":20,"command":20,"mission":20,"recovery":0}
+  },
+  "mission_impact": {
+    "availability": 0.7,
+    "integrity": 0.9,
+    "safety": 0.95,
+    "continuity": 0.6,
+    "recoverability": 0.8,
+    "overall_impact": 0.75,
+    "mission_risk": "Moderate"
+  },
+  "policy_rule": {
+    "rule_id": "PR07",
+    "priority": 2,
+    "condition": "session_network_score&lt;50 AND mission_phase='Execution'",
+    "action": "Continue + Monitoring"
+  },
+  "recovery_plan": {
+    "recovery_id": "RC20260705-01",
+    "recovery_score": 0.78,
+    "reason": "Reattach to PFCP and filter unauthorized commands"
+  },
+  "decision": "Continue + Monitoring",
+  "confidence": 0.82,
+  "trace_steps": [
+    "EV20260705-0001 and EV20260705-0007 correlate under rule CR01.",
+    "Session network trust drops due to PFCP deletion and unauthorized command.",
+    "Mission Impact remains moderate due to high integrity and safety.",
+    "Policy PR07 recommends continuing with enhanced monitoring.",
+    "Recovery plan RC20260705-01 chosen based on feasibility score."
+  ]
+}</pre>
+  </div>
+
+  <!-- Core Data Flow Model -->
+  <h2 id="core-data-flow-model"><span class="num">7.</span> Core&nbsp;Data&nbsp;Flow&nbsp;Model</h2>
+  <div class="panel">
+    <h4>Purpose</h4>
+    <p>Core&nbsp;Data&nbsp;Flow&nbsp;Model은 Mission‑Centric Defense Architecture 내에서 객체가 어떻게 생성되고 이동하는지를 정형화한다. 이 모델은 각 단계의 프로듀서와 컨슈머를 명시하여 End‑to‑End 파이프라인을 이해하고 구현할 수 있도록 지원한다.</p>
+
+    <h4>Why Required</h4>
+    <p>각 Chapter가 독립적으로 설계되더라도, 데이터가 어떤 경로를 통해 흐르는지 명확히 정의하지 않으면 연결성이 붕괴된다. Core Data Flow Model은 Capability에서 발생한 데이터가 Evidence, Trust, Mission Context, Mission Impact, Policy, Recovery, Mission Decision에 이르기까지 단계별로 어떻게 전달되는지 설명한다.</p>
+
+    <h4>Inputs</h4>
+    <p>이 모델 자체는 입력이 없다. 대신 Core Model에서 정의된 모든 객체(Evidence, Trust, Mission Context, Mission Impact, Policy Rule, Recovery, Mission Decision)를 대상으로 한다.</p>
+
+    <h4>Internal&nbsp;Fields</h4>
+    <table>
+      <thead><tr><th>Step</th><th>Producer</th><th>Input&nbsp;Objects</th><th>Output&nbsp;Object</th><th>Consumer</th></tr></thead>
+      <tbody>
+        <tr><td>1&nbsp;Capability&nbsp;Monitoring</td><td>Capability Agent</td><td>Raw Event Data</td><td>Evidence&nbsp;Object</td><td>Evidence Collector</td></tr>
+        <tr><td>2&nbsp;Evidence&nbsp;Correlation</td><td>Correlation Engine</td><td>Evidence&nbsp;Object, Correlation&nbsp;Rules, Time Windows</td><td>Incident&nbsp;Object</td><td>Trust Evaluator</td></tr>
+        <tr><td>3&nbsp;Trust&nbsp;Evaluation</td><td>Trust Evaluator</td><td>Evidence/Incident&nbsp;Objects, Mission Weight, Thresholds, Confidence Model</td><td>Trust&nbsp;Object</td><td>Mission Context Evaluator</td></tr>
+        <tr><td>4&nbsp;Mission&nbsp;Context&nbsp;Construction</td><td>Mission Context Evaluator</td><td>Mission&nbsp;Plan, Mission Weight Model</td><td>Mission&nbsp;Context&nbsp;Object</td><td>Impact Evaluator</td></tr>
+        <tr><td>5&nbsp;Mission&nbsp;Impact&nbsp;Computation</td><td>Impact Evaluator</td><td>Trust&nbsp;Object, Mission&nbsp;Context&nbsp;Object, Mission Weight, Confidence</td><td>Mission&nbsp;Impact&nbsp;Object</td><td>Policy Engine</td></tr>
+        <tr><td>6&nbsp;Policy&nbsp;Assessment</td><td>Policy Engine</td><td>Mission&nbsp;Impact&nbsp;Object, Trust&nbsp;Object, Policy&nbsp;Rule&nbsp;Object</td><td>Policy Decision (Rule&nbsp;ID &amp; Action)</td><td>Recovery Planner</td></tr>
+        <tr><td>7&nbsp;Recovery&nbsp;Feasibility</td><td>Recovery Planner</td><td>Policy Decision, Recovery&nbsp;Object Candidates, Trust &amp; Mission Impact</td><td>Recovery&nbsp;Object (scored)</td><td>Mission Decision Engine</td></tr>
+        <tr><td>8&nbsp;Mission&nbsp;Decision</td><td>Mission Decision Engine</td><td>Trust&nbsp;Object, Mission&nbsp;Impact&nbsp;Object, Policy Decision, Recovery&nbsp;Object</td><td>Mission&nbsp;Decision&nbsp;Object &amp; Decision Trace</td><td>Operator &amp; Actuation</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Relationships</h4>
+    <p>각 단계는 이전 단계의 출력 객체를 입력으로 사용하며, 프로듀서와 컨슈머를 명확히 정의함으로써 모듈화된 구현과 교차 검증이 가능해진다. Evidence Correlation과 Trust Evaluation은 Time Window Model과 Threshold Policy Model을 참조하고, Mission Impact 계산은 Mission Weight Model과 Confidence Model을 참조한다. Recovery Planner는 Recovery Feasibility Model을 호출하여 점수화된 회복을 제공하고, Mission Decision Engine은 Decision Trace Model을 생성한다.</p>
+
+    <h4>Processing&nbsp;Logic</h4>
+    <p>데이터 흐름은 순차적으로 진행되나, 일부 단계는 비동기적으로 실행될 수 있다. 예를 들어 Evidence Collection과 Correlation은 실시간 스트림으로 처리하고, Trust Evaluation과 Impact Calculation은 일정 간격으로 배치 처리할 수 있다. 흐름의 무결성을 유지하기 위해 각 객체에는 고유 ID와 타임스탬프가 포함되며, 추적성을 확보한다.</p>
+
+    <h4>Outputs</h4>
+    <p>정의된 데이터 흐름 표와 단계별 프로듀서·컨슈머 정의. 이 표는 아키텍처 구현과 문서화의 기준으로 사용된다.</p>
+
+    <h4>Design&nbsp;Considerations</h4>
+    <ul>
+      <li>데이터 흐름은 기밀성·무결성·가용성 보장을 위해 암호화 및 인증 메커니즘을 포함해야 한다.</li>
+      <li>각 단계 간 인터페이스는 명확히 정의되어야 하며, 객체 스키마와 네트워크 프로토콜을 문서화해야 한다.</li>
+      <li>병렬 실행 시 동기화 문제를 고려하여, Evidence와 Incident의 순서가 보존되도록 타임스탬프와 시퀀스 번호를 사용한다.</li>
+      <li>로그 및 감사용 메타데이터를 각 객체에 포함시켜 Decision Trace와 연계한다.</li>
+    </ul>
+
+    <h4>Example Structure</h4>
+    <p>위 표 자체가 Core Data Flow Model의 예시이다. 추가 예로, PFCP Delete Attempt가 탐지된 후의 흐름은 다음과 같다:</p>
+    <pre>
+Capability(session_network) → Evidence&nbsp;Object(EV20260705-0001) → Correlation Engine → Incident(INC20260705-0003) → Trust Evaluator → Trust&nbsp;Object( session_network_score = 40 ) → Mission Impact Evaluator → Mission&nbsp;Impact(availability=0.6) → Policy Engine(continue + monitor) → Recovery Planner(session_reconnect) → Mission Decision(Continue + Monitoring) → Decision Trace 기록.
+    </pre>
+  </div>
+
+  <!-- Mission Decision Model (Revision) -->
+  <h2 id="mission-decision-model-revision"><span class="num">8.</span> Mission&nbsp;Decision&nbsp;Model&nbsp;(Revision)</h2>
+  <div class="panel">
+    <h4>Purpose</h4>
+    <p>Mission&nbsp;Decision&nbsp;Model&nbsp;(Revision)은 기존의 세 가지 결정(Continue, Partial, Abort)을 여섯 가지로 확장하여 임무 상태에 따른 세분화된 대응을 가능하게 한다. 이를 통해 방어 에이전트가 신뢰와 임무 위험, 복구 가능성을 종합하여 더 유연한 결정을 내릴 수 있다.</p>
+
+    <h4>Why Required</h4>
+    <p>공격 영향이 항상 임무 중단을 의미하지는 않는다. 공격이 단일 영역에 국한되거나 빠르게 복구 가능한 경우 임무를 계속하면서도 추가 감시나 재구성이 필요할 수 있다. 확장된 결정 모델은 Mission Impact와 Recovery Feasibility를 고려하여 적절한 대응을 선택하도록 설계된다【574666281232364†L162-L176】.</p>
+
+    <h4>Inputs</h4>
+    <ul>
+      <li><strong>Mission Impact:</strong> Mission Impact Object의 overall_impact, 각 영역별 영향도, Mission Risk.</li>
+      <li><strong>Trust Vector:</strong> 도메인별 Trust Object와 Confidence.</li>
+      <li><strong>Recovery Feasibility:</strong> Recovery Object의 Recovery Score와 예상 회복량.</li>
+      <li><strong>Policy Conditions:</strong> Policy Rule Object에서 정의한 조건과 우선순위.</li>
+      <li><strong>Mission Context:</strong> 임무 유형, 우선순위, 단계 및 환경 제약.</li>
+    </ul>
+
+    <h4>Internal&nbsp;Fields</h4>
+    <p>Mission Decision Model은 다음 여섯 가지 결정 카테고리를 정의하고, 각 카테고리에 대한 조건을 정한다:</p>
+    <table>
+      <thead><tr><th>Decision</th><th>Description</th><th>Applicable Conditions</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Continue</strong></td>
+          <td>임무를 변경 없이 지속한다.</td>
+          <td>Mission Risk가 낮음(예: overall_impact ≥ 0.8), Trust Scores가 각 도메인에서 높은 범위(≥70), Recovery 필요성이 없음.</td>
+        </tr>
+        <tr>
+          <td><strong>Continue&nbsp;+&nbsp;Monitoring</strong></td>
+          <td>임무를 지속하되 감시를 강화한다.</td>
+          <td>Mission Risk가 보통 수준, 신뢰가 50–70 사이이거나 특정 도메인에서 경고/critical 수준. Recovery Score가 높지만 지금 즉시 실행할 필요가 없을 때.</td>
+        </tr>
+        <tr>
+          <td><strong>Mission&nbsp;Reconfiguration</strong></td>
+          <td>임무를 재구성하여 공격 영역을 우회하거나 임무 경로를 변경한다.</td>
+          <td>Mission Risk가 중간 이상, Trust가 낮은 도메인이 있으나 완전 중단 필요성은 없는 경우. Recovery Feasibility에서 재구성이 높은 점수를 받은 경우.</td>
+        </tr>
+        <tr>
+          <td><strong>Graceful&nbsp;Degradation</strong></td>
+          <td>임무 범위를 축소하거나 일부 기능을 제한하여 안전성을 확보한다.</td>
+          <td>Mission Risk가 높음, Trust가 여러 도메인에서 낮고 Recovery Score가 중간 이하. 하지만 임무의 일부 목표는 달성할 수 있을 때.</td>
+        </tr>
+        <tr>
+          <td><strong>Operator&nbsp;Confirmation</strong></td>
+          <td>자동 결정 대신 사람이 상황을 검토하고 승인·중단 여부를 결정한다.</td>
+          <td>Mission Risk가 높음 또는 극히 높음, 신뢰와 회복 가능성에 대한 불확실성이 큰 경우. 법적·안전 요구 사항으로 인해 인간 판단이 필요할 때.</td>
+        </tr>
+        <tr>
+          <td><strong>Mission&nbsp;Abort</strong></td>
+          <td>임무를 즉시 중단하고 안전하게 귀환한다.</td>
+          <td>Mission Risk가 매우 높음(overall_impact ≤ 0.4), Trust Scores가 대부분 도메인에서 30 미만, Recovery Feasibility가 낮거나 복구가 임무 기간 내 불가능한 경우.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h4>Relationships</h4>
+    <p>Mission Decision Model은 Mission Impact Object, Trust Vector, Recovery Feasibility, Policy Rules, Mission Context를 통합하여 최종 결정을 내린다. 결정 후 Decision Trace Model을 생성하며, 선택된 결정은 실행 모듈과 오퍼레이터에게 전달된다. 각 결정은 Threshold Policy Model과 Time Window Model에서 정의된 값을 기반으로 실제 값과 비교하여 선택된다.</p>
+
+    <h4>Processing&nbsp;Logic</h4>
+    <ul>
+      <li>Mission Impact를 기반으로 Mission Risk 범주를 결정한다(예: Very High, High, Moderate, Low, Very Low).</li>
+      <li>Trust Vector를 확인하여 도메인별 신뢰 수준과 Confidence를 파악한다.</li>
+      <li>Recovery Feasibility에서 가장 높은 Recovery Score와 예상 회복량을 확인한다. Score가 특정 임계치(예: 0.7) 이상이면 Recovery가 실현 가능한 것으로 간주한다.</li>
+      <li>Policy Rule에서 허용되는 Action을 확인한다. 특정 상황에서는 일부 Action만 허용될 수 있다.</li>
+      <li>위 조건을 조합하여 여섯 가지 결정 중 하나를 선택한다. 우선순위는 Continue→Continue+Monitoring→Mission Reconfiguration→Graceful Degradation→Operator Confirmation→Mission Abort 순으로 평가하되, 조건 충족 여부에 따라 건너뛴다.</li>
+      <li>선택된 결정과 근거는 Mission Decision Object에 기록되고 Decision Trace Model이 생성된다.</li>
+    </ul>
+
+    <h4>Outputs</h4>
+    <p>업데이트된 Mission Decision Object와 Decision Trace. 기존 Core Model의 Mission Decision Object는 이 구조를 반영하도록 수정된다.</p>
+
+    <h4>Design Considerations</h4>
+    <ul>
+      <li>각 결정 카테고리에 대한 정확한 임계값은 임무 유형, 위험 허용도, 법규 등을 고려하여 조직에서 정의해야 한다.</li>
+      <li>Operator Confirmation은 인간 오퍼레이터에게 부담을 줄 수 있으므로, 명확한 지침과 사용자 인터페이스를 제공해야 한다.</li>
+      <li>Graceful Degradation과 Mission Reconfiguration은 미리 계획된 임무 변경 경로가 필요하다. 임무 계획 단계에서 이러한 옵션을 설계해두어야 한다.</li>
+      <li>Abort 결정은 UAV와 지상 자산의 안전을 최우선으로 고려해야 하며, 보안 사고의 확산을 방지하는 조치와 함께 실행한다.</li>
+    </ul>
+
+    <h4>Example Structure</h4>
+    <pre>{
+  "decision": "Mission Reconfiguration",
+  "conditions": {
+    "mission_risk": "High",
+    "lowest_trust_score": 45,
+    "recovery_score": 0.65,
+    "policy_rule": "PR10"
+  },
+  "applicable_action": "Switch to backup communication channel and alter flight path",
+  "reason": "Session network trust dropped due to repeated PFCP deletion and unauthorized commands; mission can continue on alternate path with degraded performance."
+}</pre>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,1139 @@
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mission‑Centric Defense Architecture Skeleton</title>
+  <!--
+    This document defines the skeleton for the mission‑centric defense architecture.
+    It follows the same UI style as the provided blueprint and testbed template.  The
+    skeleton stage establishes the structure of each chapter without writing the
+    final prose.  Each chapter outlines its purpose, scope, section tree,
+    internal components and flows, data objects and interfaces.  Only data
+    available in the testbed and attack scenarios is considered.
+  -->
+  <style>
+    :root{
+      --bg:#0d1117; --panel:#161b22; --panel2:#1c2430; --line:#30363d;
+      --ink:#e6edf3; --sub:#9da7b3; --muted:#6e7681;
+      --cell:#3b82f6; --core:#a855f7; --sgi:#22c55e; --ran:#f59e0b; --air:#ef4444; --atk:#f43f5e;
+      --accent:#58a6ff; --ok:#3fb950; --warn:#d29922; --bad:#f85149; --plain:#f59e0b; --ct:#22c55e;
+      --code:#0b0f14;
+    }
+    *{box-sizing:border-box}
+    html{-webkit-text-size-adjust:100%}
+    body{margin:0;background:var(--bg);color:var(--ink);
+      font-family:"Segoe UI","Malgun Gothic",-apple-system,system-ui,sans-serif;line-height:1.65;font-size:15px}
+    .wrap{max-width:1080px;margin:0 auto;padding:32px 22px 90px}
+    code,kbd,.mono{font-family:"Cascadia Code",Consolas,"D2Coding",monospace}
+
+    header.doc{border:1px solid var(--line);border-radius:14px;overflow:hidden;
+      background:linear-gradient(135deg,#12203a 0%,#161b22 55%,#101a2c 100%);
+      padding:26px 28px;margin-bottom:24px}
+    header.doc h1{margin:14px 0 6px;font-size:25px;line-height:1.3}
+    header.doc .sub{color:var(--sub);font-size:14px}
+    header.doc .meta{display:flex;flex-wrap:wrap;gap:8px 10px;margin-top:16px}
+    .pill{display:inline-block;font-size:12.5px;font-weight:700;padding:6px 11px;border-radius:8px;background:var(--panel2);
+      border:1px solid var(--line);color:var(--sub)}
+    .pill b{color:var(--ink);font-weight:600}
+
+    h2{margin:46px 0 14px;font-size:20px;border-bottom:1px solid var(--line);padding-bottom:8px;scroll-margin-top:16px}
+    h2 .num{color:var(--accent);font-variant-numeric:tabular-nums;margin-right:10px}
+    h3{margin:26px 0 10px;font-size:16px;color:#dbe6f2}
+    p{margin:10px 0}
+    .lede{color:var(--sub);font-size:15px}
+    ul{padding-left:20px;margin:10px 0}
+    ul li{margin:6px 0}
+    ol.flow{list-style:none;counter-reset:s;padding:0;margin:14px 0}
+    ol.flow li{counter-increment:s;position:relative;padding:12px 14px 12px 52px;border:1px solid var(--line);
+      border-radius:10px;margin:9px 0;background:var(--panel2)}
+    ol.flow li::before{content:counter(s);position:absolute;left:12px;top:12px;width:28px;height:28px;border-radius:8px;
+      background:var(--accent);color:#04101f;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px}
+    ol.flow li b{color:#dbe6f2}
+    ol.flow li .mono{color:#8fd0ff;font-family:"Cascadia Code",Consolas,"D2Coding",monospace}
+
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:16px 0}
+    table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+    th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+    th{background:var(--panel2);color:#cbd5e1;font-weight:600;font-size:12.5px}
+    tr:nth-child(even) td{background:rgba(255,255,255,.015)}
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="doc">
+    <h1>Mission‑Centric Defense Architecture Skeleton</h1>
+    <div class="sub">LTE/5G 기반 UAV C2 환경을 위한 임무 중심 방어 아키텍처 Skeleton 설계 (2026‑07‑04)</div>
+    <div class="meta">
+      <span class="pill">프로젝트 <b>Mission‑Centric Defense Architecture</b></span>
+      <span class="pill">환경 <b>4G/5G UAV C2 Testbed</b></span>
+      <span class="pill">버전 <b>Skeleton Stage</b></span>
+      <span class="pill">철학 <b>Capability‑Driven, Mission‑Aware</b></span>
+    </div>
+  </header>
+
+  <!-- ──────── 1. Skeleton Overview ──────── -->
+  <h2 id="overview"><span class="num">1.</span> Skeleton&nbsp;Overview</h2>
+  <p class="lede">본 Skeleton 문서는 Mission‑Centric Defense Architecture 디자인 문서의 내부 구조를 설계한다. 각 장은 목적과 범위를 명확히 정의하고,
+    테스트베드에서 수집 가능한 데이터와 공격 시나리오에서 도출된 위협만을 입력으로 사용한다. Skeleton은 추상적인 표현 없이 데이터 객체,
+    내부 흐름, 인터페이스, 표/다이어그램 요구사항을 규정하며, 이후 단계에서 이 구조를 기반으로 본문을 작성할 수 있도록 한다.</p>
+
+  <!-- ──────── 2. Chapter Skeletons ──────── -->
+  <h2 id="chapters"><span class="num">2.</span> Chapter&nbsp;Skeletons</h2>
+  <p class="lede">각 Chapter는 아래 항목을 모두 포함한다. Chapter&nbsp;Summary는 장의 역할을 요약하고, Section&nbsp;Tree는 구체적인 하위
+    섹션 구조를 보여준다. Internal&nbsp;Components와 Internal&nbsp;Flow는 데이터를 어떻게 처리하는지 설명하며, Input/Generated/Output
+    Objects와 Interfaces는 데이터 객체와 연결 지점을 정의한다. Required&nbsp;Tables와 Required&nbsp;Diagrams는 본문 작성 시
+    제공해야 할 시각적 자료를 식별한다. Failure&nbsp;Handling은 데이터 부재나 예외 상황에 대응하는 설계 전략을 기술하고, Cross
+    References는 다른 장과의 의존 관계를 나타낸다. Design&nbsp;Notes는 설계 시 고려해야 할 현실적 제약과 판단 기준을 기록한다.</p>
+
+  <!-- ──────── 2.1 Threat Analysis ──────── -->
+  <h3 id="threat-analysis">Threat&nbsp;Analysis</h3>
+  <div class="panel">
+    <h4>Chapter&nbsp;Summary</h4>
+    <p>테스트베드 인프라와 공격 시나리오를 분석하여 공통 <em>Security&nbsp;Property</em>와 실패 원인을 도출하고, 이를 기반으로 후속
+      Capability 설계의 입력을 생성한다. 개별 공격에 집중하지 않고 취약점의 근본 원인을 식별한다.</p>
+
+    <h4>Purpose</h4>
+    <p>공격 표면과 취약점을 체계적으로 분석하여 보호해야 할 보안 속성과 실패 유형을 정의하고, 각 노출면을 해당 속성에 매핑한다.</p>
+
+    <h4>Scope</h4>
+    <ul>
+      <li>대상: 테스트베드 인프라 구성 및 공격 시나리오(가용한 데이터에 한함).</li>
+      <li>행위: 신뢰 경계·라우팅·인증·키 관리 등 공통 영역을 분석.</li>
+      <li>제외: 암호 알고리즘 내부, PoC 코드 세부 동작.</li>
+    </ul>
+
+    <h4>Section&nbsp;Tree</h4>
+    <ul>
+      <li><strong>Threat&nbsp;Sources</strong> – 테스트베드 노출면(H1–H8)과 공격 시나리오를 정리하고 분류한다.</li>
+      <li><strong>Security&nbsp;Property&nbsp;Derivation</strong> – 인증, 인가, 무결성, 격리, 키 관리 등 보호해야 할 속성을 도출한다.</li>
+      <li><strong>Failure&nbsp;Classification</strong> – 각 노출면을 공통 실패 유형(CWE)으로 분류한다.</li>
+      <li><strong>Exposure&nbsp;Mapping</strong> – 노출면과 보안 속성·실패 간 매핑을 작성한다.</li>
+    </ul>
+    <p>각 섹션은 <em>Purpose → Input → Internal&nbsp;Processing → Generated&nbsp;Data → Output → Design&nbsp;Considerations</em>
+      구조를 따른다.</p>
+
+    <h4>Internal&nbsp;Components</h4>
+    <ul>
+      <li><strong>Attack&nbsp;Data&nbsp;Ingestor</strong> – 공격 시나리오와 인프라 노출 정보를 수집한다.</li>
+      <li><strong>Property&nbsp;Extractor</strong> – 데이터에서 공통 보안 속성을 추출한다.</li>
+      <li><strong>Failure&nbsp;Mapper</strong> – 각 노출면을 실패 유형으로 분류한다.</li>
+      <li><strong>Exposure&nbsp;Repository</strong> – 노출면과 속성 매핑을 저장한다.</li>
+    </ul>
+
+    <h4>Internal&nbsp;Flow</h4>
+    <ol class="flow">
+      <li><b>Collect&nbsp;Inputs:</b> 테스트베드 노출면(H1–H8), 공격 시나리오 로그와 판정 결과를 수집한다.</li>
+      <li><b>Derive&nbsp;Properties:</b> 노출 데이터에서 인증, 인가, 무결성, 격리, 키 관리 등 공통 보안 속성을 도출한다.</li>
+      <li><b>Classify&nbsp;Failures:</b> 노출면을 결함 유형으로 분류한다(CWE 기준).</li>
+      <li><b>Map&nbsp;Exposures:</b> 각 노출면을 도출된 속성과 실패 유형에 매핑하고 Exposure&nbsp;Map을 생성한다.</li>
+    </ol>
+
+    <h4>Input&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Testbed&nbsp;Exposure&nbsp;Records:</strong> H1–H8 항목(예: SITL 시리얼 포트, NAS 암호 설정, MongoDB 노출, 웹 API, 키 배포, UE
+        격리 부재, PFCP 노출, GPS 입력)【208159606947672†L279-L293】.</li>
+      <li><strong>Attack&nbsp;Scenario&nbsp;Logs:</strong> TM1/V2 오라클 주입, TM2 PFCP 세션 삭제, NF-3 가입자 DB 탈취, NF-4 웹 무인증, NF-6
+        서명키 노출 등 공격 과정·관측·판정 데이터【574666281232364†L162-L176】【574666281232364†L270-L289】.</li>
+      <li><strong>Kill&nbsp;Chain&nbsp;Analysis:</strong> VULN-01~VULN-06 결과와 근본원인(CWE) 분석【574666281232364†L162-L176】【574666281232364†L270-L289】.</li>
+    </ul>
+
+    <h4>Generated&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Security&nbsp;Property&nbsp;List:</strong> 보호해야 할 보안 속성(인증, 인가, 무결성, 격리, 키 관리 등).</li>
+      <li><strong>Failure&nbsp;List:</strong> 공통 실패 유형(CWE-306/862 등)과 간략 설명.</li>
+      <li><strong>Exposure&nbsp;Map:</strong> 노출면과 보안 속성 및 실패 유형 간 매핑 표.</li>
+    </ul>
+
+    <h4>Output&nbsp;Objects</h4>
+    <ul>
+      <li>Security&nbsp;Property&nbsp;List → Defense&nbsp;Capability 장.</li>
+      <li>Failure&nbsp;List → Defense&nbsp;Capability 장.</li>
+      <li>Exposure&nbsp;Map → Defense&nbsp;Capability 장.</li>
+    </ul>
+
+    <h4>Interfaces</h4>
+    <ul>
+      <li><strong>Data&nbsp;Import&nbsp;Interface:</strong> 테스트베드와 공격 시나리오 로그를 불러오는 파일/DB 연결.</li>
+      <li><strong>Exposure&nbsp;API:</strong> 후속 Capability 설계에서 노출면 정보를 조회하는 인터페이스.</li>
+    </ul>
+
+    <h4>Required&nbsp;Tables</h4>
+    <ul>
+      <li><strong>Security&nbsp;Property&nbsp;vs&nbsp;Failure&nbsp;Table</strong> – 각 보안 속성에 대해 관련 실패(CWE)를 요약.</li>
+      <li><strong>Exposure&nbsp;Map</strong> – 노출면, 속성, 실패, 증거를 4열로 나열.</li>
+    </ul>
+
+    <h4>Required&nbsp;Diagrams</h4>
+    <ul>
+      <li><strong>Threat&nbsp;Analysis&nbsp;Flow</strong> – 위 내부 흐름 4단계를 시각화.</li>
+      <li><strong>Kill&nbsp;Chain&nbsp;Mapping</strong> – 공격 시나리오를 Cyber&nbsp;Kill&nbsp;Chain 단계에 배치하고 보안 속성과 연결.</li>
+    </ul>
+
+    <h4>Failure&nbsp;Handling</h4>
+    <ul>
+      <li>테스트베드에서 수집할 수 없는 데이터가 있을 경우 해당 노출면을 제외하거나 보완 수단을 명시한다.</li>
+      <li>공격 로그가 불완전하거나 오류가 있는 경우 검증된 증거만 사용한다.</li>
+    </ul>
+
+    <h4>Cross&nbsp;References</h4>
+    <ul>
+      <li>Defense&nbsp;Capability – 보안 속성과 실패 유형을 Capability 정의에 전달한다.</li>
+      <li>Attack&nbsp;Mapping – 각 노출면과 공격 시나리오를 매핑한다.</li>
+    </ul>
+
+    <h4>Design&nbsp;Notes</h4>
+    <ul>
+      <li>공격별 탐지기가 아닌 공통 속성에 기반한 설계를 위해 보안 속성을 일반화한다.</li>
+      <li>테스트베드에서 측정 가능한 데이터만 사용하며, 실제 수집 불가능한 가상의 센서는 포함하지 않는다.</li>
+      <li>보안 속성과 실패 유형의 정의는 가능한 한 표준(CWE, ATT&CK) 분류 체계를 따르며, 이후 단계에서 확장 가능하도록 한다.</li>
+    </ul>
+  </div>
+
+  <!-- ──────── 2.2 Defense Capability ──────── -->
+  <h3 id="defense-capability">Defense&nbsp;Capability</h3>
+  <div class="panel">
+    <h4>Chapter&nbsp;Summary</h4>
+    <p>Threat&nbsp;Analysis에서 도출한 보안 속성과 실패 유형을 기반으로 다섯 가지 Defense&nbsp;Capability를 정의한다. 각
+      Capability는 책임 영역을 명확히 하고, 테스트베드에서 수집할 수 있는 메트릭을 지정한다.</p>
+
+    <h4>Purpose</h4>
+    <p>인증·인가·무결성·격리·키 관리 등의 속성을 보장하는 능력을 정의하고, 각 능력이 관찰해야 할 원시 데이터를 명시한다.</p>
+
+    <h4>Scope</h4>
+    <ul>
+      <li>5개의 Capability만 정의하며, 공격별 감지기를 생성하지 않는다.</li>
+      <li>각 Capability는 자신의 책임 영역(통신, 신원·접근, 세션·네트워크, 명령, 임무)에 해당하는 데이터만 수집한다.</li>
+      <li>평가 모델과 임계값은 다음 단계에서 설계한다.</li>
+    </ul>
+
+    <h4>Section&nbsp;Tree</h4>
+    <ul>
+      <li><strong>Capability&nbsp;Overview</strong> – 공통 역할과 철학을 설명한다.</li>
+      <li><strong>Communication&nbsp;Trust&nbsp;Capability</strong> – 통신 채널(ARIA 암호, NAS, PFCP/GTP)의 무결성·신뢰성 모니터링.</li>
+      <li><strong>Identity&nbsp;&amp;&nbsp;Access&nbsp;Trust&nbsp;Capability</strong> – USIM 인증, 가입자 DB 접근, API 인증 등 신원·권한 검증.</li>
+      <li><strong>Session&nbsp;&amp;&nbsp;Network&nbsp;Trust&nbsp;Capability</strong> – UE 격리, PFCP 세션 상태, hairpin 트래픽 감시.</li>
+      <li><strong>Command&nbsp;Trust&nbsp;Capability</strong> – MAVLink 명령 소스 검증, 오라클 주입 탐지, 웹 명령 인증.</li>
+      <li><strong>Mission&nbsp;Trust&nbsp;Capability</strong> – 임무 계획과 관련된 시스템 상태, 키 분배 상태, GPS 입력의 신뢰성 감시.</li>
+    </ul>
+    <p>각 Capability 섹션은 <em>Purpose → Input → Internal&nbsp;Processing → Generated&nbsp;Data → Output → Design&nbsp;Considerations</em>
+      구조를 따른다.</p>
+
+    <h4>Internal&nbsp;Components</h4>
+    <ul>
+      <li><strong>Metric&nbsp;Collector</strong> – 각 Capability에 필요한 원시 로그와 상태 정보를 수집한다.</li>
+      <li><strong>Metric&nbsp;Preprocessor</strong> – 수집된 데이터를 정규화하고 필터링한다.</li>
+      <li><strong>Capability&nbsp;Monitor</strong> – 정의된 보안 속성에 따라 메트릭을 해석하고 원시 Evidence 이벤트를 생성한다.</li>
+    </ul>
+
+    <h4>Internal&nbsp;Flow</h4>
+    <ol class="flow">
+      <li><b>Receive&nbsp;Definitions:</b> 보안 속성, 실패 리스트를 입력받아 Capability별 책임을 할당한다.</li>
+      <li><b>Identify&nbsp;Metrics:</b> 테스트베드 로그에서 관찰 가능한 메트릭을 매핑한다.
+        <span class="mono">communication</span>: ARIA 암호 상태, NAS 암호 우선순위, PFCP/GTP 세션 로그, GPS 입력【208159606947672†L260-L293】;
+        <span class="mono">identity &amp; access</span>: USIM 인증 로그, MongoDB 접속 로그, web API 인증 로그【208159606947672†L279-L289】【574666281232364†L270-L289】;
+        <span class="mono">session &amp; network</span>: PFCP session deletion, UE hairpin traffic, S1-U/GTP-U integrity【208159606947672†L279-L293】【574666281232364†L304-L344】;
+        <span class="mono">command</span>: MAVLink command source logs, Oracle injection attempts, web cmd calls【488147192654095†L50-L57】【574666281232364†L162-L176】;
+        <span class="mono">mission</span>: mission plan parameters, key distribution state, GPS input integrity【208159606947672†L279-L293】.</li>
+      <li><b>Collect&nbsp;Metrics:</b> Metric&nbsp;Collector가 각 영역의 로그를 수집한다.</li>
+      <li><b>Generate&nbsp;Raw&nbsp;Evidence:</b> Capability&nbsp;Monitor가 사건을 감지하여 Evidence&nbsp;Architecture로 전달한다.</li>
+    </ol>
+
+    <h4>Input&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Security&nbsp;Property&nbsp;List</strong> – Threat&nbsp;Analysis에서 전달된 보호 속성.</li>
+      <li><strong>Failure&nbsp;List</strong> – Threat&nbsp;Analysis에서 전달된 실패 유형.</li>
+      <li><strong>Exposure&nbsp;Map</strong> – 각 노출면과 매핑된 속성.</li>
+      <li><strong>Testbed&nbsp;Logs</strong> – 시스템 로그, PFCP/GTP 세션 상태, MAVLink command logs, API access logs.</li>
+    </ul>
+
+    <h4>Generated&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Capability&nbsp;Definitions:</strong> 5개 Capability 각각의 역할과 책임 영역 문서화.</li>
+      <li><strong>Monitored&nbsp;Metrics:</strong> 각 Capability가 수집해야 할 메트릭 목록.</li>
+      <li><strong>Raw&nbsp;Evidence&nbsp;Events:</strong> 메트릭을 기반으로 발생하는 원시 Evidence 이벤트.</li>
+    </ul>
+
+    <h4>Output&nbsp;Objects</h4>
+    <ul>
+      <li>Capability&nbsp;Definitions → Evidence&nbsp;Architecture.</li>
+      <li>Monitored&nbsp;Metrics → Evidence&nbsp;Architecture.</li>
+      <li>Raw&nbsp;Evidence&nbsp;Events → Evidence&nbsp;Architecture.</li>
+    </ul>
+
+    <h4>Interfaces</h4>
+    <ul>
+      <li><strong>Metric&nbsp;Ingest&nbsp;Interface:</strong> 로그 및 데이터 스트림을 Capability 모듈로 전송하는 메커니즘.</li>
+      <li><strong>Evidence&nbsp;Emitter:</strong> 원시 이벤트를 Evidence&nbsp;Architecture로 전달하는 비동기 큐 또는 API.</li>
+    </ul>
+
+    <h4>Required&nbsp;Tables</h4>
+    <ul>
+      <li><strong>Capability&nbsp;vs&nbsp;Metrics&nbsp;Table</strong> – 각 Capability와 관련된 입력 메트릭을 요약.</li>
+      <li><strong>Capability&nbsp;vs&nbsp;Exposures&nbsp;Table</strong> – 노출면이 어느 Capability에 의해 모니터링되는지 표시.</li>
+    </ul>
+
+    <h4>Required&nbsp;Diagrams</h4>
+    <ul>
+      <li><strong>Capability&nbsp;Flow&nbsp;Diagram</strong> – 각 Capability가 데이터를 수집하고 Evidence를 생성하는 흐름을 표시.</li>
+      <li><strong>Capability&nbsp;Responsibility&nbsp;Map</strong> – 보안 속성과 Capability 간 매핑을 시각화.</li>
+    </ul>
+
+    <h4>Failure&nbsp;Handling</h4>
+    <ul>
+      <li>로그 누락 또는 센서 오류 발생 시, Capability는 해당 메트릭의 상태를 “불확실”로 표시하고 Evidence&nbsp;Architecture에 보고한다.</li>
+      <li>정상 임무 절차로 간주되는 활동과 공격 징후를 구분하기 위한 기준선 학습이 필요하며, 초기 스켈레톤에서는 그 필요성을 명시한다.</li>
+    </ul>
+
+    <h4>Cross&nbsp;References</h4>
+    <ul>
+      <li>Evidence&nbsp;Architecture – Capability에서 생성된 Evidence를 전달한다.</li>
+      <li>Attack&nbsp;Mapping – 각 Capability가 어느 공격을 탐지할 수 있는지 매핑한다.</li>
+    </ul>
+
+    <h4>Design&nbsp;Notes</h4>
+    <ul>
+      <li>각 Capability는 독립된 감지기가 아니라, 공통 보안 속성을 모니터링하는 모듈이다.</li>
+      <li>테스트베드에서 실제로 수집 가능한 로그(예: PFCP 로그, MongoDB 접근 로그, MAVLink 명령 로그)만 사용한다.</li>
+      <li>Capability별 평가 모델은 다음 단계에서 정의하며, Skeleton에서는 입력과 출력 구조만 설계한다.</li>
+    </ul>
+  </div>
+
+  <!-- ──────── 2.3 Evidence Architecture ──────── -->
+  <h3 id="evidence-architecture">Evidence&nbsp;Architecture</h3>
+  <div class="panel">
+    <h4>Chapter&nbsp;Summary</h4>
+    <p>Capability 모듈이 생성한 원시 Evidence 이벤트를 수집·정규화·연관 분석하여 표준화된 Evidence 레코드로 변환하고, 이를 저장소에 축적한다.</p>
+
+    <h4>Purpose</h4>
+    <p>다양한 Capability에서 발생하는 이벤트를 공통 스키마로 통합하여 후속 신뢰 평가가 가능한 Evidence Repository를 구축한다.</p>
+
+    <h4>Scope</h4>
+    <ul>
+      <li>수집: Capability가 전송한 모든 원시 Evidence를 수신한다.</li>
+      <li>정규화: 이벤트 필드를 표준화하고 시계열로 정렬한다.</li>
+      <li>연관 분석: 관련 이벤트를 상호 연관지어 의미 있는 레코드로 만든다.</li>
+      <li>제외: 신뢰 평가 모델의 계산식(Trust Architecture에 위임).</li>
+    </ul>
+
+    <h4>Section&nbsp;Tree</h4>
+    <ul>
+      <li><strong>Evidence&nbsp;Sources</strong> – Capability에서 전달되는 이벤트 스트림을 설명한다.</li>
+      <li><strong>Collection&nbsp;and&nbsp;Normalization</strong> – 데이터 형식 통일, 타임스탬프 동기화.</li>
+      <li><strong>Correlation&nbsp;Engine</strong> – 서로 다른 Capability 이벤트를 상호 연관 분석한다.</li>
+      <li><strong>Evidence&nbsp;Repository</strong> – Evidence 레코드를 저장하고 검색하는 저장소 설계.</li>
+    </ul>
+    <p>모든 섹션은 동일한 구조(Purpose → Input → Processing → Generated Data → Output → Design Considerations)를 따른다.</p>
+
+    <h4>Internal&nbsp;Components</h4>
+    <ul>
+      <li><strong>Evidence&nbsp;Collector</strong> – 원시 Evidence 이벤트를 구독하여 수신한다.</li>
+      <li><strong>Normalizer</strong> – 이벤트 속성 이름과 형식을 표준화한다.</li>
+      <li><strong>Correlation&nbsp;Engine</strong> – 시간과 엔티티 기준으로 관련 이벤트를 연결한다.</li>
+      <li><strong>Evidence&nbsp;Repository</strong> – 정규화된 Evidence 레코드를 저장한다.</li>
+    </ul>
+
+    <h4>Internal&nbsp;Flow</h4>
+    <ol class="flow">
+      <li><b>Receive&nbsp;Events:</b> Evidence&nbsp;Collector가 Capability에서 발생한 원시 이벤트를 수신한다.</li>
+      <li><b>Normalize&nbsp;Fields:</b> Normalizer가 이벤트 필드를 표준 스키마(발생 시간, 주체, 속성, 메트릭, 심각도 등)로 변환한다.</li>
+      <li><b>Correlate&nbsp;Events:</b> Correlation&nbsp;Engine이 동일 엔티티·시간 윈도우 내 이벤트를 연결하여 복합 사건을 형성한다.</li>
+      <li><b>Store&nbsp;Evidence:</b> Evidence&nbsp;Repository에 정규화된 레코드를 저장하고 인덱싱한다.</li>
+    </ol>
+
+    <h4>Input&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Raw&nbsp;Evidence&nbsp;Events</strong> – Capability에서 전송된 이벤트 스트림.</li>
+      <li><strong>Evidence&nbsp;Schema&nbsp;Definition</strong> – 표준 필드 정의(예: 시간, 엔티티, 속성, 메트릭, 심각도).</li>
+    </ul>
+
+    <h4>Generated&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Normalized&nbsp;Evidence&nbsp;Record</strong> – 표준 스키마로 변환된 Evidence.</li>
+      <li><strong>Evidence&nbsp;Repository&nbsp;Index</strong> – 시간/엔티티 기반 인덱스.</li>
+      <li><strong>Correlation&nbsp;Linkage</strong> – 관련 이벤트 간 관계 정보.</li>
+    </ul>
+
+    <h4>Output&nbsp;Objects</h4>
+    <ul>
+      <li>Evidence&nbsp;Records → Trust&nbsp;Architecture.</li>
+    </ul>
+
+    <h4>Interfaces</h4>
+    <ul>
+      <li><strong>Evidence&nbsp;Ingest&nbsp;API:</strong> Capability 모듈이 이벤트를 게시하는 인터페이스.</li>
+      <li><strong>Evidence&nbsp;Query&nbsp;API:</strong> Trust&nbsp;Architecture가 Evidence를 조회하는 인터페이스.</li>
+    </ul>
+
+    <h4>Required&nbsp;Tables</h4>
+    <ul>
+      <li><strong>Evidence&nbsp;Schema&nbsp;Table</strong> – 필드 이름, 타입, 설명을 요약한다.</li>
+      <li><strong>Correlation&nbsp;Mapping&nbsp;Table</strong> – 이벤트 유형 간 연관 규칙을 정리한다.</li>
+    </ul>
+
+    <h4>Required&nbsp;Diagrams</h4>
+    <ul>
+      <li><strong>Evidence&nbsp;Flow</strong> – 수집→정규화→연관→저장 흐름을 도식화.</li>
+      <li><strong>Repository&nbsp;Architecture</strong> – Evidence 저장소 구조(테이블·인덱스 등)를 나타낸다.</li>
+    </ul>
+
+    <h4>Failure&nbsp;Handling</h4>
+    <ul>
+      <li>이벤트 데이터가 손상되거나 필드가 누락된 경우, 해당 이벤트를 무효로 처리하고 별도 오류 레코드를 생성한다.</li>
+      <li>수신 버퍼 초과 등 시스템 자원 고갈 상황에 대비해 백프레셔(backpressure) 메커니즘을 설계한다.</li>
+    </ul>
+
+    <h4>Cross&nbsp;References</h4>
+    <ul>
+      <li>Trust&nbsp;Architecture – Evidence 평가를 위해 정규화된 레코드를 제공한다.</li>
+      <li>Attack&nbsp;Mapping – 어떤 Evidence가 어떤 공격 탐지에 사용되는지 기록한다.</li>
+    </ul>
+
+    <h4>Design&nbsp;Notes</h4>
+    <ul>
+      <li>Evidence 스키마는 향후 모델 확장을 고려하여 유연하게 설계한다.</li>
+      <li>저장소는 시간·엔티티 기반 쿼리에 최적화된 인덱스를 제공해야 한다.</li>
+      <li>테스트베드 환경의 트래픽 양을 고려하여 성능 요구사항을 설정한다.</li>
+    </ul>
+  </div>
+
+  <!-- ──────── 2.4 Trust Architecture ──────── -->
+  <h3 id="trust-architecture">Trust&nbsp;Architecture</h3>
+  <div class="panel">
+    <h4>Chapter&nbsp;Summary</h4>
+    <p>Evidence 레코드를 평가하여 통신, 신원·접근, 세션·네트워크, 명령, 임무 영역별 신뢰 수준을 계산하고 신뢰 벡터를 생성한다.</p>
+
+    <h4>Purpose</h4>
+    <p>정규화된 Evidence를 토대로 영역별 신뢰 점수를 산출하여 시스템의 현재 건강 상태를 정량화한다.</p>
+
+    <h4>Scope</h4>
+    <ul>
+      <li>Evidence 평가 모델과 신뢰 계산 논리를 정의한다(모델 수식은 다음 단계에서 설계).</li>
+      <li>각 영역별 신뢰 점수 범주(높음/중간/낮음)를 정의한다.</li>
+      <li>신뢰 벡터를 Mission&nbsp;Context에 전달할 수 있도록 형식을 규정한다.</li>
+    </ul>
+
+    <h4>Section&nbsp;Tree</h4>
+    <ul>
+      <li><strong>Trust&nbsp;Evaluation&nbsp;Models</strong> – 영역별 평가 모델 개요를 정의한다.</li>
+      <li><strong>Trust&nbsp;Vector&nbsp;Generation</strong> – 개별 점수를 종합하여 신뢰 벡터를 생성한다.</li>
+    </ul>
+    <p>각 섹션은 Purpose → Input → Processing → Generated Data → Output → Design Considerations 구조를 따른다.</p>
+
+    <h4>Internal&nbsp;Components</h4>
+    <ul>
+      <li><strong>Evidence&nbsp;Evaluator</strong> – 정의된 모델에 따라 Evidence를 점수화한다.</li>
+      <li><strong>Score&nbsp;Aggregator</strong> – 영역별 점수를 종합하여 신뢰 벡터를 형성한다.</li>
+    </ul>
+
+    <h4>Internal&nbsp;Flow</h4>
+    <ol class="flow">
+      <li><b>Retrieve&nbsp;Evidence:</b> Evidence&nbsp;Architecture에서 정규화된 레코드를 가져온다.</li>
+      <li><b>Evaluate&nbsp;Scores:</b> Evidence&nbsp;Evaluator가 영역별 신뢰 점수를 계산한다. 예: 통신 신뢰는 PFCP 세션 상태와 NAS 암호 설정에 기반【208159606947672†L260-L293】;
+        신원·접근 신뢰는 USIM 인증 로그와 MongoDB 접근 정책에 기반【208159606947672†L279-L289】【574666281232364†L270-L289】;
+        세션·네트워크 신뢰는 UE 격리 여부와 PFCP 삭제 이벤트에 기반【208159606947672†L279-L293】【574666281232364†L304-L344】;
+        명령 신뢰는 오라클 주입, 서명 검증 실패, 서명키 유출 증거에 기반【488147192654095†L50-L57】【574666281232364†L162-L176】;
+        임무 신뢰는 GPS 입력 무결성과 키 배포 상태에 기반【208159606947672†L279-L293】.</li>
+      <li><b>Aggregate&nbsp;Vector:</b> Score&nbsp;Aggregator가 영역별 점수를 조합하여 신뢰 벡터를 생성한다.</li>
+    </ol>
+
+    <h4>Input&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Evidence&nbsp;Records</strong> – 정규화된 Evidence 리스트.</li>
+      <li><strong>Trust&nbsp;Evaluation&nbsp;Parameters</strong> – 각 영역별 평가 모델에 필요한 가중치·임계값(다음 단계에서 정의).</li>
+    </ul>
+
+    <h4>Generated&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Domain&nbsp;Trust&nbsp;Scores</strong> – 영역별 신뢰 점수.</li>
+      <li><strong>Trust&nbsp;Vector</strong> – 전체 시스템의 신뢰 벡터.</li>
+      <li><strong>Evaluation&nbsp;Summary</strong> – 각 점수의 근거 요약.</li>
+    </ul>
+
+    <h4>Output&nbsp;Objects</h4>
+    <ul>
+      <li>Trust&nbsp;Vector → Mission&nbsp;Context.</li>
+      <li>Evaluation&nbsp;Summary → Mission&nbsp;Context.</li>
+    </ul>
+
+    <h4>Interfaces</h4>
+    <ul>
+      <li><strong>Evidence&nbsp;Query&nbsp;API:</strong> Evidence&nbsp;Architecture로부터 레코드를 조회하는 인터페이스.</li>
+      <li><strong>Trust&nbsp;Export&nbsp;API:</strong> Mission&nbsp;Context가 신뢰 벡터를 가져가는 인터페이스.</li>
+    </ul>
+
+    <h4>Required&nbsp;Tables</h4>
+    <ul>
+      <li><strong>Trust&nbsp;Evaluation&nbsp;Criteria</strong> – 각 영역별 평가 항목과 중요도를 요약.</li>
+      <li><strong>Trust&nbsp;Vector&nbsp;Format</strong> – 벡터 구조와 값 범주를 기술.</li>
+    </ul>
+
+    <h4>Required&nbsp;Diagrams</h4>
+    <ul>
+      <li><strong>Trust&nbsp;Flow&nbsp;Diagram</strong> – Evidence→평가→점수→벡터 생성 과정을 도식화.</li>
+      <li><strong>Trust&nbsp;Vector&nbsp;Heatmap</strong> – 임무 Impact 단계에서 사용할 수 있도록 각 영역의 신뢰 수준을 시각화(다음 단계).</li>
+    </ul>
+
+    <h4>Failure&nbsp;Handling</h4>
+    <ul>
+      <li>Evidence 부족으로 평가 불가능한 경우 해당 영역의 신뢰를 “미정”으로 표시하고 Mission&nbsp;Context에 통보한다.</li>
+      <li>평가 모델의 오류나 구성 실패 시 기본값과 알림 메커니즘을 설계한다.</li>
+    </ul>
+
+    <h4>Cross&nbsp;References</h4>
+    <ul>
+      <li>Mission&nbsp;Context – 신뢰 벡터를 입력받아 임무 가중치를 설정한다.</li>
+      <li>Policy – 신뢰 수준이 낮은 영역을 정책 규칙의 조건으로 사용할 수 있다.</li>
+    </ul>
+
+    <h4>Design&nbsp;Notes</h4>
+    <ul>
+      <li>신뢰 평가 모델은 선형 또는 비선형 가중 합 방식 등 다양하며, Skeleton에서는 모델 입력과 출력 구조만 정의한다.</li>
+      <li>신뢰 점수의 범주 정의(예: High/Medium/Low)는 임무 컨텍스트와 연계될 수 있도록 명확히 구분한다.</li>
+    </ul>
+  </div>
+
+  <!-- ──────── 2.5 Mission Context ──────── -->
+  <h3 id="mission-context">Mission&nbsp;Context</h3>
+  <div class="panel">
+    <h4>Chapter&nbsp;Summary</h4>
+    <p>신뢰 벡터와 임무 계획(임무 유형, 환경, 중요도)을 결합하여 각 영역별 가중치를 설정한다. 임무 컨텍스트는 Impact 평가와 정책 결정에 영향을 미친다.</p>
+
+    <h4>Purpose</h4>
+    <p>임무의 특성에 따라 신뢰 수준이 임무 성과에 미치는 영향을 조정하기 위해 컨텍스트 가중치를 정의한다.</p>
+
+    <h4>Scope</h4>
+    <ul>
+      <li>임무 유형: 정찰, 항로 지정, 물자 운송 등 UAV 임무 범주를 정의한다.</li>
+      <li>환경 조건: 날씨, 지형, 위협 수준 등 임무 수행 환경의 파라미터.</li>
+      <li>중요도: 임무 실패 시 조직이 감수해야 하는 손실 수준.</li>
+      <li>제외: 임무 계획 자체의 생성(운영 계획서에 포함).</li>
+    </ul>
+
+    <h4>Section&nbsp;Tree</h4>
+    <ul>
+      <li><strong>Mission&nbsp;Parameters</strong> – 임무 유형, 환경, 중요도 등의 입력 파라미터를 정의한다.</li>
+      <li><strong>Contextual&nbsp;Weighting</strong> – 각 신뢰 영역에 대한 가중치를 설정하는 방법을 설계한다.</li>
+    </ul>
+    <p>각 섹션은 동일한 구조(Purpose → Input → Processing → Generated Data → Output → Design Considerations)를 따른다.</p>
+
+    <h4>Internal&nbsp;Components</h4>
+    <ul>
+      <li><strong>Mission&nbsp;Parameter&nbsp;Extractor</strong> – 임무 계획에서 유형·환경·중요도 파라미터를 추출한다.</li>
+      <li><strong>Weighting&nbsp;Engine</strong> – 신뢰 영역별 가중치를 계산한다.</li>
+    </ul>
+
+    <h4>Internal&nbsp;Flow</h4>
+    <ol class="flow">
+      <li><b>Receive&nbsp;Trust&nbsp;Vector:</b> Trust&nbsp;Architecture로부터 신뢰 벡터를 입력받는다.</li>
+      <li><b>Extract&nbsp;Mission&nbsp;Parameters:</b> Mission&nbsp;Parameter&nbsp;Extractor가 임무 유형, 환경, 중요도를 가져온다.</li>
+      <li><b>Compute&nbsp;Weights:</b> Weighting&nbsp;Engine이 임무 파라미터를 기반으로 각 영역의 중요도를 결정한다.</li>
+      <li><b>Create&nbsp;Context&nbsp;Object:</b> 계산된 가중치와 신뢰 벡터를 결합하여 Mission&nbsp;Context&nbsp;Object를 생성한다.</li>
+    </ol>
+
+    <h4>Input&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Trust&nbsp;Vector</strong> – 영역별 신뢰 점수.</li>
+      <li><strong>Mission&nbsp;Plan</strong> – 임무 유형, 환경 조건, 중요도를 담은 계획 문서.</li>
+      <li><strong>Mission&nbsp;Parameter&nbsp;Definitions</strong> – 각 파라미터의 범위와 단위 정의.</li>
+    </ul>
+
+    <h4>Generated&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Contextual&nbsp;Weights</strong> – 각 신뢰 영역의 가중치.</li>
+      <li><strong>Mission&nbsp;Context&nbsp;Object</strong> – 신뢰 벡터와 가중치가 결합된 객체.</li>
+    </ul>
+
+    <h4>Output&nbsp;Objects</h4>
+    <ul>
+      <li>Mission&nbsp;Context&nbsp;Object → Mission&nbsp;Impact.</li>
+    </ul>
+
+    <h4>Interfaces</h4>
+    <ul>
+      <li><strong>Mission&nbsp;Plan&nbsp;Input:</strong> 임무 계획 파일/데이터베이스에서 파라미터를 읽어오는 인터페이스.</li>
+      <li><strong>Context&nbsp;Export&nbsp;API:</strong> Mission&nbsp;Impact 단계가 컨텍스트 객체를 조회하는 인터페이스.</li>
+    </ul>
+
+    <h4>Required&nbsp;Tables</h4>
+    <ul>
+      <li><strong>Mission&nbsp;Types&nbsp;Table</strong> – 임무 유형과 각 영역의 기본 가중치.</li>
+      <li><strong>Environmental&nbsp;Factors&nbsp;Table</strong> – 환경 파라미터와 영향도.</li>
+    </ul>
+
+    <h4>Required&nbsp;Diagrams</h4>
+    <ul>
+      <li><strong>Mission&nbsp;Context&nbsp;Flow</strong> – 신뢰 벡터와 임무 파라미터의 결합 과정을 도식화.</li>
+      <li><strong>Weighting&nbsp;Matrix</strong> – 각 임무 유형별 영역 가중치를 표현한 행렬.</li>
+    </ul>
+
+    <h4>Failure&nbsp;Handling</h4>
+    <ul>
+      <li>임무 계획 데이터가 부족하거나 파라미터가 정의되지 않은 경우 기본 가중치를 적용한다.</li>
+      <li>신뢰 벡터와 가중치 간 모순이 발견될 경우 관리자에게 알리고 Impact 계산을 보수적으로 처리한다.</li>
+    </ul>
+
+    <h4>Cross&nbsp;References</h4>
+    <ul>
+      <li>Mission&nbsp;Impact – 컨텍스트 가중치를 사용하여 영향 점수를 계산한다.</li>
+      <li>Policy – 임무 유형 및 중요도가 정책 선택에 영향을 준다.</li>
+    </ul>
+
+    <h4>Design&nbsp;Notes</h4>
+    <ul>
+      <li>임무 유형과 환경 파라미터는 조직별로 맞춤화할 수 있으므로 Skeleton에서는 구조만 정의하고 값은 추후 설정한다.</li>
+      <li>컨텍스트 가중치는 합이 1이 되도록 정규화하여 각 영역의 상대적 중요도를 나타낸다.</li>
+    </ul>
+  </div>
+
+  <!-- ──────── 2.6 Mission Impact ──────── -->
+  <h3 id="mission-impact">Mission&nbsp;Impact</h3>
+  <div class="panel">
+    <h4>Chapter&nbsp;Summary</h4>
+    <p>신뢰 벡터와 임무 컨텍스트 가중치를 결합하여 각 영역의 영향 점수를 계산하고 위험 등급을 도출한다. 결과는 정책 판단의 기초가 된다.</p>
+
+    <h4>Purpose</h4>
+    <p>신뢰 결핍이 임무 목표에 미치는 영향을 정량화하여 정책과 복구 판단의 근거로 제공한다.</p>
+
+    <h4>Scope</h4>
+    <ul>
+      <li>영향 점수 계산 로직과 위험 등급 구분(예: 녹색/황색/적색)을 정의한다.</li>
+      <li>각 영역별 영향 점수를 종합하여 임무 전체 위험 프로필을 생성한다.</li>
+      <li>제외: 정책 자체의 선택 로직(Policy 단계에 위임).</li>
+    </ul>
+
+    <h4>Section&nbsp;Tree</h4>
+    <ul>
+      <li><strong>Impact&nbsp;Metrics</strong> – 영향 점수 계산에 사용되는 공식과 입력 변수를 정의한다.</li>
+      <li><strong>Impact&nbsp;Evaluation&nbsp;Structure</strong> – 계산된 점수를 위험 등급으로 매핑한다.</li>
+    </ul>
+    <p>모든 섹션은 Purpose → Input → Processing → Generated Data → Output → Design Considerations 구조를 따른다.</p>
+
+    <h4>Internal&nbsp;Components</h4>
+    <ul>
+      <li><strong>Impact&nbsp;Calculator</strong> – 신뢰 벡터와 컨텍스트 가중치를 입력으로 영향 점수를 계산한다.</li>
+      <li><strong>Risk&nbsp;Categorizer</strong> – 점수를 위험 등급으로 변환한다.</li>
+    </ul>
+
+    <h4>Internal&nbsp;Flow</h4>
+    <ol class="flow">
+      <li><b>Receive&nbsp;Inputs:</b> Mission&nbsp;Context&nbsp;Object와 신뢰 벡터를 가져온다.</li>
+      <li><b>Compute&nbsp;Impact&nbsp;Scores:</b> Impact&nbsp;Calculator가 각 영역별로 신뢰×가중치 계산을 수행하여 영향 점수를 산출한다.</li>
+      <li><b>Assign&nbsp;Risk&nbsp;Categories:</b> Risk&nbsp;Categorizer가 영향 점수를 사전 정의된 등급(예: Green/Yellow/Red)으로 변환한다.</li>
+      <li><b>Create&nbsp;Impact&nbsp;Record:</b> 영역별 영향 점수와 등급을 포함하는 Impact&nbsp;Assessment&nbsp;Record를 생성한다.</li>
+    </ol>
+
+    <h4>Input&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Mission&nbsp;Context&nbsp;Object</strong> – 신뢰 벡터와 영역별 가중치를 포함한다.</li>
+      <li><strong>Trust&nbsp;Vector</strong> – 영역별 신뢰 점수.</li>
+      <li><strong>Impact&nbsp;Thresholds</strong> – 위험 등급을 결정하는 임계값(다음 단계에서 정의).</li>
+    </ul>
+
+    <h4>Generated&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Impact&nbsp;Scores</strong> – 각 영역별 영향 점수.</li>
+      <li><strong>Risk&nbsp;Categories</strong> – 등급(Green/Yellow/Red 등).</li>
+      <li><strong>Impact&nbsp;Assessment&nbsp;Record</strong> – 종합적인 임무 영향 기록.</li>
+    </ul>
+
+    <h4>Output&nbsp;Objects</h4>
+    <ul>
+      <li>Impact&nbsp;Assessment&nbsp;Record → Policy.</li>
+    </ul>
+
+    <h4>Interfaces</h4>
+    <ul>
+      <li><strong>Impact&nbsp;Export&nbsp;API:</strong> Policy 단계가 영향 기록을 조회하는 인터페이스.</li>
+    </ul>
+
+    <h4>Required&nbsp;Tables</h4>
+    <ul>
+      <li><strong>Impact&nbsp;Score&nbsp;Table</strong> – 영역별 신뢰, 가중치, 영향 점수, 위험 등급을 요약.</li>
+    </ul>
+
+    <h4>Required&nbsp;Diagrams</h4>
+    <ul>
+      <li><strong>Impact&nbsp;Calculation&nbsp;Diagram</strong> – 입력→점수→등급 흐름을 도식화.</li>
+    </ul>
+
+    <h4>Failure&nbsp;Handling</h4>
+    <ul>
+      <li>필수 입력(신뢰 벡터 또는 컨텍스트)가 없을 경우 임무 영향 평가를 수행하지 않고 보수적(최악) 위험 등급을 할당한다.</li>
+      <li>임계값이 정의되지 않은 영역은 조직 정책에 따라 기본 등급을 적용한다.</li>
+    </ul>
+
+    <h4>Cross&nbsp;References</h4>
+    <ul>
+      <li>Policy – 위험 등급에 따라 정책 규칙을 선택한다.</li>
+      <li>Recovery – 영향 점수를 고려하여 복구 후보를 평가한다.</li>
+    </ul>
+
+    <h4>Design&nbsp;Notes</h4>
+    <ul>
+      <li>영향 계산식은 곱셈/가중합 등 단순 연산으로 설계하여 실시간 평가가 가능하도록 한다.</li>
+      <li>위험 등급 분포는 조직의 위험 허용도에 따라 조정 가능하도록 파라미터화한다.</li>
+    </ul>
+  </div>
+
+  <!-- ──────── 2.7 Policy ──────── -->
+  <h3 id="policy">Policy</h3>
+  <div class="panel">
+    <h4>Chapter&nbsp;Summary</h4>
+    <p>Mission&nbsp;Impact에서 도출한 위험 등급과 조직의 정책 규칙을 기반으로 가능한 행동 옵션을 평가하고 권장 정책을 선택한다.</p>
+
+    <h4>Purpose</h4>
+    <p>조직의 안전·임무 지속성 목표를 고려하여 임무를 계속, 제한, 감시 강화, 또는 중단할지 결정하는 고수준 정책을 제안한다.</p>
+
+    <h4>Scope</h4>
+    <ul>
+      <li>정책 규칙과 조건, 예외를 정의한다.</li>
+      <li>위험 등급과 임무 유형에 따른 행동 옵션을 평가한다.</li>
+      <li>제외: 개별 복구 절차(Recovery 단계에서 처리).</li>
+    </ul>
+
+    <h4>Section&nbsp;Tree</h4>
+    <ul>
+      <li><strong>Policy&nbsp;Rules&nbsp;Definition</strong> – 조직의 방어 정책과 규칙을 체계화한다.</li>
+      <li><strong>Action&nbsp;Evaluation</strong> – 위험 등급과 임무 유형을 입력으로 행동 옵션을 평가한다.</li>
+    </ul>
+    <p>각 섹션은 Purpose → Input → Processing → Generated Data → Output → Design Considerations 구조를 따른다.</p>
+
+    <h4>Internal&nbsp;Components</h4>
+    <ul>
+      <li><strong>Policy&nbsp;Engine</strong> – 정의된 정책 규칙을 적용하여 권장 행동을 선택한다.</li>
+      <li><strong>Action&nbsp;Selector</strong> – 가능한 행동 옵션(continue, restrict, monitor, abort)을 정렬한다.</li>
+    </ul>
+
+    <h4>Internal&nbsp;Flow</h4>
+    <ol class="flow">
+      <li><b>Retrieve&nbsp;Impact&nbsp;Assessment:</b> Mission&nbsp;Impact의 결과를 받아온다.</li>
+      <li><b>Apply&nbsp;Policy&nbsp;Rules:</b> 위험 등급과 임무 유형에 대한 조직의 규칙을 적용한다.</li>
+      <li><b>Select&nbsp;Recommended&nbsp;Action:</b> 가능한 행동 옵션 중 가장 적합한 권장 정책을 결정한다.</li>
+      <li><b>Create&nbsp;Policy&nbsp;Recommendation:</b> 선택된 행동과 근거를 문서화한다.</li>
+    </ol>
+
+    <h4>Input&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Impact&nbsp;Assessment&nbsp;Record</strong> – Mission&nbsp;Impact에서 생성된 위험 정보.</li>
+      <li><strong>Policy&nbsp;Rules</strong> – 조직이 정의한 규칙 목록.</li>
+      <li><strong>Mission&nbsp;Type</strong> – 임무 유형(정찰, 항로 지정 등).</li>
+    </ul>
+
+    <h4>Generated&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Policy&nbsp;Recommendation</strong> – 선택된 권장 행동(continue/restrict/monitor/abort).</li>
+    </ul>
+
+    <h4>Output&nbsp;Objects</h4>
+    <ul>
+      <li>Policy&nbsp;Recommendation → Recovery.</li>
+    </ul>
+
+    <h4>Interfaces</h4>
+    <ul>
+      <li><strong>Policy&nbsp;Query&nbsp;API:</strong> Mission&nbsp;Impact 결과를 가져오는 인터페이스.</li>
+      <li><strong>Policy&nbsp;Export&nbsp;API:</strong> Recovery 단계가 권장 정책을 읽는 인터페이스.</li>
+    </ul>
+
+    <h4>Required&nbsp;Tables</h4>
+    <ul>
+      <li><strong>Policy&nbsp;Mapping&nbsp;Table</strong> – 위험 등급·임무 유형별 권장 행동을 요약.</li>
+    </ul>
+
+    <h4>Required&nbsp;Diagrams</h4>
+    <ul>
+      <li><strong>Policy&nbsp;Decision&nbsp;Tree</strong> – 정책 규칙을 기반으로 행동 옵션을 선택하는 과정을 표현.</li>
+    </ul>
+
+    <h4>Failure&nbsp;Handling</h4>
+    <ul>
+      <li>정책 규칙이 정의되지 않은 상황에서는 기본적으로 “monitor and continue” 정책을 선택하고 관리자 알림을 생성한다.</li>
+      <li>정책 충돌이 발생할 경우 우선순위 규칙을 적용하거나 관리자가 수동으로 개입한다.</li>
+    </ul>
+
+    <h4>Cross&nbsp;References</h4>
+    <ul>
+      <li>Recovery – 권장 정책을 기반으로 복구 옵션을 생성한다.</li>
+      <li>Mission&nbsp;Decision – 정책과 복구를 종합하여 최종 결정을 내린다.</li>
+    </ul>
+
+    <h4>Design&nbsp;Notes</h4>
+    <ul>
+      <li>정책 규칙은 조직의 위험 허용도와 운영 지침에 따라 지속적으로 업데이트될 수 있으며, Skeleton에는 구조만 정의한다.</li>
+    </ul>
+  </div>
+
+  <!-- ──────── 2.8 Recovery ──────── -->
+  <h3 id="recovery">Recovery</h3>
+  <div class="panel">
+    <h4>Chapter&nbsp;Summary</h4>
+    <p>정책 추천과 신뢰 결핍 영역을 기반으로 시스템의 신뢰를 회복하거나 안전하게 운영할 수 있는 구체적인 복구 옵션을 평가하고 실행 가능성을 선택한다.</p>
+
+    <h4>Purpose</h4>
+    <p>임무를 계속 수행하기 위해 시스템을 복구하거나 필요한 경우 안전하게 축소하는 방안을 결정한다.</p>
+
+    <h4>Scope</h4>
+    <ul>
+      <li>복구 후보 생성: 재인증, 세션 재설정, 대체 링크 전환, 키 회전 등.</li>
+      <li>복구 평가: 각 후보의 실행 가능성, 비용, 효과를 분석.</li>
+      <li>제외: 최종 임무 결정 로직(다음 단계).</li>
+    </ul>
+
+    <h4>Section&nbsp;Tree</h4>
+    <ul>
+      <li><strong>Recovery&nbsp;Candidates</strong> – 가능한 복구 절차 목록을 생성한다.</li>
+      <li><strong>Recovery&nbsp;Evaluation</strong> – 후보들의 실행 가능성과 효과를 평가한다.</li>
+      <li><strong>Recovery&nbsp;Strategy</strong> – 최적의 복구 절차를 선택한다.</li>
+    </ul>
+    <p>각 섹션은 동일한 구조(Purpose → Input → Processing → Generated Data → Output → Design Considerations)로 작성한다.</p>
+
+    <h4>Internal&nbsp;Components</h4>
+    <ul>
+      <li><strong>Recovery&nbsp;Candidate&nbsp;Generator</strong> – 신뢰 결핍 영역과 정책 추천을 입력받아 복구 후보를 생성한다.</li>
+      <li><strong>Feasibility&nbsp;Evaluator</strong> – 각 후보의 실행 가능성을 기술적·운영적 기준으로 평가한다.</li>
+      <li><strong>Recovery&nbsp;Selector</strong> – 최적 후보를 선택한다.</li>
+    </ul>
+
+    <h4>Internal&nbsp;Flow</h4>
+    <ol class="flow">
+      <li><b>Gather&nbsp;Inputs:</b> Policy&nbsp;Recommendation, Trust deficits, Impact scores.</li>
+      <li><b>Generate&nbsp;Candidates:</b> Recovery&nbsp;Candidate&nbsp;Generator가 재인증, 세션 재설정, 키 회전 등 후보를 생성한다.</li>
+      <li><b>Evaluate&nbsp;Candidates:</b> Feasibility&nbsp;Evaluator가 실행 가능성(시간, 자원), 효과(신뢰 회복 여부), 위험을 평가한다.</li>
+      <li><b>Select&nbsp;Action:</b> Recovery&nbsp;Selector가 가장 적합한 복구 옵션을 선택한다.</li>
+      <li><b>Create&nbsp;Recovery&nbsp;Decision:</b> 선택된 복구 절차와 근거를 문서화한다.</li>
+    </ol>
+
+    <h4>Input&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Policy&nbsp;Recommendation</strong> – Policy 단계에서 선택된 행동.</li>
+      <li><strong>Trust&nbsp;Deficits</strong> – 영역별 신뢰 부족 정보.</li>
+      <li><strong>Impact&nbsp;Scores</strong> – 영역별 영향 정도.</li>
+      <li><strong>Available&nbsp;Resources</strong> – 시스템에서 실행 가능한 복구에 필요한 자원 목록.</li>
+    </ul>
+
+    <h4>Generated&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Recovery&nbsp;Candidate&nbsp;List</strong> – 제안된 복구 옵션 목록.</li>
+      <li><strong>Recovery&nbsp;Evaluation&nbsp;Report</strong> – 각 후보의 평가 결과.</li>
+      <li><strong>Selected&nbsp;Recovery&nbsp;Action</strong> – 최종 선택된 복구 절차.</li>
+    </ul>
+
+    <h4>Output&nbsp;Objects</h4>
+    <ul>
+      <li>Selected&nbsp;Recovery&nbsp;Action → Mission&nbsp;Decision.</li>
+    </ul>
+
+    <h4>Interfaces</h4>
+    <ul>
+      <li><strong>Recovery&nbsp;Query&nbsp;API:</strong> Policy와 Trust 정보를 조회하는 인터페이스.</li>
+      <li><strong>Recovery&nbsp;Execution&nbsp;API:</strong> 선택된 복구 절차를 실제 시스템에 적용하는 인터페이스(다음 단계에서 정의).</li>
+    </ul>
+
+    <h4>Required&nbsp;Tables</h4>
+    <ul>
+      <li><strong>Recovery&nbsp;Candidate&nbsp;Table</strong> – 후보 이름, 조건, 효과, 비용 등을 요약.</li>
+      <li><strong>Recovery&nbsp;Evaluation&nbsp;Table</strong> – 각 후보의 평가 결과를 비교.</li>
+    </ul>
+
+    <h4>Required&nbsp;Diagrams</h4>
+    <ul>
+      <li><strong>Recovery&nbsp;Flow&nbsp;Diagram</strong> – 후보 생성→평가→선택 과정을 시각화.</li>
+    </ul>
+
+    <h4>Failure&nbsp;Handling</h4>
+    <ul>
+      <li>모든 복구 후보가 실행 불가능하거나 효과가 없을 경우 임무 결정 단계에서 조건부 임무 중단을 고려한다.</li>
+      <li>실행 중 복구가 실패할 경우 롤백 절차와 대체 후보를 준비한다.</li>
+    </ul>
+
+    <h4>Cross&nbsp;References</h4>
+    <ul>
+      <li>Mission&nbsp;Decision – 복구 선택을 최종 결정에 반영한다.</li>
+    </ul>
+
+    <h4>Design&nbsp;Notes</h4>
+    <ul>
+      <li>복구 옵션은 시스템 구성 요소와 실제 제약(예: 재부팅 시간이 긴 MME, 키 회전 시간)을 고려하여 현실적으로 설정한다.</li>
+      <li>복구 절차는 자동화될 수 있지만, 안전상의 이유로 일부 단계는 관리자 승인을 요구할 수 있다.</li>
+    </ul>
+  </div>
+
+  <!-- ──────── 2.9 Mission Decision ──────── -->
+  <h3 id="mission-decision">Mission&nbsp;Decision</h3>
+  <div class="panel">
+    <h4>Chapter&nbsp;Summary</h4>
+    <p>Policy 추천과 선택된 복구 절차, 임무 영향 정보를 종합하여 임무를 계속 수행할지, 조건부 수행할지, 중단할지를 최종 결정한다.</p>
+
+    <h4>Purpose</h4>
+    <p>임무 성공과 안전을 균형있게 고려하여 최종 임무 행동을 결정하고, 그 근거를 기록한다.</p>
+
+    <h4>Scope</h4>
+    <ul>
+      <li>정책과 복구 결과를 통합하여 최종 결정을 내린다.</li>
+      <li>결정 근거와 데이터 출처를 기록하는 Auditing 메커니즘을 설계한다.</li>
+      <li>제외: 복구 절차 실행 자체(Recovery 단계에서 처리).</li>
+    </ul>
+
+    <h4>Section&nbsp;Tree</h4>
+    <ul>
+      <li><strong>Decision&nbsp;Logic</strong> – 정책과 복구를 결합하여 결정 규칙을 설계한다.</li>
+      <li><strong>Rationale&nbsp;Recording</strong> – 결정 근거와 입력 데이터를 기록하는 방법을 정의한다.</li>
+    </ul>
+
+    <h4>Internal&nbsp;Components</h4>
+    <ul>
+      <li><strong>Decision&nbsp;Engine</strong> – 규칙을 적용하여 임무 행동(Continue, Partial, Abort)을 선택한다.</li>
+      <li><strong>Audit&nbsp;Logger</strong> – 결정 이유, 입력 데이터를 기록한다.</li>
+    </ul>
+
+    <h4>Internal&nbsp;Flow</h4>
+    <ol class="flow">
+      <li><b>Consolidate&nbsp;Inputs:</b> Policy&nbsp;Recommendation, Selected Recovery Action, Impact&nbsp;Assessment.</li>
+      <li><b>Apply&nbsp;Decision&nbsp;Rules:</b> Decision&nbsp;Engine이 사전 정의된 규칙에 따라 임무 행동을 선택한다.</li>
+      <li><b>Record&nbsp;Rationale:</b> Audit&nbsp;Logger가 결정 이유, 사용된 데이터, 선택된 옵션을 기록한다.</li>
+      <li><b>Produce&nbsp;Mission&nbsp;Decision:</b> 임무 결정 객체를 생성하고 Attack&nbsp;Mapping 단계에 전달한다.</li>
+    </ol>
+
+    <h4>Input&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Policy&nbsp;Recommendation</strong> – 추천된 행동.</li>
+      <li><strong>Selected&nbsp;Recovery&nbsp;Action</strong> – 복구 단계에서 선택된 옵션.</li>
+      <li><strong>Impact&nbsp;Assessment</strong> – 위험 등급 및 영향 점수.</li>
+    </ul>
+
+    <h4>Generated&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Mission&nbsp;Decision&nbsp;Object</strong> – 최종 행동 및 조건을 포함.</li>
+      <li><strong>Decision&nbsp;Rationale</strong> – 선택 근거와 사용된 데이터.</li>
+    </ul>
+
+    <h4>Output&nbsp;Objects</h4>
+    <ul>
+      <li>Mission&nbsp;Decision&nbsp;Object → Attack&nbsp;Mapping.</li>
+    </ul>
+
+    <h4>Interfaces</h4>
+    <ul>
+      <li><strong>Decision&nbsp;Export&nbsp;API:</strong> Attack&nbsp;Mapping과 End‑to‑End Architecture가 임무 결정을 가져가는 인터페이스.</li>
+    </ul>
+
+    <h4>Required&nbsp;Tables</h4>
+    <ul>
+      <li><strong>Mission&nbsp;Decision&nbsp;Table</strong> – 정책, 복구, 영향, 최종 행동을 요약.</li>
+    </ul>
+
+    <h4>Required&nbsp;Diagrams</h4>
+    <ul>
+      <li><strong>Decision&nbsp;Flow&nbsp;Diagram</strong> – 입력→규칙→결정→기록 과정을 도식화.</li>
+    </ul>
+
+    <h4>Failure&nbsp;Handling</h4>
+    <ul>
+      <li>필수 입력이 없거나 충돌하는 경우 가장 안전한 옵션(임무 중단)을 선택하고 관리자 승인을 요구한다.</li>
+      <li>Audit 기록이 실패할 경우 로그를 보조 저장소에 백업한다.</li>
+    </ul>
+
+    <h4>Cross&nbsp;References</h4>
+    <ul>
+      <li>Attack&nbsp;Mapping – 임무 결정과 공격 시나리오 매핑을 위해 사용된다.</li>
+      <li>End‑to‑End&nbsp;Architecture – 전체 시스템 흐름에 결정 정보를 통합한다.</li>
+    </ul>
+
+    <h4>Design&nbsp;Notes</h4>
+    <ul>
+      <li>결정 규칙은 조직의 위험 허용도와 임무 우선순위에 따라 조정할 수 있도록 설계한다.</li>
+      <li>결정 근거의 투명성을 위해 모든 입력과 규칙 적용 과정을 상세히 기록해야 한다.</li>
+    </ul>
+  </div>
+
+  <!-- ──────── 2.10 Attack Mapping ──────── -->
+  <h3 id="attack-mapping">Attack&nbsp;Mapping</h3>
+  <div class="panel">
+    <h4>Chapter&nbsp;Summary</h4>
+    <p>각 공격 시나리오와 Defense&nbsp;Capability·Evidence·Trust·Mission&nbsp;Decision 간의 관계를 매핑하여 방어 체계의 커버리지와
+      취약점을 평가한다.</p>
+
+    <h4>Purpose</h4>
+    <p>공격이 탐지·완화되는 경로를 명확히 하여 방어 시스템의 효과를 검증하고, 커버리지 갭을 식별한다.</p>
+
+    <h4>Scope</h4>
+    <ul>
+      <li>각 공격 시나리오가 어느 Capability, Evidence, Trust 영역을 통해 탐지되고 임무 결정을 어떻게 변화시키는지 기록한다.</li>
+      <li>커버리지 갭을 식별하고 추가 Capability 또는 Evidence 요구사항을 제안한다.</li>
+      <li>제외: 실제 탐지 알고리즘 세부 구현.</li>
+    </ul>
+
+    <h4>Section&nbsp;Tree</h4>
+    <ul>
+      <li><strong>Mapping&nbsp;Matrix</strong> – 공격 시나리오와 방어 요소(Capability, Evidence, Trust, Policy, Recovery, Decision)의 매핑 표를 정의한다.</li>
+      <li><strong>Coverage&nbsp;Analysis</strong> – 매핑 결과를 분석하여 커버리지 부족 영역을 식별한다.</li>
+    </ul>
+
+    <h4>Internal&nbsp;Components</h4>
+    <ul>
+      <li><strong>Attack&nbsp;Catalog</strong> – 공격 시나리오 목록과 특성을 유지한다.</li>
+      <li><strong>Mapping&nbsp;Builder</strong> – 각 공격에 대한 Detection path를 구성한다.</li>
+      <li><strong>Coverage&nbsp;Analyzer</strong> – 매핑 결과를 분석하여 방어 결함을 찾는다.</li>
+    </ul>
+
+    <h4>Internal&nbsp;Flow</h4>
+    <ol class="flow">
+      <li><b>Import&nbsp;Attack&nbsp;Catalog:</b> 공격 시나리오 목록과 특성을 로드한다.</li>
+      <li><b>Build&nbsp;Mappings:</b> 각 공격을 어떤 Capability, Evidence, Trust 평가가 탐지하는지 매핑한다.</li>
+      <li><b>Analyze&nbsp;Coverage:</b> Mapping&nbsp;Builder의 출력에서 커버리지 갭(탐지 불가 영역)을 식별한다.</li>
+      <li><b>Produce&nbsp;Mapping&nbsp;Matrix:</b> 공격 시나리오, 탐지 경로, 결과 임무 결정을 표 형태로 정리한다.</li>
+    </ol>
+
+    <h4>Input&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Attack&nbsp;Scenarios</strong> – TM1/V2, TM2, TM3, NF-3, NF-4, NF-6 등 시나리오 목록【488147192654095†L60-L99】.</li>
+      <li><strong>Capability&nbsp;Definitions</strong> – 각 Capability와 모니터링 메트릭.</li>
+      <li><strong>Evidence&nbsp;Records</strong> – 탐지된 이벤트.</li>
+      <li><strong>Mission&nbsp;Decisions</strong> – 결정 결과.</li>
+    </ul>
+
+    <h4>Generated&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Attack‑to‑Capability&nbsp;Mapping</strong> – 각 공격이 어느 Capability에서 탐지되는지 매핑.</li>
+      <li><strong>Coverage&nbsp;Gap&nbsp;List</strong> – 탐지되지 않거나 대응이 부족한 공격.</li>
+      <li><strong>Mapping&nbsp;Matrix</strong> – 공격, Detection path, 임무 결정 결과를 포함한 표.</li>
+    </ul>
+
+    <h4>Output&nbsp;Objects</h4>
+    <ul>
+      <li>Mapping&nbsp;Matrix → End‑to‑End&nbsp;Architecture.</li>
+    </ul>
+
+    <h4>Interfaces</h4>
+    <ul>
+      <li><strong>Attack&nbsp;Catalog&nbsp;API:</strong> 공격 시나리오 목록을 조회하는 인터페이스.</li>
+      <li><strong>Mapping&nbsp;Query&nbsp;API:</strong> 다른 장이 매핑 결과를 조회하는 인터페이스.</li>
+    </ul>
+
+    <h4>Required&nbsp;Tables</h4>
+    <ul>
+      <li><strong>Attack&nbsp;Mapping&nbsp;Matrix</strong> – 공격, 감지 Capability, Evidence, Trust 영역, 정책/복구, 임무 결정 결과를 6열로 정리.</li>
+    </ul>
+
+    <h4>Required&nbsp;Diagrams</h4>
+    <ul>
+      <li><strong>Mapping&nbsp;Diagram</strong> – 공격에서 임무 결정까지의 탐지·완화 경로를 시각화.</li>
+    </ul>
+
+    <h4>Failure&nbsp;Handling</h4>
+    <ul>
+      <li>공격 시나리오가 충분히 문서화되지 않은 경우, 해당 공격을 커버리지 분석에서 제외하거나 별도 조사 필요성을 기록한다.</li>
+      <li>매핑이 불가능한 경우(예: 새로운 공격), Capability 확장 또는 추가 Evidence 필요성을 End‑to‑End Architecture에서 논의한다.</li>
+    </ul>
+
+    <h4>Cross&nbsp;References</h4>
+    <ul>
+      <li>End‑to‑End&nbsp;Architecture – 전체 방어 체계의 통합 시 공격 매핑 정보를 사용한다.</li>
+      <li>Defense&nbsp;Capability – 매핑을 통해 Capability 설계가 적절한지 피드백한다.</li>
+    </ul>
+
+    <h4>Design&nbsp;Notes</h4>
+    <ul>
+      <li>Mapping Matrix는 지속적으로 업데이트되어야 하며, 새로운 공격에 대한 방어 커버리지 평가에 활용된다.</li>
+      <li>매핑 결과를 통해 방어 체계의 우선 개선 영역을 도출한다.</li>
+    </ul>
+  </div>
+
+  <!-- ──────── 2.11 End‑to‑End Architecture ──────── -->
+  <h3 id="end-to-end">End‑to‑End&nbsp;Architecture</h3>
+  <div class="panel">
+    <h4>Chapter&nbsp;Summary</h4>
+    <p>모든 장의 입력과 출력, 데이터 흐름, 모듈 상호작용을 종합하여 전체 Mission‑Centric Defense Architecture를 한눈에 보여준다.</p>
+
+    <h4>Purpose</h4>
+    <p>Threat&nbsp;Analysis부터 Mission&nbsp;Decision까지의 파이프라인과 Attack&nbsp;Mapping 결과를 통합하여 방어 체계의
+      전반적인 구조를 설명한다.</p>
+
+    <h4>Scope</h4>
+    <ul>
+      <li>모든 데이터 객체의 흐름과 모듈 간 인터페이스를 정리한다.</li>
+      <li>각 장의 역할과 상호 의존성을 도식화한다.</li>
+      <li>제외: 개별 모듈의 내부 알고리즘 세부 사항.</li>
+    </ul>
+
+    <h4>Section&nbsp;Tree</h4>
+    <ul>
+      <li><strong>Overall&nbsp;Pipeline</strong> – Threat&nbsp;Analysis부터 Mission&nbsp;Decision까지의 연속 흐름을 설명한다.</li>
+      <li><strong>Component&nbsp;Interactions</strong> – 각 모듈 간 호출 및 데이터 교환 관계를 정리한다.</li>
+    </ul>
+
+    <h4>Internal&nbsp;Components</h4>
+    <ul>
+      <li><strong>Pipeline&nbsp;Integrator</strong> – 각 장의 출력과 입력을 연결하는 연결 로직.</li>
+      <li><strong>Interface&nbsp;Catalog</strong> – 모든 인터페이스와 데이터 객체의 정의를 저장한다.</li>
+      <li><strong>Visualization&nbsp;Generator</strong> – 종합 아키텍처 다이어그램을 생성한다.</li>
+    </ul>
+
+    <h4>Internal&nbsp;Flow</h4>
+    <ol class="flow">
+      <li><b>Collect&nbsp;Artifacts:</b> 각 장에서 정의한 데이터 객체, 인터페이스, 흐름을 수집한다.</li>
+      <li><b>Map&nbsp;Pipeline:</b> 입력과 출력의 연결 관계를 분석하여 연속 파이프라인을 구성한다.</li>
+      <li><b>Define&nbsp;Interactions:</b> 모듈 간 호출 순서와 데이터 교환을 기록한다.</li>
+      <li><b>Generate&nbsp;Integrated&nbsp;View:</b> 도표와 설명을 통해 End‑to‑End Architecture를 작성한다.</li>
+    </ol>
+
+    <h4>Input&nbsp;Objects</h4>
+    <ul>
+      <li><strong>All&nbsp;Chapter&nbsp;Outputs</strong> – 각 장에서 생성된 모든 데이터 객체와 정의.</li>
+      <li><strong>Attack&nbsp;Mapping&nbsp;Matrix</strong> – 공격과 방어 경로 매핑.</li>
+    </ul>
+
+    <h4>Generated&nbsp;Objects</h4>
+    <ul>
+      <li><strong>Integrated&nbsp;Architecture&nbsp;Document</strong> – 전체 방어 체계 설명.</li>
+      <li><strong>End‑to‑End&nbsp;Diagrams</strong> – 파이프라인 다이어그램, 모듈 상호작용 도표.</li>
+    </ul>
+
+    <h4>Output&nbsp;Objects</h4>
+    <ul>
+      <li>Integrated&nbsp;Architecture&nbsp;Document – 최종 설계 문서의 기반.</li>
+    </ul>
+
+    <h4>Interfaces</h4>
+    <ul>
+      <li><strong>Artifact&nbsp;Repository:</strong> 각 장의 결과물을 저장·조회하는 인터페이스.</li>
+      <li><strong>Visualization&nbsp;API:</strong> Diagram 생성 도구와 연동하는 인터페이스.</li>
+    </ul>
+
+    <h4>Required&nbsp;Tables</h4>
+    <ul>
+      <li><strong>Component&nbsp;List</strong> – 모든 모듈과 담당 기능을 요약.</li>
+      <li><strong>Data&nbsp;Flow&nbsp;Table</strong> – 데이터 객체와 이동 경로를 요약.</li>
+    </ul>
+
+    <h4>Required&nbsp;Diagrams</h4>
+    <ul>
+      <li><strong>End‑to‑End&nbsp;Architecture&nbsp;Diagram</strong> – 전체 시스템과 데이터 흐름을 한눈에 보여준다.</li>
+      <li><strong>Interaction&nbsp;Diagram</strong> – 모듈 간 호출 관계를 시퀀스 형태로 표현한다.</li>
+    </ul>
+
+    <h4>Failure&nbsp;Handling</h4>
+    <ul>
+      <li>연결 관계에 모순이나 누락이 발견될 경우, 원 장에 피드백을 제공하고 Skeleton을 업데이트한다.</li>
+    </ul>
+
+    <h4>Cross&nbsp;References</h4>
+    <ul>
+      <li>모든 Chapter – End‑to‑End Architecture는 각 장의 정의를 참조하여 구성된다.</li>
+    </ul>
+
+    <h4>Design&nbsp;Notes</h4>
+    <ul>
+      <li>End‑to‑End 시각화는 독자가 전체 방어 흐름을 빠르게 이해할 수 있도록 간결하고 일관된 표현을 사용한다.</li>
+      <li>모듈 간 인터페이스 정의는 추후 코드 설계에 직접 활용될 수 있도록 명확해야 한다.</li>
+    </ul>
+  </div>
+
+  <footer>
+    본 Skeleton 문서는 Mission‑Centric Defense Architecture 상세 설계의 기반이 되는 내부 구조를 정의한다. 각 Chapter는 테스트베드에서
+    실제로 수집 가능한 데이터와 공격 시나리오에서 검증된 위협만을 입력으로 사용하며, 보안 속성에 기반한 Capability 중심 설계를 관통한다.
+    Skeleton을 바탕으로 후속 단계에서 알고리즘, 임계값, 규칙을 상세화하여 자동 방어 시스템을 구현할 수 있다.
+  </footer>
+
+</div>
+</body>

@@ -1,0 +1,2352 @@
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Updated title to reflect the new focus on an implementable architecture specification for the Mission Defense Gateway. -->
+  <title>Mission Defense Gateway Architecture Specification for LTE/5G UAV Testbed – Chapters 1‑10</title>
+  <!--
+    This document describes the complete Mission‑Centric Defense Architecture Design covering
+    Chapters 1–10.  It unifies the previously separate design documents for Chapters 1–5 and
+    Chapters 6–10 into a single, implementation‑free specification.  The purpose is to provide a
+    comprehensive description of how the defence system is structured, why it was designed this way,
+    what data it consumes, how information flows through each layer, and what each layer produces
+    and hands to the next.  All chapters – Introduction, Architecture Overview, Threat Analysis,
+    Defense Capability Architecture, Evidence Architecture, Trust Architecture, Mission Context &
+    Impact Architecture, Policy & Recovery Architecture, Mission Decision Architecture, and Attack
+    Mapping & End‑to‑End Validation – are fully detailed in this document.
+  -->
+  <style>
+    :root{
+      --bg:#0d1117; --panel:#161b22; --panel2:#1c2430; --line:#30363d;
+      --ink:#e6edf3; --sub:#9da7b3; --muted:#6e7681;
+      --cell:#3b82f6; --core:#a855f7; --sgi:#22c55e; --ran:#f59e0b; --air:#ef4444; --atk:#f43f5e;
+      --accent:#58a6ff; --ok:#3fb950; --warn:#d29922; --bad:#f85149; --plain:#f59e0b; --ct:#22c55e;
+      --code:#0b0f14;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);
+      font-family:"Segoe UI","Malgun Gothic",-apple-system,system-ui,sans-serif;line-height:1.65;font-size:15px}
+    .wrap{max-width:1080px;margin:0 auto;padding:32px 22px 90px}
+    header.doc{border:1px solid var(--line);border-radius:14px;overflow:hidden;
+      background:linear-gradient(135deg,#12203a 0%,#161b22 55%,#101a2c 100%);
+      padding:26px 28px;margin-bottom:24px}
+    header.doc h1{margin:14px 0 6px;font-size:25px;line-height:1.3}
+    header.doc .sub{color:var(--sub);font-size:14px}
+    header.doc .meta{display:flex;flex-wrap:wrap;gap:8px 10px;margin-top:16px}
+    .pill{display:inline-block;font-size:12.5px;font-weight:700;padding:6px 11px;border-radius:8px;background:var(--panel2);
+      border:1px solid var(--line);color:var(--sub)}
+    .pill b{color:var(--ink);font-weight:600}
+    h2{margin:46px 0 14px;font-size:20px;border-bottom:1px solid var(--line);padding-bottom:8px;scroll-margin-top:16px}
+    h2 .num{color:var(--accent);font-variant-numeric:tabular-nums;margin-right:10px}
+    h3{margin:32px 0 14px;font-size:17px;color:#dbe6f2}
+    h4{margin:20px 0 8px;font-size:15px;color:#9fd0ff;font-weight:600}
+    p{margin:10px 0}
+    .lede{color:var(--sub);font-size:15px}
+    ul{margin:8px 0 12px 20px}
+    ul li{margin:5px 0}
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:16px 0}
+    table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+    th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+    th{background:var(--panel2);color:#cbd5e1;font-weight:600;font-size:12.5px}
+    tr:nth-child(even) td{background:rgba(255,255,255,.015)}
+    pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto;
+      font-size:12.5px;color:#cdd9e5;margin:10px 0}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header class="doc">
+    <!-- Updated main heading to indicate this document is now a Mission Defense Gateway architecture specification. -->
+    <h1>Mission Defense Gateway Architecture Specification</h1>
+    <!-- Updated subtitle to reflect the specification nature of the document. -->
+    <div class="sub">LTE/5G 기반 UAV C2 환경을 위한 Mission Defense Gateway 아키텍처 명세 – Chapters 1‑10 (2026‑07‑05)</div>
+    <div class="meta">
+      <span class="pill">프로젝트 <b>Mission‑Centric Defense Architecture</b></span>
+      <span class="pill">환경 <b>4G/5G UAV C2 Testbed</b></span>
+      <span class="pill">버전 <b>Design Document Stage</b></span>
+      <span class="pill">철학 <b>Capability‑Driven, Mission‑Aware</b></span>
+    </div>
+  </header>
+
+  <!-- ========================
+       Chapter 1 – Introduction
+       ======================== -->
+  <h2 id="chapter-1"><span class="num">1.</span> Introduction</h2>
+  <div class="panel">
+    <h3>Background</h3>
+    <p>
+      본 프로젝트는 LTE/5G 기반 UAV C2(testbed) 환경에서 임무 수행을 보호하기 위한 방어 아키텍처를 설계하는 것을
+      목적으로 한다. 테스트베드는 다수의 eNB/UE 쌍이 공통 EPC와 APN을 공유하는 구조이며, GPS 채널은
+      <code>dahnet</code>이라는 별도 네트워크로 분리된다. 주제의 맥락에서 중요한 사실은 많은 서비스가 네트워크 상에
+      평문으로 노출되어 있으며, PFCP와 GTP 제어 평면에 대한 인증 부족, MongoDB 및 web API의 무인증 접근,
+      NAS 암호 우선순위 오류, SITL serial port tcp/5762와 GPS port 14560 등 여러 오픈 포트가 존재한다는 점이다
+      . 이러한 환경은 임무 지향 시스템에 대해 전통적인
+      IDS/IPS가 단순 트래픽 패턴만으로 공격을 탐지하는 것과 달리, 임무 상의 영향과 신뢰를 함께 평가하는 방어
+      체계가 필요함을 보여준다.
+    </p>
+
+    <h3>Problem Statement</h3>
+    <p>
+      기존의 네트워크 보안 체계는 패킷 위협을 탐지하고 차단하는 데 초점을 맞추지만, UAV C2 환경에서는
+      다양한 계층의 구성 요소가 상호작용하면서 발생하는 복합 위협을 고려해야 한다. Kill Chain 분석에 따르면
+      PFCP 세션 삭제, web API 무인증 호출, MongoDB 접근, NAS null 암호 설정 등 공격은 암호화 자체의 약점이 아닌
+      인증·분리·키 관리 실패에서 비롯된다. 따라서 단일 지표에 기반한
+      탐지 시스템으로는 임무 실패에 직접적인 영향을 미치는 복합 공격을 적시에 인지하기 어렵다. 문제는 "어떤
+      데이터를 어떤 기준으로 평가해 임무 위험을 판단할 것인가"이며, 이를 위해 임무 맥락과 신뢰를 종합하는
+      설계가 요구된다.
+    </p>
+
+    <h3>Existing Security Limitation</h3>
+    <p>
+      테스트베드의 노출면 분석은 기존 보안 체계의 한계를 구체적으로 보여준다. 예를 들어 SITL serial port와
+      GPS port가 외부에 노출되어 있어 임의 명령 삽입이 가능하며, NAS null 암호 우선순위가 설정된 MME는
+      제어 평면이 평문으로 전송되는 상황을 유발한다. MongoDB는 인증 없이 접근 가능하고, web API도 별도의
+      인증 절차가 없어 공격자가 임의로 명령을 주입할 수 있다. 또한 UE 격리 기능이
+      비활성화되어 모든 사용자 장비가 같은 APN에 존재하므로 공격자가 타 기체의 트래픽을 관찰하거나
+      세션 삭제를 시도할 수 있다. 이러한 한계는 전통적인 암호화·방화벽 체계만으로는 임무의 안정성을 보장할 수
+      없음을 의미한다.
+    </p>
+
+    <h3>Why Mission‑Centric Defense</h3>
+    <p>
+      방어 아키텍처의 목표는 단순히 위협을 탐지하는 것이 아니라, 임무의 성공 여부를 중심으로 방어 결정을
+      내리는 것이다. 공격이 미션에 미치는 영향을 정량화하고, 임무를 지속할지 재구성할지 중단할지 판단하려면
+      통신 신뢰, 식별 신뢰, 세션/네트워크 신뢰, 명령 신뢰, 임무 신뢰 등 다양한 관점의 Evidence가 필요하다.
+      또한 임무 유형(정찰, 공격, 중계, 운송 등)에 따라 각 Capability의 중요도가 달라지므로 Mission Weight
+      Model을 통해 신뢰 점수를 조정해야 한다. 이와 같은 Mission‑Centric Defense는 기존 IDS/IPS 대비 더 높은
+      가시성과 정확성을 제공하며, 실제 임무에서의 의사결정을 지원한다.
+    </p>
+
+    <h3>Architecture Objective</h3>
+    <p>
+      본 설계의 핵심 목표는 다음과 같다:
+    </p>
+    <ul>
+      <li>테스트베드에서 수집 가능한 메트릭을 기반으로 12개의 공격을 흡수하는 다섯 가지 Defense Capability를 정의한다.</li>
+      <li>각 Capability에서 생성된 Evidence를 정규화하고, 신뢰 계산을 위한 Trust Object를 생성한다.</li>
+      <li>신뢰와 임무 맥락, 임무 가중치를 이용하여 Mission Impact를 평가할 수 있도록 구조를 마련한다.</li>
+      <li>임계치·시간 창·상관분석·복구 평가 등 공통 모델을 정의하여 모든 Chapter에서 일관된 기준을 사용하도록 한다.</li>
+      <li>방어 시스템의 처리 흐름을 명확히 하여, 향후 실제 방어 에이전트 설계 시 추가 데이터 모델 정의가 필요 없는 수준의 완성도를 확보한다.</li>
+    </ul>
+
+    <h3>Design Philosophy</h3>
+    <p>
+      아키텍처는 <strong>Capability‑Driven, Mission‑Aware</strong>를 철학으로 삼는다. 이는 12개의 공격을 각각의 탐지기로
+      대응하지 않고, 공통 Security Failure를 분석하여 5개의 Capability로 귀속시키는 것을 의미한다. 각
+      Capability는 검출된 사건을 Evidence Object로 생성하고 신뢰 점수를 산출하며, 임계치와 가중치를 사용하는
+      일관된 정책 하에 운영된다. 또한 임무 맥락과 우선순위를 고려해 동일한 사건이라도 상황에 따라 다른 결정을
+      가능케 한다. 이러한 설계 철학은 Mission‑Centric Defense가 기존 공격 중심 방어의 한계를 극복하게 한다.
+    </p>
+
+    <h3>Scope</h3>
+    <p>
+      본 문서는 테스트베드 상의 UAV C2 환경에 한정한다. 여기에는 EPC, eNB, UE, 각종 컨테이너, ZMQ/MAVLink
+      통신, PFCP/GTP 세션 관리, 웹 백엔드와 데이터베이스 등이 포함된다. GPS 채널(<code>dahnet</code>)과 C2/APN
+      채널, 코어 네트워크는 분리된 상태로 가정한다. 코드 구현, API 명세, 구체적 알고리즘은 범위에서 제외되며,
+      추후 세부 설계 단계에서 다룬다. 본 설계는 LTE/5G 외 다른 무선 기술에 대한 일반화를 목적으로 하지 않는다.
+    </p>
+
+    <h3>Assumptions</h3>
+    <ul>
+      <li>테스트베드는 현실적 UAV C2 환경을 모사하며, 모든 노출면(H1–H8)과 공격 시나리오를 재현할 수 있다.</li>
+      <li>Capability Monitor는 필요한 메트릭(PFCP 삭제 시도, DB 접근 수, 명령 유형, NAS 암호 설정 등)을 정확히 수집할 수 있다.</li>
+      <li>Mission Context는 임무 계획 시스템과 연동되어 임무 유형, 단계, 우선순위 등 정보를 제공한다.</li>
+      <li>시간 동기화가 이루어져 모든 Evidence에 신뢰할 수 있는 타임스탬프가 포함된다.</li>
+      <li>복구 수단(예: 재시도, 통신 채널 재구성, 임무 재계획)은 사전에 정의되어 있으며, Recovery Feasibility Model에서 평가할 수 있다.</li>
+    </ul>
+
+    <h3>Contributions</h3>
+    <p>
+      본 설계는 다음과 같은 공헌을 한다:
+    </p>
+    <ul>
+      <li>12개의 공격 시나리오를 분석하여 공통 Security Failure를 도출하고, 이를 방어 Capability로 일반화하였다.</li>
+      <li>Core Architecture Model을 통해 Evidence, Trust, Mission Context, Mission Impact, Policy, Recovery,
+      Decision Object 등 공통 데이터 구조를 정의했다.</li>
+      <li>Additive Design Model을 통해 임계치 정책, 시간 창, 상관 분석, 복구 가능성, 결정 추적, 데이터 흐름, 미션
+      결정 모델을 추가하여 완성도를 높였다.</li>
+      <li>Architecture Skeleton과 Blueprint를 기반으로 구체적 Chapter 구조와 처리 흐름을 설계하였다.</li>
+      <li>Mission‑Centric Defense가 기존 IDS/IPS의 한계를 극복하는 방법을 제시하고, 실제 방산 환경에 적용할 수
+      있는 설계 지침을 제공하였다.</li>
+    </ul>
+
+    <h3>Document Organization</h3>
+    <p>
+      이 문서는 총 5개의 Chapter로 구성되며, 각 장은 다음과 같은 내용을 담고 있다:
+    </p>
+    <ul>
+      <li><strong>Chapter 1 – Introduction:</strong> 문제 배경, 보안 한계, 임무 중심 방어의 필요성, 설계 목적과 철학을 소개한다.</li>
+      <li><strong>Chapter 2 – Architecture Overview:</strong> 전체 아키텍처의 레이어, 구성 요소, 데이터 흐름, 인터페이스와 배치 개념을 설명한다.</li>
+      <li><strong>Chapter 3 – Threat Analysis:</strong> 위협 지형과 분류, 12개 공격 분석, 공통 보안 실패 도출, Capability 요구를 논의한다.</li>
+      <li><strong>Chapter 4 – Defense Capability Architecture:</strong> 다섯 가지 Defense Capability의 목적, 입력 메트릭, 처리 책임, 생성 데이터와 인터페이스를 상세히 설계한다.</li>
+      <li><strong>Chapter 5 – Evidence Architecture:</strong> Evidence의 수집, 정규화, 상관 분석, 저장, 품질·신뢰도 평가, 수명 주기와 인터페이스를 정의한다.</li>
+    </ul>
+    <p>
+      이후 Chapter(Trust Architecture, Mission Context, Mission Impact, Policy, Recovery, Mission Decision,
+      Attack Mapping)는 별도 문서에서 다룰 예정이다.
+    </p>
+  </div>
+
+  <!-- ========================
+       Chapter 11 – Implementation Considerations
+       ======================== -->
+  <h2 id="chapter-11"><span class="num">11.</span> Implementation Considerations</h2>
+  <div class="panel">
+    <h3>Overview</h3>
+    <p>
+      Mission Defense Gateway 아키텍처를 테스트베드에서 구현하기 위해서는 실시간 처리, 확장성, 모듈 독립성, 장애 허용성, 로그 및 Evidence 저장, 그리고 향후 AI 에이전트 연동 가능성 등 여러 고려사항을 충족해야 한다. 본 장에서는 이러한 구현상의 주요 포인트를 요약한다.
+    </p>
+
+    <h3>Real‑Time Processing</h3>
+    <p>
+      UAV C2 환경에서는 공격을 탐지하고 대응하는 지연이 임무 성공에 직접적인 영향을 미친다. Collector Layer와 MDG 모듈은 비동기 메시지 큐 및 스트림 처리 방식으로 구현하여 수 밀리초 단위의 처리 지연을 달성해야 한다. Evidence Engine과 Correlation Engine은 이벤트를 배치가 아닌 스트림으로 평가하고, Decision Engine은 실시간으로 업데이트된 Trust와 Mission Impact를 사용하여 즉각적인 결정을 내린다.
+    </p>
+
+    <h3>Scalability</h3>
+    <p>
+      테스트베드가 확장되어 더 많은 UAV나 새로운 네트워크 요소가 추가될 때 Collector와 MDG 모듈은 선형적으로 확장 가능해야 한다. Collector Layer는 경량 에이전트로 설계되어 시스템당 하나 이상 실행될 수 있으며, MDG는 모듈 단위로 컨테이너화하여 추가 인스턴스를 통해 처리량을 증대할 수 있다. 메시지 브로커와 데이터베이스는 샤딩(sharding)과 클러스터링을 통해 확장해야 한다.
+    </p>
+
+    <h3>Module Independence</h3>
+    <p>
+      각 모듈은 명확한 API와 데이터 모델을 통해 교환하며, 내부 로직은 다른 모듈에 영향을 주지 않도록 설계한다. 예를 들어 Evidence Engine은 Trust Engine의 구현을 알 필요가 없고, Trust Engine은 Policy Engine과 독립적으로 개발될 수 있다. 이러한 독립성은 기능 추가와 유지보수를 용이하게 하며, 특정 모듈을 AI 기반으로 대체하거나 개선하는 것도 가능하게 한다.
+    </p>
+
+    <h3>Fault Tolerance</h3>
+    <p>
+      Collector Layer나 MDG 모듈의 장애는 임무의 신뢰도를 떨어뜨릴 수 있다. 따라서 각 구성 요소는 장애 발생 시 재시도, 대체 경로 및 페일오버(fail‑over)를 지원해야 한다. Evidence나 Incident가 일시적으로 누락되더라도 Trust Engine은 confidence 감소를 통해 보수적 결정을 내리고, Response Layer는 안전한 기본 행동을 적용해야 한다.
+    </p>
+
+    <h3>Log and Evidence Storage</h3>
+    <p>
+      실시간 분석과 사후 감사 모두를 위해 로그와 Evidence를 안정적으로 저장해야 한다. Evidence Repository는 분산된 시계열 데이터베이스 혹은 NoSQL 스토리지로 구현하여 대량의 데이터를 처리하고 TTL 정책에 따라 자동 만료를 지원한다. 감사 로그는 별도의 WORM(write‑once read‑many) 스토리지에 암호화하여 보관하고, 운영자는 Query Evidence 인터페이스를 통해 과거 데이터를 검색할 수 있다.
+    </p>
+
+    <h3>Evidence Retention and TTL</h3>
+    <p>
+      각 Evidence는 TTL 필드를 갖고 일정 시간 후 만료된다. 구현에서는 TTL 관리 프로세스가 주기적으로 만료된 Evidence를 정리하고, Incident가 완료되면 관련 Evidence를 아카이브로 이동한다. TTL 값은 임무 중요도와 법적 요구사항에 따라 설정되며, 만료 이후에는 Mission Decision에 사용되지 않는다.
+    </p>
+
+    <h3>Future AI Integration</h3>
+    <p>
+      아키텍처는 향후 AI/ML 에이전트와의 연동을 고려해 설계된다. 예를 들어 Evidence Engine은 이상 탐지를 위해 머신러닝 모델을 호출할 수 있고, Trust Engine은 Reinforcement Learning 기반의 신뢰 업데이트를 적용할 수 있다. Policy Engine과 Recovery Engine은 자동화된 시뮬레이션을 통해 정책 최적화를 수행할 수 있으며, Decision Engine은 인간 운영자의 피드백을 학습하여 의사결정을 보완할 수 있다. 이러한 확장성은 모듈 독립성과 표준화된 인터페이스 덕분에 가능하다.
+    </p>
+
+    <h3>Distributed vs Centralized Deployment</h3>
+    <p>
+      본 아키텍처에서 Collector는 데이터를 생성하는 각 컴포넌트에 분산 배치되고, MDG는 관리 평면의 중앙에서 동작한다.
+      분산 배치는 데이터가 발생하는 지점에서 지연 없이 Evidence를 생성할 수 있고, 각 구성 요소의 변경을 최소화한다.
+      반면, 중앙 집중형 MDG는 다양한 도메인의 Evidence를 연계·분석하여 교차 상관 관계를 파악하고, 임무 차원의 의사결정을 내리는 데 필수적이다.
+      Capability Analysis가 Collector 내부가 아니라 MDG에서 수행되는 이유는 각 Capability가 다른 도메인(EPC, RAN, UAV, GCS, 웹, DB)에 걸친 데이터를 필요로 하기 때문이다.
+      중앙에서 수행함으로써 통합된 Trust Vector와 Mission Impact를 계산하고, 네트워크 전체에 일관된 정책을 적용할 수 있다.
+      이러한 구조는 LTE/5G UAV 환경에서도 적용 가능하며, 셀룰러 코어와 무선 구간, 응용 계층 모두를 포괄하는 방어 체계를 구현할 수 있다.
+    </p>
+
+    <h3>Summary</h3>
+    <p>
+      Implementation Considerations Chapter는 Mission Defense Gateway 아키텍처가 테스트베드에서 실제로 동작하기 위해 필요한 성능, 확장성, 견고성, 저장 정책 및 AI 연계성 등을 제시한다. 이 지침을 통해 추상적인 설계를 구현 가능한 시스템으로 전환할 수 있으며, 향후 연구와 제품화 단계에서 참고할 수 있다.
+    </p>
+  </div>
+
+  <!-- ========================
+       Chapter 2 – Architecture Overview
+       ======================== -->
+  <h2 id="chapter-2"><span class="num">2.</span> Architecture Overview</h2>
+  <div class="panel">
+    <h3>Architecture Overview</h3>
+    <p>
+      Mission‑Centric Defense Architecture는 항공기(UE)와 지상국(GCS), 그리고 코어 네트워크 사이에서 발생하는
+      데이터 흐름을 실시간으로 감시하고, 각 단계에서 신뢰와 임무 영향을 평가하도록 계층화된 구조를 갖는다.
+      전체 파이프라인은 <em>Capability → Evidence → Trust → Mission Context → Mission Impact → Policy →
+      Recovery → Mission Decision</em>으로 구성되며, 각 계층은 상위 계층에 필요한 정보를 제공한다. 모든
+      데이터는 테스트베드에서 수집 가능한 메트릭과 로그에서 비롯되며, 임계치 및 시간 창 모델에 따라 평가된다.
+    </p>
+
+    <h3>Overall Pipeline</h3>
+    <p>
+      파이프라인의 주요 단계는 다음과 같다:
+    </p>
+    <ul>
+      <li><strong>Capability Monitoring:</strong> 각 Capability Monitor가 PFCP 세션 관리, NAS 암호 설정, DB 접근,
+      명령 전송 등 특정 메트릭을 수집한다.</li>
+      <li><strong>Evidence Generation:</strong> 모니터로부터 받은 원시 이벤트를 Evidence Object로 정규화하고
+      threshold policy를 적용하여 severity·weight·confidence를 부여한다.</li>
+      <li><strong>Evidence Correlation:</strong> 상관 규칙을 통해 관련 Evidence를 Incident로 묶는다. 예를 들면,
+      5초 이내 PFCP Delete와 MAVLink Command가 발생하면 동일 Incident로 분류한다.</li>
+      <li><strong>Trust Evaluation:</strong> 도메인별 Evidence 집합을 사용하여 Trust Score와 Confidence를 계산한다.
+      Mission Weight Model을 적용해 임무 유형에 따른 가중치를 반영한다.</li>
+      <li><strong>Mission Context:</strong> 임무 유형, 단계, 우선순위, 환경 제약 등을 통해 신뢰 평가를 해석한다.</li>
+      <li><strong>Mission Impact:</strong> Trust 결과와 임무 가중치를 이용하여 임무 가용성, 무결성, 안전성,
+      연속성, 회복 가능성을 계산하고 Overall Mission Impact와 Risk를 산출한다.</li>
+      <li><strong>Policy Evaluation:</strong> Mission Impact와 Rule Set을 기반으로 적절한 대응(Action)을 선택한다.
+      룰 우선순위, 조건, 예외 등을 포함한다.</li>
+      <li><strong>Recovery Planning:</strong> 복구 후보의 실행 시간, 비용, 신뢰 회복량, 성공 확률 등을 평가하여
+      Recovery Score를 계산하고 우선순위를 결정한다.</li>
+      <li><strong>Mission Decision:</strong> 최종적으로 Continue, Continue+Monitoring, Mission Reconfiguration,
+      Graceful Degradation, Operator Confirmation, Mission Abort 중 하나를 선택한다.</li>
+    </ul>
+
+    <h3>Architecture Layers</h3>
+    <p>아키텍처는 다음과 같은 레이어로 구성된다:</p>
+    <ul>
+      <li><strong>Capability Layer:</strong> 테스트베드의 각 구성 요소(eNB, MME, UPF, UE, GCS, DB, web backend 등)에
+      설치된 모니터가 메트릭을 수집한다. 예: PFCP Delete Attempt, Auth Failure, DB Access, MAVLink Command 등.</li>
+      <li><strong>Evidence Layer:</strong> 수집된 이벤트를 Evidence Object로 변환하고, 상관 분석을 통해 Incident를
+      생성하며 Evidence Repository에 저장한다.</li>
+      <li><strong>Trust Layer:</strong> 도메인별 Evidence를 입력으로 Trust Object를 계산한다. 신뢰 계산은 Trust
+      Score Model과 Confidence Model을 사용하며, Mission Weight Model을 통해 임무 유형을 반영한다.</li>
+      <li><strong>Mission Context Layer:</strong> 임무 유형, 단계, 우선순위, 환경 제약 등 Mission Context Object를
+      관리한다. Mission Context는 Trust 평가의 의미를 해석하는 역할을 한다.</li>
+      <li><strong>Mission Impact Layer:</strong> Mission Impact Model을 사용하여 임무에 미치는 영향을 계산한다.
+      결과는 Mission Impact Object로 표현된다.</li>
+      <li><strong>Policy Layer:</strong> Policy Engine은 정책 룰 집합을 적용하여 권장 Action을 결정한다. 룰은
+      우선순위와 조건, 예외를 포함한다.</li>
+      <li><strong>Recovery Layer:</strong> Recovery Planner는 복구 후보를 평가하고 Recovery Object를
+      생성한다. Recovery Feasibility Model을 사용한다.</li>
+      <li><strong>Decision Layer:</strong> Decision Engine은 임무 지속 여부를 판단하는 최종 계층이다. Decision
+      Trace Model을 통해 판단 경로를 기록한다.</li>
+    </ul>
+
+    <h3>Core Components</h3>
+    <p>각 레이어는 구체적인 컴포넌트로 구성된다. 주요 컴포넌트와 역할은 다음 표에 요약된다.</p>
+    <table>
+      <thead>
+        <tr><th>Component</th><th>Role</th><th>Input</th><th>Output</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Capability Monitor</td><td>테스트베드의 모듈(eNB, UE, DB, web API 등)에서 메트릭을 수집한다.</td><td>Raw Metrics (e.g., PFCP_Delete_Attempt, Auth_Failure, DB_Access, NAS_Cipher_Order)</td><td>Raw Events</td></tr>
+        <tr><td>Evidence Collector</td><td>Raw Events를 받아 Evidence Object를 생성하고 threshold policy를 적용한다.</td><td>Raw Events, Threshold Policy</td><td>Evidence Objects</td></tr>
+        <tr><td>Correlation Engine</td><td>Evidence Objects를 시간 창과 규칙에 따라 Incident로 묶고 Correlation Score를 계산한다.</td><td>Evidence Objects, Correlation Rules</td><td>Incident Records</td></tr>
+        <tr><td>Evidence Repository</td><td>Evidence Objects와 Incident를 저장하고 질의 인터페이스를 제공한다.</td><td>Evidence Objects, Incident Records</td><td>Stored Evidence, Incident Data</td></tr>
+        <tr><td>Trust Evaluator</td><td>도메인별 Evidence를 집계하여 Trust Object를 계산한다.</td><td>Evidence Objects, Mission Weight Model, Trust Score Model</td><td>Trust Objects</td></tr>
+        <tr><td>Mission Context Manager</td><td>Mission Context Object를 관리하고 임무 계획 시스템과 연동한다.</td><td>Mission Plan Inputs</td><td>Mission Context Object</td></tr>
+        <tr><td>Mission Impact Evaluator</td><td>Trust Objects와 Mission Context를 입력으로 Mission Impact Object를 계산한다.</td><td>Trust Objects, Mission Context Object, Mission Weight Model</td><td>Mission Impact Object</td></tr>
+        <tr><td>Policy Engine</td><td>Mission Impact와 Policy Rule Object를 기반으로 대응 Action을 결정한다.</td><td>Mission Impact Object, Policy Rules</td><td>Policy Decision</td></tr>
+        <tr><td>Recovery Planner</td><td>복구 후보를 평가하고 Recovery Object를 생성한다.</td><td>Policy Decision, Recovery Feasibility Model</td><td>Recovery Plan</td></tr>
+        <tr><td>Decision Engine</td><td>Policy와 Recovery 결과를 종합하여 최종 Mission Decision을 내린다.</td><td>Policy Decision, Recovery Plan, Decision Trace Model</td><td>Mission Decision Object</td></tr>
+      </tbody>
+    </table>
+
+    <!-- Attack Processing Details section moved to Chapter 10 (Attack Mapping). The following section is commented out as it is now located in Chapter 10. -->
+    <!--
+    <h3>Attack Processing Details</h3>
+    <p>
+      Attack Mapping Table 위의 열은 각 공격의 주요 매핑을 요약한다. 다음 표는 각 공격 시나리오가 수집 단계부터 응답 단계까지 실제로 어떤 모듈을 통과하는지 구체적으로 설명한다. 모든 단계는 Collector에서 Evidence Engine으로, Trust Engine을 거쳐 Mission Impact 평가와 Policy 선정, Recovery Plan, Decision Engine, Response Controller의 순서로 연결된다. 여기서 <em>Collector(s)</em>는 공격을 탐지하는 위치, <em>Evidence Process</em>는 이벤트가 Evidence로 전환되는 방식, <em>Trust Impact</em>는 해당 도메인의 신뢰 점수 변화를, <em>Mission Impact Assessment</em>는 임무 지표(availability, integrity, safety, continuity, risk 등)에 미치는 영향을, <em>Policy &amp; Recovery</em>는 선택되는 정책과 복구 후보를, <em>Response</em>는 Response Controller가 실제 적용하는 조치를 의미한다.
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Attack Scenario</th>
+          <th>Collector(s)</th>
+          <th>Evidence Process</th>
+          <th>Trust Impact</th>
+          <th>Mission Impact Assessment</th>
+          <th>Policy &amp; Recovery</th>
+          <th>Response</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>PFCP Session Delete</td>
+          <td>Network Collector monitors PFCP control plane</td>
+          <td>Raw PFCP_Delete_Attempt events exceeding threshold become Evidence; repeated incidents correlate within time window</td>
+          <td>Session Trust decreases; confidence reduced</td>
+          <td>mission_continuity ↓, mission_risk ↑</td>
+          <td>Policy: Continue + Monitoring; Recovery: Session Reestablishment</td>
+          <td>Block malicious PFCP traffic via firewall, re-initiate session using network controller</td>
+        </tr>
+        <tr>
+          <td>Web API Injection</td>
+          <td>Web Backend Collector &amp; MongoDB Collector monitor unauthorized API calls</td>
+          <td>Unauthorized_Command events generate Evidence; repeated patterns correlate into incidents</td>
+          <td>Identity Trust decreases</td>
+          <td>mission_integrity ↓, mission_risk ↑</td>
+          <td>Policy: Continue + Monitoring; Recovery: Key Rotation / Access Control</td>
+          <td>Enforce API authentication, rotate credentials, update firewall rules</td>
+        </tr>
+        <tr>
+          <td>MongoDB Access</td>
+          <td>MongoDB Collector monitors DB_Access attempts</td>
+          <td>Untrusted access attempts become Evidence; correlation groups repeated queries</td>
+          <td>Identity Trust decreases</td>
+          <td>mission_integrity ↓, mission_risk ↑</td>
+          <td>Policy: Continue + Monitoring; Recovery: Access Control Reinforcement</td>
+          <td>Restrict network access, enforce DB authentication, rotate DB credentials</td>
+        </tr>
+        <tr>
+          <td>NAS Null Cipher</td>
+          <td>Network Collector observes NAS encryption order</td>
+          <td>EEA0 ordering events generate Evidence; correlated with key management incidents</td>
+          <td>Identity Trust decreases</td>
+          <td>mission_integrity ↓, mission_risk ↑</td>
+          <td>Policy: Graceful Degradation; Recovery: Key Rotation</td>
+          <td>Reconfigure MME to enforce strong encryption; rotate keys</td>
+        </tr>
+        <tr>
+          <td>MAVLink Replay</td>
+          <td>UAV Collector &amp; GCS Collector monitor command sequences</td>
+          <td>Replay or duplicated sequence numbers become Evidence; correlation identifies repeated replay pattern</td>
+          <td>Command Trust decreases</td>
+          <td>mission_safety ↓, mission_risk ↑</td>
+          <td>Policy: Mission Reconfiguration; Recovery: Command Override / Sequence Reset</td>
+          <td>Override suspicious commands via PX4, reset MAVLink sequences, update autopilot state</td>
+        </tr>
+        <tr>
+          <td>GPS Spoofing</td>
+          <td>Mission Context Collector monitors GPS deviation and mission planning anomalies</td>
+          <td>GPS_Signal_Deviation Evidence triggers when deviation exceeds threshold; correlation with other sensor anomalies</td>
+          <td>Mission Trust decreases</td>
+          <td>mission_safety ↓, mission_integrity ↓, mission_risk ↑</td>
+          <td>Policy: Mission Abort; Recovery: Route Replanning if feasible</td>
+          <td>Replan mission trajectory or abort flight; engage inertial navigation fallback</td>
+        </tr>
+        <tr>
+          <td>UE Isolation Bypass</td>
+          <td>Network Collector monitors Session_Reset and isolation events</td>
+          <td>Session_Reset or cross‑APN traffic becomes Evidence; correlated to confirm isolation breach</td>
+          <td>Session Trust decreases</td>
+          <td>mission_continuity ↓, mission_risk ↑</td>
+          <td>Policy: Continue + Monitoring; Recovery: Network Isolation</td>
+          <td>Apply APN isolation via SDN flows; segregate compromised UE; reconfigure network segmentation</td>
+        </tr>
+        <tr>
+          <td>GTP Bridge Attack</td>
+          <td>Network Collector observes abnormal GTP bridging attempts</td>
+          <td>GTP_Bridge_Attempt events become Evidence; correlation groups repeated bridging attempts</td>
+          <td>Session Trust decreases</td>
+          <td>mission_continuity ↓, mission_risk ↑</td>
+          <td>Policy: Graceful Degradation; Recovery: Network Isolation</td>
+          <td>Reconfigure network routing to block bridging; isolate affected tunnels</td>
+        </tr>
+        <tr>
+          <td>Command Format Abuse</td>
+          <td>UAV Collector &amp; GCS Collector inspect command syntax</td>
+          <td>Invalid_Command_Format events become Evidence; correlation distinguishes malicious formatting from benign errors</td>
+          <td>Command Trust decreases</td>
+          <td>mission_integrity ↓, mission_risk ↑</td>
+          <td>Policy: Mission Reconfiguration; Recovery: Command Override</td>
+          <td>Enforce valid command structure via PX4/Mission API; override malformed commands</td>
+        </tr>
+        <tr>
+          <td>Key Exposure</td>
+          <td>Web Backend Collector &amp; Mission Context Collector detect key leaks and unauthorized access patterns</td>
+          <td>Key_Exposure_Detected events become Evidence; correlation cross‑references access logs and unusual API usage</td>
+          <td>Identity Trust decreases</td>
+          <td>mission_integrity ↓, mission_risk ↑</td>
+          <td>Policy: Graceful Degradation; Recovery: Key Rotation</td>
+          <td>Rotate compromised keys; revoke credentials; update policies across systems</td>
+        </tr>
+        <tr>
+          <td>SITL Serial Port Injection</td>
+          <td>UAV Collector monitors tcp/5762 port; GCS Collector monitors serial commands</td>
+          <td>Unauthorized_Command on serial port becomes Evidence; correlation detects repeated injection attempts</td>
+          <td>Command Trust decreases</td>
+          <td>mission_safety ↓, mission_risk ↑</td>
+          <td>Policy: Mission Abort / Operator Confirmation; Recovery: Command Override</td>
+          <td>Block exposed port via firewall; override injected commands; involve operator for confirmation</td>
+        </tr>
+        <tr>
+          <td>Environment Sensor Spoofing</td>
+          <td>Mission Context Collector &amp; UAV Collector monitor environmental sensor values</td>
+          <td>Env_Sensor_Deviation Evidence triggers when sensor readings diverge from expected values; correlation ensures anomaly persistence</td>
+          <td>Mission Trust decreases</td>
+          <td>mission_safety ↓, mission_integrity ↓, mission_risk ↑</td>
+          <td>Policy: Mission Abort; Recovery: Route Replanning or Abort</td>
+          <td>Recalibrate or ignore compromised sensors; replan mission or abort based on updated sensor fusion</td>
+        </tr>
+      </tbody>
+    </table>
+
+    -->
+    <h3>Component Relationships</h3>
+    <p>
+      컴포넌트 간의 관계는 생산자–소비자(Producer–Consumer) 패턴으로 정의된다. Capability Monitor는 Raw Event를
+      생산하며 Evidence Collector가 이를 소비한다. Correlation Engine은 Evidence를 소비하고 Incident를
+      생산하며, Evidence Repository는 이들을 저장한다. Trust Evaluator는 Evidence를 소비하여 신뢰를 생산하고,
+      Mission Context Manager와 Mission Impact Evaluator는 이를 소비한다. Policy Engine과 Recovery Planner는
+      Mission Impact를 소비하고 대응과 복구 계획을 생성한다. 마지막으로 Decision Engine은 Policy와
+      Recovery 결과를 소비하여 최종 Mission Decision을 생산한다. 각 컴포넌트는 명확한 인터페이스로만 상호
+      연결되어 있어 계층 간 결합을 줄이고 재사용성을 높인다.
+    </p>
+
+    <h3>Processing Pipeline Diagram</h3>
+    <pre>
+Capability Metrics
+   ↓
+Evidence Collector
+   ↓
+Correlation Engine
+   ↓
+Evidence Repository
+   ↓
+Trust Evaluator
+   ↓        Mission Context
+Mission Impact Evaluator
+   ↓
+Policy Engine
+   ↓
+Recovery Planner
+   ↓
+Decision Engine
+    </pre>
+    
+
+    <h3>Architecture Interfaces</h3>
+    <p>
+      아키텍처의 인터페이스는 내부와 외부로 나뉜다. 내부 인터페이스는 위 표에 제시한 컴포넌트 간 데이터
+      교환을 의미하며, 객체는 명확한 스키마(Evidence Object, Trust Object 등)를 따라야 한다. 외부
+      인터페이스에는 다음이 포함된다:
+    </p>
+    <ul>
+      <li><strong>Sensor Interface:</strong> Capability Monitor가 테스트베드의 컨테이너나 프로세스에서 메트릭을 수집하는
+      인터페이스. 예: ZMQ/MAVLink 메시지 구독, PFCP/GTP 제어 평면 모니터링, web API 호출 로그.</li>
+      <li><strong>Mission Plan Interface:</strong> 임무 계획 시스템과 연동하여 Mission Context Object를 업데이트한다.</li>
+      <li><strong>Operator Interface:</strong> Decision Engine이 최종 Mission Decision과 Decision Trace를 전달하여
+      운영자가 확인하고 필요 시 수동 개입을 할 수 있도록 한다.</li>
+      <li><strong>Logging Interface:</strong> 모든 객체 생성과 평가 과정은 감사와 추적을 위해 로깅 시스템에 전송된다.</li>
+    </ul>
+
+    <h3>Data Flow Overview</h3>
+    <p>
+      데이터는 Capability Monitor에서 시작하여 Decision Engine으로 끝나는 일련의 흐름을 따른다. Core Data
+      Flow Model에서 정의한 바와 같이, 각 단계는 Input Object를 받아 Output Object를 생성하고 다음 단계에
+      전달한다. 아래 표는 주요 흐름을 요약한다.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Step</th><th>Input Object</th><th>Processing</th><th>Output Object</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1 – Evidence Generation</td><td>Raw Event (Metric, Expected Value, Threshold)</td><td>Threshold Policy Model과 Time Window Model을 적용하여 severity, weight, confidence 산출</td><td>Evidence Object</td></tr>
+        <tr><td>2 – Evidence Correlation</td><td>Evidence Object</td><td>Correlation Rules에 따라 상관 스코어를 계산하고 Incident를 생성</td><td>Incident Record, Evidence Object (updated correlation_id)</td></tr>
+        <tr><td>3 – Trust Evaluation</td><td>Evidence Objects grouped by domain</td><td>Trust Score Model과 Confidence Model을 사용하여 신뢰 점수 계산</td><td>Trust Object</td></tr>
+        <tr><td>4 – Mission Impact</td><td>Trust Object, Mission Context Object</td><td>Mission Impact Model로 가용성, 무결성, 안전성, 연속성, 회복 가능성을 산출</td><td>Mission Impact Object</td></tr>
+        <tr><td>5 – Policy Evaluation</td><td>Mission Impact Object</td><td>Policy Rules를 평가하여 권장 Action 선택</td><td>Policy Decision</td></tr>
+        <tr><td>6 – Recovery Planning</td><td>Policy Decision</td><td>Recovery Feasibility Model에 따라 복구 후보를 평가하고 우선순위를 정함</td><td>Recovery Plan (Recovery Object)</td></tr>
+        <tr><td>7 – Mission Decision</td><td>Policy Decision, Recovery Plan</td><td>Mission Decision Model(Revision)을 통해 최종 결정과 이유, 증거, 신뢰 요약을 기록</td><td>Mission Decision Object</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Architecture Principles</h3>
+    <p>
+      설계는 다음 원칙에 기반한다:
+    </p>
+    <ul>
+      <li><strong>Capability‑Driven:</strong> 공격별 탐지기가 아닌 공통 도메인을 정의하여 확장성과 유지보수성을 높인다.</li>
+      <li><strong>Mission‑Aware:</strong> 임무 유형과 우선순위를 고려하여 평가하고 결정한다.</li>
+      <li><strong>Data Integrity:</strong> 모든 객체는 타임스탬프와 상관 ID를 포함하여 검증 가능한 추적성을 보장한다.</li>
+      <li><strong>Modularity:</strong> 각 컴포넌트는 명확한 인터페이스를 통해 상호작용하여 독립적으로 발전할 수 있다.</li>
+      <li><strong>Realistic Inputs:</strong> 설계에 사용되는 메트릭과 데이터는 테스트베드에서 실제 수집 가능한 것에 한정한다.</li>
+      <li><strong>Explainability:</strong> Decision Trace Model을 통해 각 결정의 근거가 투명하게 제공된다.</li>
+    </ul>
+
+    <h3>Deployment Concept</h3>
+    <p>
+      아키텍처는 테스트베드의 컨테이너 기반 환경에 배치된다. Capability Monitor는 각 컨테이너 내부 또는
+      인접 네트워크에서 동작하며, ZMQ/MAVLink 메시지를 구독하거나 PFCP, GTP, API 로그를 수집한다. Evidence,
+      Trust 및 Mission Impact 계산은 중앙 분석 노드에서 수행되며, Policy Engine과 Recovery Planner는 임무
+      제어 소프트웨어와 연동되어 결정을 적용한다. 핵심 원리는 APN 채널, 코어 네트워크, GPS dahnet 간 분리된
+      네트워크를 유지하면서 모니터가 모든 중요한 포인트를 관찰하도록 배치하는 것이다.
+    </p>
+
+    <!-- ==================================================================== -->
+    <!-- New implementation-oriented sections augmenting the architecture design -->
+    <!-- These sections provide an implementation view, deployment details, collector definitions, MDG modules, runtime flow, response layer, architectural positions and sequence diagrams. -->
+    <!-- ==================================================================== -->
+
+    <!--
+      2.1 Implementation‑Centric Architecture Overview
+      The conceptual pipeline described earlier (Capability→Evidence→Trust→Mission Context→Mission Impact→Policy→Recovery→Decision) focuses on logical flow. For an implementable testbed architecture, we describe the concrete data path from the physical testbed through collectors and the Mission Defense Gateway to the response execution back into the testbed.
+    -->
+    <h3 id="impl-overview"><span class="num">2.1</span> Implementation‑Centric Architecture Overview</h3>
+    <p>
+      기존 설계는 Capability→Evidence→Trust→Mission Context→Mission Impact→Policy→Recovery→Decision이라는 추상적인 논리 흐름을 설명하였다. 구현 관점에서는 테스트베드에서 실제 발생하는 데이터가 각 구성 요소에 배치된 분산 Collector(UAV Collector, GCS Collector, Network Collector, Web Backend Collector, MongoDB Collector, Mission Context Collector)를 통해 <strong>Mission Defense Gateway (MDG)</strong>로 전달된다. MDG 내부에서 분석과 판단을 거쳐 <strong>Decision Engine</strong>과 <strong>Response Executor</strong>를 통해 다시 테스트베드로 명령이 내려간다. 이러한 파이프라인은 물리적 실체를 다음과 같이 표현할 수 있다: <em>Testbed → Collectors → Mission Defense Gateway → Decision Engine → Response Executor → Testbed</em>.
+    </p>
+    <p>
+      <strong>Testbed</strong>는 UAV, GCS, eNB, EPC, UPF, web backend, MongoDB, Mission Server 등으로 구성된 실제 환경을 의미한다. <strong>Collectors</strong>는 이러한 시스템마다 설치된 경량 에이전트로서 로그와 메트릭을 수집하여 MDG로 전송한다. Collector는 각 컴포넌트에 사이드카 또는 호스트 에이전트로 배치되며 추론을 수행하지 않는다. <strong>Mission Defense Gateway</strong>는 수집된 데이터를 Evidence로 변환하고 상관·신뢰·임무 영향·정책·복구·결정을 수행하는 핵심 분석 엔진이다. <strong>Decision Engine</strong>은 MDG 내부 모듈로서 최종 임무 판단을 내리고, <strong>Response Executor</strong>는 결정된 정책을 실제 시스템에 적용하는 액추에이터 계층이다. 마지막으로, 변경된 상태는 Testbed에서 반영되어 다음 주기의 입력으로 다시 수집된다.
+    </p>
+
+    <!--
+      2.2 Deployment Architecture
+      This section describes where each collector is deployed within the testbed. MDG runs on the same host as the web backend, not externally. Collectors gather data locally and forward to MDG.
+    -->
+    <h3 id="deployment-architecture"><span class="num">2.2</span> Deployment Architecture</h3>
+    <p>
+      배치 아키텍처는 테스트베드를 구성하는 각 시스템에 어떤 Collector가 위치하는지 설명한다. Mission Defense Gateway는 테스트베드 외부의 별도 장치가 아니라 <strong>Web Backend</strong>가 위치한 동일 서버에 배치되지만, 웹 서비스 내부 기능이 아닌 독립적인 <code>mdg_core</code> 컨테이너로 동작한다. 각 Collector는 자신이 설치된 시스템에서 로그와 상태를 실시간 수집하여 MDG로 전달하며, 처리 결과는 Response Executor를 통해 다시 해당 시스템에 반영된다.
+    </p>
+    <table>
+      <thead>
+        <tr><th>System</th><th>Deployment Location</th><th>Deployed Collector(s)</th><th>Purpose</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>UAV</td><td>Flight controller container</td><td>UAV Collector</td><td>수집: MAVLink 명령, 비행 telemetry, 센서 상태</td></tr>
+        <tr><td>GCS</td><td>Ground control station container</td><td>GCS Collector</td><td>수집: 조종사 명령, GCS 로그, 시스템 이벤트</td></tr>
+        <tr><td>eNB/EPC/UPF</td><td>RAN 및 코어 네트워크 컨테이너</td><td>Network Collector</td><td>수집: PFCP/GTP 제어 평면 이벤트, 세션 상태, 포트 스캔</td></tr>
+        <tr><td>Web Backend</td><td>Mission control backend 서버</td><td>Web Backend Collector</td><td>수집: REST API 호출, 인증 로그, HTTP 트래픽</td></tr>
+        <tr><td>MongoDB</td><td>Database container</td><td>MongoDB Collector</td><td>수집: 데이터베이스 접근 로그, 쿼리 패턴</td></tr>
+        <tr><td>Mission Server</td><td>Mission planning/management server</td><td>Mission Context Collector</td><td>수집: 임무 계획, 우선순위, 임무 단계 및 제약 정보</td></tr>
+        <tr><td>Mission Defense Gateway</td><td><code>mdg_core</code> container (web_backend host, net_sgi 172.30/24)</td><td>—</td><td>Evidence 생성, 상관·신뢰 계산, 임무 영향 평가, 정책/복구/결정 수행</td></tr>
+      </tbody>
+    </table>
+
+    <!--
+      2.3 Collector Layer Definition
+      Define each collector: UAV, GCS, Network, Web Backend, MongoDB, Mission Context. For each, describe collected data, input, output, and role.
+    -->
+    <h3 id="collector-layer-definition"><span class="num">2.3</span> Collector Layer Definition</h3>
+    <p>
+      Collector Layer는 테스트베드 각 구성 요소에서 데이터를 수집하여 MDG로 전달하는 경량 에이전트들로 구성된다. 기존 설계의 Capability Monitor는 하나의 모듈로 설명되었지만, 구현 관점에서는 기능에 따라 다음과 같이 분리된다.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Collector</th><th>Collected Data</th><th>Input Source</th><th>Output</th><th>Role</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>UAV Collector</td><td>MAVLink 명령, telemetry, 시퀀스 번호, 서명 여부</td><td><code>uav_sitl</code> (udp/14550, tcp/5762) 및 <code>uav_proxy</code> (udp/14555/14540)</td><td>Raw events to MDG</td><td>비행기 명령과 상태를 수집하여 Command Trust와 Mission Trust 평가에 제공</td></tr>
+        <tr><td>GCS Collector</td><td>조종사 입력, 시스템 상태, API 호출 로그</td><td><code>gcs_c2</code> (udp/14550)와 <code>gcs_proxy</code> (udp/14556, ws/14560)</td><td>Raw events to MDG</td><td>운용자의 명령과 GCS 상태를 수집하여 Command Trust 및 Identity Trust 평가에 사용</td></tr>
+        <tr><td>Network Collector</td><td>PFCP Delete/Reset 시도, GTP 터널 상태, 포트 스캔, 세션 TTL, UE Isolation 상태</td><td><code>epc_upf</code>, <code>epc_sgwu</code>, <code>epc_smf</code>, <code>epc_mme</code>, <code>ran_enb</code>의 PFCP/GTP/S1AP 인터페이스</td><td>Raw events to MDG</td><td>세션 무결성과 네트워크 분리 상태를 수집하여 Session &amp; Network Trust 및 Communication Trust 계산에 제공</td></tr>
+        <tr><td>Web Backend Collector</td><td>REST API 호출, 인증 실패/성공 로그, 토큰 사용 패턴</td><td><code>web_backend</code> HTTP/WS 8080 엔드포인트 및 C2 tap (udp/14560)</td><td>Raw events to MDG</td><td>서비스 접근 이벤트를 수집하여 Identity &amp; Access Trust 평가에 활용</td></tr>
+        <tr><td>MongoDB Collector</td><td>DB 접속 시도, 쿼리 패턴, 인증 상태</td><td><code>epc_mongo</code> audit 로그</td><td>Raw events to MDG</td><td>데이터베이스 접근을 모니터링하여 Identity &amp; Access Trust와 데이터 무결성 평가에 기여</td></tr>
+        <tr><td>Mission Context Collector</td><td>임무 유형, 단계, 우선순위, 환경 제약, 미션 가중치</td><td>Mission planning/management API (HTTP/REST)</td><td>Mission Context Object to MDG</td><td>임무 계획과 상태 정보를 수집하여 Mission Context와 Mission Trust 및 Mission Impact 계산에 사용</td></tr>
+      </tbody>
+    </table>
+
+    <!--
+      2.4 Mission Defense Gateway (MDG) Core Component
+      Define the internal modules of the Mission Defense Gateway and their responsibilities.
+    -->
+    <h3 id="mdg-core"><span class="num">2.4</span> Mission Defense Gateway (MDG)</h3>
+    <p>
+      Mission Defense Gateway는 방어 시스템의 중심 컴포넌트로서, 모든 Collector로부터 데이터를 수신하여 Evidence 생성, 상관 분석, 신뢰 평가, 임무 영향 분석, 정책 평가, 복구 계획, 최종 결정 및 응답 실행을 수행한다. MDG 내부에는 다음과 같은 모듈이 포함된다.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>Role</th><th>Input</th><th>Output</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Collector Manager</td><td>모든 Collector로부터 이벤트를 수신, 버퍼링 및 순서 보장</td><td>Raw events, Mission Context Object</td><td>정규화되지 않은 이벤트 스트림</td></tr>
+        <tr><td>Evidence Engine</td><td>Raw events에 Threshold Policy와 Time Window를 적용하여 Evidence Object를 생성</td><td>Raw events</td><td>Evidence Objects</td></tr>
+        <tr><td>Correlation Engine</td><td>Evidence Objects를 규칙과 시간 창에 따라 Incident로 묶고 Correlation Score를 계산</td><td>Evidence Objects</td><td>Incident Records</td></tr>
+        <tr><td>Trust Engine</td><td>Incident와 Evidence를 도메인별로 집계하여 Trust Score를 계산</td><td>Incident Records, Mission Weight, Threshold Policy</td><td>Trust Objects (domain별 신뢰 점수)</td></tr>
+        <tr><td>Mission Context Manager</td><td>임무 유형, 단계, 우선순위, 제약을 관리하며 Mission Weight를 계산</td><td>Mission Context Inputs</td><td>Mission Context Object</td></tr>
+        <tr><td>Mission Impact Engine</td><td>Trust Objects와 Mission Context를 사용하여 mission_availability, mission_integrity, mission_safety, mission_continuity, recoverability, mission_risk를 평가</td><td>Trust Objects, Mission Context Object</td><td>Mission Impact Object</td></tr>
+        <tr><td>Policy Engine</td><td>Mission Impact와 Policy Rules를 평가하여 권장 Action을 결정</td><td>Mission Impact Object, Policy Rules</td><td>Policy Decision</td></tr>
+        <tr><td>Recovery Engine</td><td>Policy Decision에 따라 복구 후보를 평가하고 Recovery Plan을 수립</td><td>Policy Decision, Recovery Feasibility Model</td><td>Recovery Object</td></tr>
+        <tr><td>Decision Engine</td><td>Policy Decision과 Recovery Plan을 종합하여 최종 Mission Decision을 생성하고 Decision Trace를 기록</td><td>Policy Decision, Recovery Object, Trust Vector, Mission Impact Object</td><td>Mission Decision Object</td></tr>
+        <tr><td>Response Controller</td><td>Mission Decision을 기반으로 실제 시스템에 정책을 적용하기 위한 호출을 수행</td><td>Mission Decision Object</td><td>Network/API/PX4 actions executed</td></tr>
+      </tbody>
+    </table>
+
+    <!--
+      2.5 Runtime Data Flow
+      Describe the end‑to‑end processing sequence at runtime, including inputs, processing purpose and outputs for each stage.
+    -->
+    <h3 id="runtime-data-flow"><span class="num">2.5</span> Runtime Data Flow</h3>
+    <p>
+      아래 표는 공격 발생부터 응답 실행까지 런타임 처리 흐름을 설명한다. 각 단계는 입력, 처리 목적, 출력으로 구성되며 실제 구현에서의 처리 단위를 명확히 한다.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Step</th><th>Input</th><th>Processing Purpose</th><th>Output</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Attack Event</td><td>테스트베드 내 시스템에서 발생한 악의적 이벤트</td><td>무단 접근, 세션 삭제, 명령 위변조 등 공격이 발생한다</td><td>Raw event at source</td></tr>
+        <tr><td>Collector</td><td>Raw event</td><td>각 Collector가 이벤트를 포착하여 MDG로 전송</td><td>Raw event forwarded</td></tr>
+        <tr><td>Evidence Engine</td><td>Raw events</td><td>Threshold Policy 적용, severity/weight/confidence 계산 및 Evidence Object 생성</td><td>Evidence Objects</td></tr>
+        <tr><td>Correlation Engine</td><td>Evidence Objects</td><td>상관 규칙과 시간 창을 적용하여 Incident 생성</td><td>Incident Records</td></tr>
+        <tr><td>Trust Engine</td><td>Incident Records, Evidence Objects</td><td>도메인별 신뢰 점수와 confidence 계산</td><td>Trust Objects</td></tr>
+        <tr><td>Mission Context Manager</td><td>Mission plans, mission_phase, priority, constraints</td><td>Mission Context Object와 mission_weight 계산</td><td>Mission Context Object</td></tr>
+        <tr><td>Mission Impact Engine</td><td>Trust Objects, Mission Context Object</td><td>Mission Impact 지표 계산(availability, integrity, safety, continuity, recoverability, risk)</td><td>Mission Impact Object</td></tr>
+        <tr><td>Policy Engine</td><td>Mission Impact Object</td><td>정책 규칙 평가 및 권장 행동 선택</td><td>Policy Decision</td></tr>
+        <tr><td>Recovery Engine</td><td>Policy Decision</td><td>복구 후보 평가 및 Recovery Plan 수립</td><td>Recovery Object</td></tr>
+        <tr><td>Decision Engine</td><td>Policy Decision, Recovery Object</td><td>최종 Mission Decision 선택 및 Decision Trace 기록</td><td>Mission Decision Object</td></tr>
+        <tr><td>Response Controller</td><td>Mission Decision Object</td><td>결정된 정책을 실행하기 위해 네트워크, 컨테이너, 비행 제어기에 명령 전송</td><td>Enforced actions on testbed</td></tr>
+        <tr><td>Target System</td><td>Enforced actions</td><td>UAV, GCS, 네트워크 등이 명령을 적용하고 상태를 변경함</td><td>Updated system state & new metrics</td></tr>
+      </tbody>
+    </table>
+
+    <!--
+      2.6 Response Layer
+      Describe the Response Layer, which executes the decisions produced by the MDG via various actuators. Real command syntax is intentionally omitted.
+    -->
+    <h3 id="response-layer"><span class="num">2.6</span> Response Layer</h3>
+    <p>
+      기존 문서에서는 Decision 이후의 조치가 정의되지 않았으나, 구현 가능한 아키텍처에서는 결정된 정책을 실제로 수행하는 <strong>Response Layer</strong>가 필요하다. Response Controller는 다양한 제어 채널을 통해 네트워크, 컨테이너, 임무 시스템, 비행 제어기에 명령을 전달한다. 명령의 구체적인 형식이나 코드는 본 문서의 범위에서 제외되지만, 구조는 다음과 같다.
+    </p>
+    <ul>
+      <li><strong>Network‑level actions:</strong> 방화벽(iptables) 규칙 적용, SDN Controller API 호출을 통해 악성 트래픽을 차단하거나 포워딩 경로를 재구성한다.</li>
+      <li><strong>Container‑level actions:</strong> Docker API를 이용해 compromised container를 일시 중지하거나 재배포하며, 웹 백엔드 또는 DB 인스턴스를 재시작한다.</li>
+      <li><strong>Mission‑level actions:</strong> Mission API를 호출하여 임무 파라미터를 재구성하거나 Waypoint를 수정한다.</li>
+      <li><strong>Autopilot‑level actions:</strong> PX4/MAVLink 채널을 통해 LAND, LOITER, RTL(Return‑to‑Launch) 등 안전 명령을 전송한다.</li>
+      <li><strong>Database actions:</strong> MongoDB 권한 변경, 키 회전 등 데이터 보안 강화를 수행한다.</li>
+    </ul>
+    <p>
+      Response Layer는 MDG의 결정에 따라 위와 같은 조치를 결합하여 실행하며, 실행된 결과는 다시 Collector를 통해 모니터링되어 폐루프 피드백을 형성한다.
+    </p>
+
+    <!--
+      2.7 Architecture Position (Implementation View)
+      Update the architecture layering to reflect the implementable layers: Testbed, Collector, MDG, Response, Operator.
+    -->
+    <h3 id="architecture-position"><span class="num">2.7</span> Architecture Position (Implementation View)</h3>
+    <p>
+      논리적 설계에서는 Capability, Evidence, Trust 등 추상 레이어를 정의하였으나, 구현에서는 다음과 같은 실제 계층 구조로 표현된다:
+    </p>
+    <ul>
+      <li><strong>Testbed:</strong> UAV, GCS, eNB, EPC, UPF, Web Backend, DB, Mission Server 등이 포함된 물리적/가상 환경이다.</li>
+      <li><strong>Collectors:</strong> 각 시스템에 설치된 분산 Collector(UAV, GCS, Network, Web Backend, MongoDB, Mission Context)가 메트릭과 로그를 수집하여 MDG로 전송한다. 추론과 의사결정은 수행하지 않는다.</li>
+      <li><strong>Mission Defense Gateway:</strong> Collector Manager, Evidence Engine, Correlation Engine, Trust Engine, Mission Context Manager, Mission Impact Engine, Policy Engine, Recovery Engine, Decision Engine, Response Controller를 포함하는 분석 및 결정의 중심이다.</li>
+      <li><strong>Response Layer:</strong> MDG의 Response Controller가 Network/API/PX4 등을 호출하여 실제 조치를 수행한다.</li>
+      <li><strong>Operator:</strong> 운영자가 Decision 결과를 확인하고 필요할 경우 수동 개입을 수행한다.</li>
+    </ul>
+    <pre>
+Testbed
+   ↓
+Collectors
+   ↓
+Mission Defense Gateway (Collector Manager → Evidence Engine → Correlation Engine → Trust Engine → Mission Context Manager → Mission Impact Engine → Policy Engine → Recovery Engine → Decision Engine → Response Controller)
+   ↓
+Response Layer (Firewall, Docker API, Mission API, PX4, DB)
+   ↓
+Operator
+    </pre>
+
+    <!--
+      2.8 Capability Sequence Flows
+      Provide ASCII sequence diagrams for representative attack scenarios within each capability domain.
+    -->
+    <h3 id="sequence-flow"><span class="num">2.8</span> Capability Sequence Flows</h3>
+    <p>
+      각 Capability는 특정 공격 시나리오에 대해 수집부터 응답까지의 순서를 가진다. 아래 ASCII 다이어그램은 대표적 공격에 대한 시퀀스를 예시로 보여준다.
+    </p>
+    <h4>Communication Capability – PFCP Delete Attack</h4>
+    <pre>
+PFCP Delete Attack
+    ↓
+Network Collector
+    ↓
+Evidence Engine
+    ↓
+Correlation Engine
+    ↓
+Trust Engine
+    ↓
+Mission Impact Engine
+    ↓
+Policy Engine
+    ↓
+Recovery Engine
+    ↓
+Decision Engine
+    ↓
+Response Controller
+    ↓
+UPF Session Reestablishment
+    ↓
+Mission Continue
+    </pre>
+    <h4>Identity &amp; Access Capability – Unauthorized API Call</h4>
+    <pre>
+Unauthorized API Call
+    ↓
+Web Backend Collector / MongoDB Collector
+    ↓
+Evidence Engine
+    ↓
+Correlation Engine
+    ↓
+Trust Engine
+    ↓
+Mission Impact Engine
+    ↓
+Policy Engine
+    ↓
+Recovery Engine
+    ↓
+Decision Engine
+    ↓
+Response Controller
+    ↓
+Access Control Enforcement & Key Rotation
+    ↓
+Mission Continue
+    </pre>
+    <h4>Session &amp; Network Capability – UE Isolation Bypass</h4>
+    <pre>
+UE Isolation Bypass
+    ↓
+Network Collector
+    ↓
+Evidence Engine
+    ↓
+Correlation Engine
+    ↓
+Trust Engine
+    ↓
+Mission Impact Engine
+    ↓
+Policy Engine
+    ↓
+Recovery Engine
+    ↓
+Decision Engine
+    ↓
+Response Controller
+    ↓
+Network Isolation / APN Reconfiguration
+    ↓
+Mission Continue
+    </pre>
+    <h4>Command Capability – MAVLink Replay</h4>
+    <pre>
+MAVLink Replay Attack
+    ↓
+UAV Collector / GCS Collector
+    ↓
+Evidence Engine
+    ↓
+Correlation Engine
+    ↓
+Trust Engine
+    ↓
+Mission Impact Engine
+    ↓
+Policy Engine
+    ↓
+Recovery Engine
+    ↓
+Decision Engine
+    ↓
+Response Controller
+    ↓
+Command Override & Sequence Reset
+    ↓
+Mission Continue
+    </pre>
+    <h4>Mission Capability – GPS Spoofing</h4>
+    <pre>
+GPS Spoofing Attack
+    ↓
+Mission Context Collector
+    ↓
+Evidence Engine
+    ↓
+Correlation Engine
+    ↓
+Trust Engine
+    ↓
+Mission Impact Engine
+    ↓
+Policy Engine
+    ↓
+Recovery Engine
+    ↓
+Decision Engine
+    ↓
+Response Controller
+    ↓
+Route Replanning / Mission Abort
+    ↓
+Mission Outcome
+    </pre>
+  <!-- 2.9 Deployment Architecture -->
+  <h3 id="deployment-architecture"><span class="num">2.9</span> Deployment&nbsp;Architecture</h3>
+  <p>
+    테스트베드 위에서 <strong>Mission&nbsp;Defense&nbsp;Gateway</strong>(MDG)는 <em>관리 평면(Management&nbsp;Plane)</em>에 위치한 독립 서비스로 배치된다.
+    <code>web_backend</code> 컨테이너와 동일한 <span class="mono">net_sgi</span> 네트워크 (172.30.0.0/24)에 존재하지만, 대시보드/제어 API를 제공하는 web&nbsp;백엔드와는 별도로 동작한다.
+    MDG의 실행 코어는 <strong>mdg_core</strong>라는 서비스로 구성되며, Collector Layer에서 발생한 Evidence를 받아 중앙에서 분석·결정한다.
+    관리 평면 배치는 테스트베드의 각 구성요소를 수정하지 않고도 방어 시스템을 추가할 수 있게 해주며, 네트워크 경계의 포착/제어를 용이하게 한다.
+    예를 들어 testbed의 <code>web_backend</code>는 FastAPI 기반으로 14560 포트와 8080 WebSocket을 통해 평문 텔레메트리를 스트리밍하는데【694800343131941†screenshot】,
+    MDG는 동일 네트워크 내 별도 포트를 사용하여 Collector와 통신한다.
+  </p>
+
+  <!-- 2.10 Collector Deployment -->
+  <h3 id="collector-deployment"><span class="num">2.10</span> Collector&nbsp;Deployment</h3>
+  <p>
+    Collector는 중앙에 존재하는 것이 아니라, 데이터가 실제 발생하는 위치에 분산 배치된다.
+    아래 표는 UAV, GCS, 네트워크, 웹 백엔드, 데이터베이스, 미션 서버 등에 설치되는 Collector들의 배치 위치와 관찰 데이터, 생성 Evidence, 연계 Capability 및 배치 이유를 정리한 것이다.
+    배치 위치는 testbed의 실제 컴포넌트 이름을 사용하여 명확하게 지정한다【694800343131941†screenshot】.
+  </p>
+  <table>
+    <thead>
+      <tr><th>Collector</th><th>Deployment Position</th><th>Observable Data</th><th>Generated Evidence</th><th>Related Capability</th><th>Placement Rationale</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>UAV Collector</strong></td>
+        <td><code>uav_sitl</code>&nbsp;&amp;&nbsp;<code>uav_proxy</code>&nbsp;(netns of <code>uav_ue</code>)</td>
+        <td>MAVLink telemetry (heartbeat, attitude, GPS), autopilot status, flight mode, command sequences</td>
+        <td>Command Anomaly Evidence, Flight Continuity Evidence</td>
+        <td>Command, Mission</td>
+        <td>Placed within the UAV namespace to observe flight‑level data without modifying the autopilot. Proximity enables real‑time capture of replay/injection attempts.</td>
+      </tr>
+      <tr>
+        <td><strong>GCS Collector</strong></td>
+        <td><code>gcs_c2</code>&nbsp;&amp;&nbsp;<code>gcs_proxy</code> (SGi network)</td>
+        <td>Uplink commands from operator, downlink telemetry, operator session logs</td>
+        <td>Unauthorized Command Evidence, Operator Activity Evidence</td>
+        <td>Command, Identity &amp; Access</td>
+        <td>Monitoring at the command origin captures malicious API calls or replayed commands early and preserves operator actions.</td>
+      </tr>
+      <tr>
+        <td><strong>Network Collector</strong></td>
+        <td><code>ran_enb</code>, <code>epc_upf</code>, <code>epc_sgwu</code>, <code>epc_smf</code>, <code>epc_mme</code> (net_cellular/net_core interfaces)</td>
+        <td>PFCP messages, GTP‑U headers, NAS/RRC messages, network sessions, throughput statistics, encryption order</td>
+        <td>PFCP Delete Evidence, UE Isolation Evidence, NAS Encryption Order Evidence, Session Integrity Evidence</td>
+        <td>Communication, Session &amp; Network</td>
+        <td>Collecting at network edges provides visibility into control‑plane anomalies such as session deletes and segmentation bypass without impacting forwarding performance.</td>
+      </tr>
+      <tr>
+        <td><strong>Web Backend Collector</strong></td>
+        <td><code>web_backend</code>&nbsp;container (172.30.0.20)</td>
+        <td>HTTP/WebSocket requests, API paths &amp; methods, request parameters, user identity, command payloads</td>
+        <td>Unauthorized API Call Evidence, Command Injection Evidence, Access Pattern Evidence</td>
+        <td>Identity &amp; Access, Command</td>
+        <td>Deployed alongside the web API to monitor misuse of <code>POST&nbsp;/api/cmd</code> and other endpoints【694800343131941†screenshot】 while remaining non‑intrusive to the service.</td>
+      </tr>
+      <tr>
+        <td><strong>MongoDB Collector</strong></td>
+        <td><code>epc_mongo</code> (10.50.0.5/10.44.0.2)</td>
+        <td>Database connection attempts, query logs, operation types (insert/read/update), authentication events</td>
+        <td>Unauthorized DB Access Evidence, Injection Pattern Evidence</td>
+        <td>Identity &amp; Access</td>
+        <td>Monitoring directly at the database layer detects credential bypass and unusual query volumes while leveraging MongoDB’s audit hooks; ensures HSS/PCRF backend integrity.</td>
+      </tr>
+      <tr>
+        <td><strong>Mission Context Collector</strong></td>
+        <td>Mission Server / Planning System (Management plane)</td>
+        <td>Mission plans, waypoints, phases, priority levels, constraints, mission weight parameters</td>
+        <td>Mission Context Object (not an anomaly)</td>
+        <td>Mission</td>
+        <td>Provides MDG with current mission context to compute mission impact; deployed at the mission planning server to avoid interfering with flight control.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 2.11 Collector and Capability Relationship -->
+  <h3 id="collector-capability-relationship"><span class="num">2.11</span> Collector &amp; Capability Relationship</h3>
+  <p>
+    Collector는 판단 로직을 포함하지 않는 <em>Evidence Generator</em>이다. 각 Collector는 테스트베드 구성 요소에서 발생하는 원시 데이터를 수집하여 <strong>Evidence Engine</strong>으로 전송한다.
+    Evidence Engine은 임계치·가중치를 적용해 이벤트를 정규화하고 <em>Evidence Object</em>로 변환한 후, 이를 해당 Defense Capability의 <strong>Analysis Module</strong>로 전달한다.
+    각 Capability(Communication, Identity &amp; Access, Session &amp; Network, Command, Mission)는 전달된 Evidence를 분석해 <strong>Trust Object</strong>를 계산하고, 신뢰 정보는 Mission Impact 평가에 사용된다.
+    Collector는 단순히 데이터를 <strong>수집·전송</strong>하며, 모든 분석과 결정은 중앙의 MDG 내부에서 이루어진다.
+    이러한 구조는 Raw Data → Evidence → Capability Analysis → Trust → Mission Impact → Policy → Recovery → Decision의 계단식 관계를 명확히 하여, 역할 분리를 강화한다.
+  </p>
+
+  <!-- 2.12 Deployment Diagram -->
+  <h3 id="deployment-diagram"><span class="num">2.12</span> Deployment Diagram</h3>
+  <p>
+    아래 ASCII 다이어그램은 테스트베드 위에 MDG와 각 Collector가 배치되는 위치를 보여준다. 사각형은 테스트베드의 실제 컴포넌트를, 대괄호 안은 해당 위치에 배치된 Collector를 나타낸다.
+    화살표는 Evidence가 MDG Core로 전달되는 경로를 나타낸다.
+  </p>
+  <pre>
+                      net_sgi (Management Plane)
+                     +----------------------------------+
+                     |  web_backend     mission_server  |
+                     |   (FastAPI)        (planning)    |
+                     |   [Web Collector]  [Mission Ctx] |
+                     |                                  |
+                     |  mdg_core (Mission Defense Gateway)|
+                     |  Evidence/Correlation/Trust/...   |
+                     +-------------------▲--------------+
+                                         |
+                ┌────────────────────────┴────────────────────────┐
+                |                       |                        |
+         gcs_proxy / gcs_c2         epc_core / ran_enb         uav_proxy / uav_sitl
+        (SGi network)               (net_cellular/net_core)    (uav netns)
+            [GCS Collector]            [Network Collector]        [UAV Collector]
+                |                       |                        |
+                └───────────────┬───────┘                        |
+                                |                                |
+                         Evidence Streams                        |
+                                |                                |
+                         +------v---------+                      |
+                         |    MDG Core    |<---------------------┘
+                         +-----------------+
+                                |
+                   Response Controller actions
+                                |
+         ┌───────────────────────────────────────────────────────────┐
+         |    Network (iptables/SDN), Containers, Mission API, FC   |
+         └───────────────────────────────────────────────────────────┘
+  </pre>
+
+  <!-- 2.13 Updated Runtime Workflow -->
+  <h3 id="updated-runtime-workflow"><span class="num">2.13</span> Updated Runtime Workflow</h3>
+  <p>
+    기존 Runtime Data Flow를 구현 관점에 맞게 업데이트한다. 아래 표는 공격 발생부터 응답까지의 단계와 각 단계의 입력·출력·역할을 요약한다.
+  </p>
+  <table>
+    <thead>
+      <tr><th>Step</th><th>Input</th><th>Processing Purpose</th><th>Output</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Attack</td><td>테스트베드 내에서 발생한 악의적 행위</td><td>무단 접근, 세션 삭제, 명령 위변조 등 공격이 발생한다</td><td>Raw data at source</td></tr>
+      <tr><td>Collector</td><td>Raw data</td><td>분산 Collector가 원시 데이터를 캡처하여 Evidence Engine으로 전달</td><td>Raw data forwarded</td></tr>
+      <tr><td>Evidence Engine</td><td>Raw data</td><td>임계치·가중치 적용, 정규화 및 <em>Evidence Object</em> 생성</td><td>Evidence Objects</td></tr>
+      <tr><td>Correlation Engine</td><td>Evidence Objects</td><td>시간 창과 상관 규칙을 적용하여 Incident Records 생성</td><td>Incident Records</td></tr>
+      <tr><td>Defense Capability</td><td>Incident Records, Evidence Objects</td><td>각 Capability가 신뢰 계산을 위한 분석을 수행</td><td>Intermediate Trust Results</td></tr>
+      <tr><td>Trust Engine</td><td>Intermediate Trust Results</td><td>도메인별 신뢰 점수와 confidence 계산</td><td>Trust Objects</td></tr>
+      <tr><td>Mission Context</td><td>Mission plans, phases, priorities</td><td>Mission Context Object와 mission_weight 생성</td><td>Mission Context Object</td></tr>
+      <tr><td>Mission Impact</td><td>Trust Objects, Mission Context Object</td><td>미션 가용성, 무결성, 안전성, 지속성, 복구 가능성, 위험 평가</td><td>Mission Impact Object</td></tr>
+      <tr><td>Policy</td><td>Mission Impact Object</td><td>정책 규칙을 평가하여 권장 Action을 선택</td><td>Policy Decision</td></tr>
+      <tr><td>Recovery</td><td>Policy Decision</td><td>복구 가능성을 평가하고 Recovery Plan을 수립</td><td>Recovery Object</td></tr>
+      <tr><td>Decision</td><td>Policy Decision, Recovery Object</td><td>최종 Mission Decision 및 Decision Trace 생성</td><td>Mission Decision Object</td></tr>
+      <tr><td>Response Controller</td><td>Mission Decision Object</td><td>결정된 정책을 실행하기 위해 네트워크/컨테이너/미션/FC 인터페이스 호출</td><td>Executed actions</td></tr>
+      <tr><td>Target Component</td><td>Executed actions</td><td>UAV, GCS, 네트워크, 데이터베이스 등이 정책을 적용하고 상태를 갱신함</td><td>Updated state & new metrics</td></tr>
+    </tbody>
+  </table>
+
+  <!-- 2.14 Collector Design Principles -->
+  <h3 id="collector-design-principles"><span class="num">2.14</span> Collector Design Principles</h3>
+  <p>
+    Collector는 단순한 이벤트 포워더이며, 탐지 엔진이나 판단 모듈이 아니다. 다음 원칙을 준수하여 설계한다:
+  </p>
+  <ul>
+    <li><strong>Evidence Generator:</strong> Collector는 원시 데이터를 <em>Evidence</em>로 변환하는 역할만 수행하며 임계치 적용이나 신뢰 계산은 수행하지 않는다.</li>
+    <li><strong>Lightweight &amp; Passive:</strong> 테스트베드의 성능과 기능을 저해하지 않도록 가볍고 수동적으로 동작한다. 네트워크 패킷을 복사하거나 로그를 읽어 들이는 방식으로 데이터를 획득한다.</li>
+    <li><strong>Additive Deployment:</strong> 기존 테스트베드를 수정하지 않고 별도의 사이드카 또는 모듈로 추가된다. 개별 컴포넌트의 코드나 설정을 변경하지 않는다.</li>
+    <li><strong>Non‑Intrusive:</strong> Collector는 테스트베드의 동작 경로를 변경하지 않고, 장애 발생 시 시스템에 영향을 주지 않도록 설계된다.</li>
+    <li><strong>Centralized Decision:</strong> 모든 판단과 정책 선택은 MDG 내부에서 수행되며, Collector는 결정을 내리지 않는다. 이렇게 함으로써 다양한 도메인에서 수집한 데이터가 한 곳에서 상호 연관 분석될 수 있다.</li>
+  </ul>
+
+  <!-- 2.15 Response Layer Execution Model -->
+  <h3 id="response-layer-execution-model"><span class="num">2.15</span> Response Layer Execution Model</h3>
+  <p>
+    Response Layer는 MDG의 결정에 따라 실제 시스템에 정책을 적용하는 주체이다. Response Controller는 대상 컴포넌트와 인터페이스를 호출하되, 정책의 위험도와 임무 우선순위에 따라 자동 실행과 운영자 승인 단계로 구분한다:
+  </p>
+  <ul>
+    <li><strong>Automatic Actions:</strong> 세션 재설정, 방화벽 규칙 적용, 로그 수준 조정 등 짧은 시간에 수행되어야 하는 조치는 MDG의 결정 즉시 실행된다.</li>
+    <li><strong>Operator‑Confirmed Actions:</strong> 임무 중단, Waypoint 변경, 서버 재시작 등 임무에 큰 영향을 미치는 조치는 운영자의 승인 후에 실행한다. Response Controller는 추천 조치를 제시하고 대시보드를 통해 승인을 요청한다.</li>
+    <li><strong>Execution Interfaces:</strong> 네트워크 제어는 iptables/SDN API를, 컨테이너 제어는 Docker API를, 임무 제어는 Mission API를, 비행 제어는 PX4/MAVLink 채널을 사용한다.</li>
+  </ul>
+
+  <!-- 2.16 Collector Deployment Specification -->
+  <h3 id="collector-deployment-specification"><span class="num">2.16</span> Collector Deployment Specification</h3>
+  <p>
+    각 Collector가 어디에 설치되고 어떻게 실행되는지, 어떤 데이터를 관찰하고 어떤 Evidence를 생성하는지, 그리고 MDG 및 테스트베드와 어떻게 통신하는지를 표로 정리한다. 이 표는 구현자가 배포 위치와 설정을 정확히 이해하도록 돕기 위해 작성되었으며, 새로운 테스트베드 컴포넌트를 추가하지 않는다.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Collector</th>
+        <th>Deployment Position</th>
+        <th>Deployment Type</th>
+        <th>Target Component</th>
+        <th>Execution Environment</th>
+        <th>Observable Interface</th>
+        <th>Observed Data</th>
+        <th>Generated Evidence</th>
+        <th>Related Capability</th>
+        <th>Communication Method</th>
+        <th>Response Target</th>
+        <th>Failure Handling</th>
+        <th>Placement Rationale</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>UAV Collector</strong></td>
+        <td><code>uav_proxy</code> container (within <code>uav_ue</code> netns)</td>
+        <td>Docker Sidecar</td>
+        <td><code>uav_sitl</code> autopilot &amp; <code>uav_proxy</code></td>
+        <td>Shares <code>uav_ue</code> namespace as independent container</td>
+        <td>udp/14550, udp/14540, tcp/5762</td>
+        <td>MAVLink commands, telemetry, GPS inject messages, simulation outputs</td>
+        <td>Command sequence events, signature flags, unauthorized cmd attempts</td>
+        <td>Command, Mission</td>
+        <td>gRPC over net_sgi</td>
+        <td><code>uav_sitl</code>, <code>uav_proxy</code> via PX4/MAVLink</td>
+        <td>Heartbeat, auto‑restart, buffered logs</td>
+        <td>Monitors plain MAVLink before encryption; no change to flight control; minimal overhead</td>
+      </tr>
+      <tr>
+        <td><strong>GCS Collector</strong></td>
+        <td><code>gcs_proxy</code> container (net_sgi 172.30.0.10)</td>
+        <td>Docker Sidecar</td>
+        <td><code>gcs_c2</code> ground station &amp; <code>gcs_proxy</code></td>
+        <td>Shares <code>gcs_proxy</code> namespace</td>
+        <td>udp/14550, udp/14556, ws/14560</td>
+        <td>Pilot commands, UI events, decrypted MAVLink, WebSocket payloads</td>
+        <td>Command rate patterns, operator authentication events, unauthorized local commands</td>
+        <td>Command, Identity &amp; Access</td>
+        <td>gRPC over net_sgi</td>
+        <td><code>gcs_c2</code>, <code>gcs_proxy</code>, <code>web_backend</code></td>
+        <td>Heartbeat, auto‑restart, buffered logs</td>
+        <td>Captures commands immediately after decryption on the ground; preserves ARIA encryption channel</td>
+      </tr>
+      <tr>
+        <td><strong>Network Collector</strong></td>
+        <td><code>epc_upf</code> host &amp; core network containers (<code>epc_sgwu</code>, <code>epc_smf</code>, <code>epc_mme</code>, <code>ran_enb</code>)</td>
+        <td>Independent Container (host network agent)</td>
+        <td>EPC &amp; RAN network functions</td>
+        <td>Host network with privileged access to <code>net_core</code> and <code>net_cellular</code></td>
+        <td>PFCP (udp/8805), GTP‑C (udp/2123), GTP‑U (udp/2152), S1AP (36412)</td>
+        <td>Session create/delete messages, GTP tunnel state, PFCP delete/reset attempts, port scans</td>
+        <td>Session deletion events, UE isolation violations, network scan patterns</td>
+        <td>Session &amp; Network, Communication</td>
+        <td>gRPC or message queue over net_sgi</td>
+        <td>UPF/SGWU firewall rules, PFCP control plane, ran_enb isolation controls</td>
+        <td>Health check, multi‑instance fail‑over; network continues if collector fails</td>
+        <td>Captures control‑plane traffic at the core, enabling detection of PFCP/GTP anomalies without modifying EPC components</td>
+      </tr>
+      <tr>
+        <td><strong>Web Backend Collector</strong></td>
+        <td><code>web_backend</code> container (net_sgi 172.30.0.20)</td>
+        <td>Docker Sidecar</td>
+        <td>FastAPI/uvicorn application</td>
+        <td>Container with shared log volume and instrumentation hooks</td>
+        <td>http/8080, ws/8080, udp/14560</td>
+        <td>REST API requests, tokens, HTTP path &amp; parameters, WebSocket messages, plain C2 tap</td>
+        <td>Unauthorized API call events, command injection patterns, credential misuse</td>
+        <td>Identity &amp; Access, Command</td>
+        <td>gRPC over net_sgi</td>
+        <td><code>web_backend</code> (ACL enforcement), <code>iptables</code></td>
+        <td>Heartbeat, auto‑restart, local buffering</td>
+        <td>Monitors API misuse directly at the service boundary without altering application code</td>
+      </tr>
+      <tr>
+        <td><strong>MongoDB Collector</strong></td>
+        <td><code>epc_mongo</code> container (10.50.0.5/10.44.0.2)</td>
+        <td>Docker Sidecar</td>
+        <td>MongoDB instance</td>
+        <td>Container with audit log plugin</td>
+        <td>MongoDB audit log stream</td>
+        <td>Database queries, authentication attempts, insert/update operations</td>
+        <td>Unauthorized DB access events, injection patterns, unusual query volume</td>
+        <td>Identity &amp; Access</td>
+        <td>gRPC over net_sgi</td>
+        <td><code>epc_mongo</code> ACL, <code>web_backend</code> auth system</td>
+        <td>Audit buffering, auto‑restart; missing logs reduce confidence scores</td>
+        <td>Places monitoring directly on the database to detect credential bypass and ensure HSS/PCRF integrity</td>
+      </tr>
+      <tr>
+        <td><strong>Mission Context Collector</strong></td>
+        <td>Mission planning server (management plane, e.g., <code>mission_server</code>)</td>
+        <td>Embedded Process</td>
+        <td>Mission planning system</td>
+        <td>Process within planning service</td>
+        <td>Mission API (HTTP/REST)</td>
+        <td>Mission type, phases, priorities, constraints, mission weight</td>
+        <td>Mission context object (no anomaly)</td>
+        <td>Mission</td>
+        <td>gRPC over net_sgi</td>
+        <td>MDG only (used for impact evaluation)</td>
+        <td>Fallback to default mission context if unavailable</td>
+        <td>Provides current mission context without interacting with flight control, enabling accurate mission impact assessment</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- 2.17 Mission Defense Gateway Deployment -->
+  <h3 id="mdg-deployment"><span class="num">2.17</span> Mission Defense Gateway Deployment</h3>
+  <p>
+    Mission Defense Gateway는 관리 평면(net_sgi)의 별도 서비스인 <code>mdg_core</code> 컨테이너로 배치된다. 이는 <code>web_backend</code>와 동일한 호스트에 위치하지만 웹 서버와는 독립적으로 동작하며, gRPC 또는 메시지 브로커를 통해 Collector와 통신한다. MDG는 별도의 컨테이너로 분리함으로써 웹 서비스의 변화와 무관하게 방어 로직을 유지하고, 관리 네트워크 상에서 안전하게 제어·감시된다. Evidence, Correlation, Trust, Mission Context, Mission Impact, Policy, Recovery, Decision 모듈을 모두 포함하며, Response Controller는 MDG 내부에서 실행되어 테스트베드 컴포넌트에 대한 정책 적용 명령을 전송한다.
+  </p>
+
+  <!-- End of added subsections -->
+
+  </div>
+
+  <!-- ========================
+       Chapter 3 – Threat Analysis
+       ======================== -->
+  <h2 id="chapter-3"><span class="num">3.</span> Threat Analysis</h2>
+  <div class="panel">
+    <h3>Threat Landscape</h3>
+    <p>
+      UAV C2 테스트베드에서 발생할 수 있는 위협은 네트워크, 인증, 세션 관리, 명령 및 임무 계층에 걸쳐 있다.
+      공격 시나리오 분석과 노출면 테이블에 따르면, 암호화 알고리즘은 안전하게 구현되었지만,
+      제어 평면과 애플리케이션 계층에서 인증과 분리 실패가 주요 취약점이다. 예를 들어 PFCP 세션 삭제 공격은
+      제어 평면에 대한 인증 부재를 악용하며, web API와 MongoDB에 대한 무인증 접근은 명령 주입과 데이터
+      변조를 가능하게 한다. 또한 동일 APN 내에서 UE 격리가 이루어지지 않아 한 기체의 트래픽이 다른 기체에
+      영향을 미칠 수 있다.
+    </p>
+
+    <h3>Threat Classification</h3>
+    <p>
+      공격을 단일 이벤트로 나열하는 대신, 공통적인 Security Failure를 기준으로 다음과 같이 분류한다:
+    </p>
+    <ul>
+      <li><strong>Authentication &amp; Authorization Failures:</strong> web API, MongoDB, PFCP/GTP control
+      plane의 인증 부재로 인한 무단 접근 및 명령 주입.</li>
+      <li><strong>Network Segmentation Failures:</strong> UE 격리 미비로 인해 동일 APN에 존재하는 다른 기체의
+      세션을 중단하거나 트래픽을 관찰할 수 있음.</li>
+      <li><strong>Session Integrity Failures:</strong> PFCP Delete, Session Reset 메시지를 통한 세션 취소 및
+      끊김 유발.</li>
+      <li><strong>Key Management &amp; Encryption Failures:</strong> NAS null 암호 우선순위, 키 배포의 부적절함으로 인해
+      기밀성과 무결성이 위협받음.</li>
+      <li><strong>Command Integrity Failures:</strong> MAVLink Command의 무결성 검증 부족과 명령 서명 키 노출로
+      발생하는 명령 변조.</li>
+      <li><strong>Infrastructure Exposure:</strong> SITL serial port 5762, GPS port 14560, API port 8080 등 오픈
+      포트로 인한 외부 공격 접점.</li>
+    </ul>
+
+    <h3>Attack Scenario Analysis</h3>
+    <p>
+      12개의 공격 시나리오를 자세히 분석한 결과, 대부분의 공격은 위에서 정의한 분류에 속한다. 예를 들어
+      PFCP Delete와 세션 재설정 공격(T x – S3)은 <em>Session Integrity Failure</em>에 해당하며, Oracle DB Injection과
+      web API Exploit은 <em>Authentication &amp; Authorization Failure</em>에 해당한다. NAS null 암호 설정과 키
+      배포 문제는 <em>Key Management Failure</em>로 분류된다. MAVLink Replay 및 Command Injection은
+      <em>Command Integrity Failure</em>에 속한다. 이러한 분류는 각 공격을 개별 탐지기로 대응하는 대신,
+      공유된 실패 원인을 기반으로 Capability를 설계해야 함을 강조한다.
+    </p>
+
+    <h3>Common Security Failures</h3>
+    <p>
+      모든 시나리오를 종합하면 다음과 같은 공통 보안 실패가 도출된다:
+    </p>
+    <ul>
+      <li><strong>Unverified Control Plane:</strong> PFCP 및 NAS 제어 평면에서 암호화 및 인증이 부재하여 세션 관리가
+      공격자가 변조할 수 있는 상태이다.</li>
+      <li><strong>Plaintext Application Interfaces:</strong> web API와 MongoDB가 인증 없이 노출되어 있어 쉽게 침해된다.</li>
+      <li><strong>Poor Key Management:</strong> 서명 키가 공개적으로 배포되거나 재사용되어 명령 위변조가 가능하다.</li>
+      <li><strong>No Isolation:</strong> UE 격리가 미비하여 공통 APN에서 공격 전파가 쉽다.</li>
+      <li><strong>Lack of Monitoring &amp; Thresholding:</strong> 현재 시스템은 지표를 수집하지만 정량적 평가나 임계치가 없어
+      이벤트의 심각도를 구분할 수 없다.</li>
+    </ul>
+
+    <h3>Need for Defense Capabilities</h3>
+    <p>
+      위의 보안 실패는 다섯 가지 Capability의 필요성을 직접적으로 보여준다:
+    </p>
+    <ul>
+      <li><strong>Communication Trust Capability:</strong> PFCP/GTP 제어 평면과 NAS 암호 설정을 모니터링하여 통신
+      채널의 신뢰를 평가한다. 패킷 손실, RTT, 삭제 시도 등 메트릭을 수집한다.</li>
+      <li><strong>Identity &amp; Access Trust Capability:</strong> web API, DB, MME 등에서 발생하는 인증 이벤트를
+      평가하여 무단 접근을 탐지하고 사용자 신원을 검증한다.</li>
+      <li><strong>Session &amp; Network Trust Capability:</strong> PFCP Delete, Session Reset, UE isolation 상태를
+      모니터링하여 세션 및 네트워크 분리의 무결성을 확보한다.</li>
+      <li><strong>Command Trust Capability:</strong> MAVLink Command의 무결성 검증, 서명 확인, 명령 유형과
+      시퀀스 분석을 통해 명령의 적법성을 평가한다.</li>
+      <li><strong>Mission Trust Capability:</strong> 임무 단계, 우선순위, 환경 제약을 모니터링하고 임무 중 나타나는
+      이상 행동을 평가한다.</li>
+    </ul>
+
+    <h3>Threat Surface</h3>
+    <p>
+      테스트베드에서 확인된 노출면은 아래와 같다:
+    </p>
+    <ul>
+      <li><strong>SITL Serial Port (tcp/5762):</strong> 원격에서 컨트롤 가능한 시리얼 포트. 명령 재주입 위험.</li>
+      <li><strong>PFCP Control Plane:</strong> 인증되지 않은 PFCP Session Delete 및 Create 메시지.</li>
+      <li><strong>Web API (8080) &amp; MongoDB (14556):</strong> 인증 없이 접근 가능해 데이터 탈취와 명령 삽입 가능.</li>
+      <li><strong>NAS Null Encryption:</strong> EEA0 우선순위가 설정된 MME로 인해 제어 평면이 평문으로 전송.</li>
+      <li><strong>Key Distribution:</strong> 명령 서명 키가 노출되어 있는 상태.</li>
+      <li><strong>UE Isolation:</strong> 동일 APN에 여러 기체가 존재하여 세션 간 간섭 가능.</li>
+      <li><strong>GPS Port (14560):</strong> GPS dahnet 포트가 외부에 노출되어 GPS 스푸핑 가능.</li>
+    </ul>
+
+    <h3>Threat Capability Matrix</h3>
+    <p>
+      아래 표는 위협 분류와 관련 Capability를 매핑한다. 이를 통해 각각의 공격이 어떤 Capability로 흡수되어야
+      하는지 확인할 수 있다.
+    </p>
+    <table>
+      <thead>
+        <tr><th>Threat Category</th><th>Security Failure</th><th>Relevant Capability</th><th>Key Metrics &amp; Examples</th><th>Example Scenarios</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Authentication Failure</td><td>web API, MongoDB, PFCP 인증 없음</td><td>Identity &amp; Access</td><td>Auth_Failure, DB_Access, API_Call_Count</td><td>Oracle Injection, Web API Exploit</td></tr>
+        <tr><td>Network Segmentation Failure</td><td>UE isolation 미비</td><td>Session &amp; Network</td><td>UE_Isolation_State, PFCP_Delete_Attempt</td><td>PFCP Session Deletion, Session Reset</td></tr>
+        <tr><td>Session Integrity Failure</td><td>세션 삭제/재설정</td><td>Session &amp; Network</td><td>PFCP_Delete_Attempt, Session_Reset_Count</td><td>PFCP DoS, Session Hijacking</td></tr>
+        <tr><td>Key Management Failure</td><td>NAS null 암호, 키 유출</td><td>Communication</td><td>NAS_Cipher_Order, Key_Distribution_Status</td><td>NAS Null Cipher Attack, Command Signature Bypass</td></tr>
+        <tr><td>Command Integrity Failure</td><td>명령 재생/변조</td><td>Command</td><td>Command_Type, Signature_Verified, Sequence</td><td>MAVLink Replay, Unauthorized Command</td></tr>
+        <tr><td>Infrastructure Exposure</td><td>오픈 포트, 외부 노출</td><td>Communication</td><td>Port_State, Packet_Count, GPS_Input</td><td>SITL Port Injection, GPS Spoofing</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Attack → Capability Mapping</h3>
+    <p>
+      모든 공격 시나리오를 Capability로 매핑하면 다음과 같은 패턴이 나타난다. PFCP Delete, Session Reset, UE
+      Isolation 공격은 <em>Session &amp; Network Trust Capability</em>에 의해 처리된다. NAS Null Cipher, 키 유출,
+      SITL port exposure, GPS spoofing은 <em>Communication Trust Capability</em>가 담당한다. DB Injection, Web API
+      Exploit, 인증 우회는 <em>Identity &amp; Access Trust Capability</em>에 대응하며, MAVLink Replay와 Command
+      Injection은 <em>Command Trust Capability</em>가 처리한다. Mission Trust Capability는 임무 단계와 우선순위를
+      평가해, 동일 공격에 대해서도 임무 중요도에 따라 다른 대응 수준을 허용한다. 이 매핑을 통해 12개의 공격을
+      다섯 개의 Capability에 통합하여, 방어 시스템을 단순화하고 확장 가능하게 한다.
+    </p>
+  </div>
+
+  <!-- ========================
+       Chapter 4 – Defense Capability Architecture
+       ======================== -->
+  <h2 id="chapter-4"><span class="num">4.</span> Defense Capability Architecture</h2>
+  <div class="panel">
+    <h3>Overview</h3>
+    <p>
+      이 장에서는 다섯 가지 Defense Capability의 구조를 설계한다. 각 Capability는 특정 도메인의 자산을 보호하며,
+      입력 메트릭을 평가하여 Evidence와 Trust를 생성한다. 아래에서 각 Capability의 구성과 데이터 흐름을
+      구체적으로 설명한다. 설계는 Core Architecture Model과 Additive Design Model의 데이터 구조를 활용하고,
+      테스트베드에서 실제로 수집 가능한 메트릭만을 사용한다.
+    </p>
+
+    <!-- Communication Trust Capability -->
+    <h3 id="comm-cap"><span class="num">4.1</span> Communication Trust Capability</h3>
+    <h4>Purpose</h4>
+    <p>통신 채널의 가용성과 무결성을 유지하기 위해 PFCP/GTP 제어 평면, NAS 암호 설정, 패킷 손실과 RTT 등을 모니터링하여 신뢰를 평가한다.</p>
+    <h4>Protected Assets</h4>
+    <p>통신 링크와 세션(UE–eNB–UPF–GCS 경로), 제어 평면 메시지(PFCP Create/Delete, NAS Security Mode), GPS 데이터 채널.</p>
+    <h4>Input Metrics</h4>
+    <ul>
+      <li><strong>PFCP_Delete_Attempt:</strong> 0이어야 정상. 1 건 이상이면 경고, 반복 시 위험.</li>
+      <li><strong>PFCP_Create_Attempt/Session_Reset:</strong> 정상 세션 생성 비율 대비 비정상 증가 여부.</li>
+      <li><strong>NAS_Cipher_Order:</strong> EEA2 우선순위인지 여부; EEA0이면 위험.</li>
+      <li><strong>Packet_Loss (%):</strong> 통신 경로의 손실률; Mission Weight Model에 따라 임계치가 달라진다.</li>
+      <li><strong>RTT (ms):</strong> 왕복 시간; 일정 기간 상승하면 DoS 의심.</li>
+      <li><strong>Port_State:</strong> SITL serial port 5762, GPS port 14560의 개방 여부.</li>
+    </ul>
+    <h4>Input Objects</h4>
+    <p>Raw Events: PFCP 로그, NAS Security Mode Command, TCP/UDP 포트 스캔, SNMP/metrics 수집 결과.</p>
+    <h4>Processing Responsibility</h4>
+    <p>
+      Evidence Collector는 Input Metrics를 받아 Threshold Policy Model과 Time Window Model을 적용하여 severity와
+      confidence를 계산한다. Correlation Engine은 PFCP Delete와 포트 스캔이 단기간에 함께 발생하면 동일 Incident로
+      묶는다. Trust Evaluator는 Evidence를 통합하여 Communication Trust Score를 계산한다.
+    </p>
+    <h4>Generated Evidence</h4>
+    <p>각 이벤트는 Evidence Object로 저장되며, 필드에는 metric, observed_value, expected_value, threshold,
+      severity, weight, confidence, timestamp, ttl, correlation_id 등이 포함된다.</p>
+    <h4>Generated Trust</h4>
+    <p>Trust Object(domain=communication)는 0–100 범위의 신뢰 점수와 confidence를 포함한다. Severity와 weight,
+      Time Window 평균을 고려하여 계산한다.</p>
+    <h4>Generated Output</h4>
+    <p>Communication Trust Capability는 계산된 Trust Object를 Trust Layer에 전달하며, Mission Impact 평가에서
+      가용성과 통신 연속성 항목에 영향을 준다.</p>
+    <h4>Interfaces</h4>
+    <ul>
+      <li><strong>Upstream:</strong> Capability Monitor로부터 Raw Events를 수신.</li>
+      <li><strong>Downstream:</strong> Evidence Collector와 Trust Evaluator에 Evidence Object 및 Trust Object를 전달.</li>
+      <li><strong>External:</strong> Monitoring Dashboard에 통신 상태를 제공하여 운영자가 확인할 수 있다.</li>
+    </ul>
+    <h4>Related Threats</h4>
+    <p>PFCP 세션 삭제, NAS null 암호 설정, 키 유출, 포트 오픈으로 인한 공격 등 모든 Communication 관련 위협.</p>
+    <h4>Related Attack Scenarios</h4>
+    <p>PFCP DoS, NAS Null Cipher, GPS Spoofing, SITL Port Injection, Key Distribution Attack 등.</p>
+    <h4>Mission Contribution</h4>
+    <p>통신 채널의 가용성 확보는 모든 임무에서 필수적이며, Communication Trust Score는 Mission Impact의 가용성,
+      연속성 항목에 큰 비중으로 반영된다.</p>
+    <h4>Architecture Position</h4>
+    <p>Capability Layer에 위치하며 Evidence Layer와 Trust Layer 사이에 직접 연결된다.</p>
+    <h4>Capability Flow</h4>
+    <pre>
+PFCP/NAS/GPS Metrics → Evidence Collector → Evidence Object(s) → Trust Evaluator → Communication Trust Object
+    </pre>
+    <h4>Failure Handling</h4>
+    <p>모니터가 비정상적인 패턴을 감지하지 못하거나 통신 로그가 손실될 경우, Confidence가 낮게 설정되고, 신뢰
+      계산에서 페널티를 적용한다. 센서 손실이 지속되면 보조 채널(예: GTP 통계)로 대체한다.</p>
+    <h4>Design Considerations</h4>
+    <p>메트릭의 정상 범위는 테스트베드 실측 데이터를 기반으로 정하며, 임무 유형에 따라 가중치를 조정한다. GPS
+      채널은 별도 네트워크로 분리되어 있어 통신 trust와 별도로 평가될 수 있다.</p>
+
+    <!-- Identity & Access Trust Capability -->
+    <h3 id="identity-cap"><span class="num">4.2</span> Identity &amp; Access Trust Capability</h3>
+    <h4>Purpose</h4>
+    <p>사용자와 서비스의 신원을 검증하고 접근 권한을 평가하여 무단 접근과 인증 우회를 방지한다.</p>
+    <h4>Protected Assets</h4>
+    <p>web backend, MongoDB 데이터베이스, PFCP/GTP 제어 평면, Mission Control API.</p>
+    <h4>Input Metrics</h4>
+    <ul>
+      <li><strong>Auth_Failure:</strong> 로그인 실패 횟수 및 패턴.</li>
+      <li><strong>DB_Access:</strong> MongoDB 접속 시도 횟수 및 성공/실패 여부.</li>
+      <li><strong>API_Call_Count:</strong> 인증 없이 호출된 web API 요청 수.</li>
+      <li><strong>Credential_Verification:</strong> 전자 서명 검증 결과.</li>
+      <li><strong>Session_Token_Usage:</strong> 만료 또는 이상 사용 패턴.</li>
+    </ul>
+    <h4>Input Objects</h4>
+    <p>Authentication 로그, web server 로그, database audit 로그, token validation 결과.</p>
+    <h4>Processing Responsibility</h4>
+    <p>
+      Evidence Collector는 로그인 실패가 일정 기간 동안 급증하는지 체크하고, 무인증 API 호출 여부를 평가한다.
+      Correlation Engine은 동일 Source IP가 여러 서비스에 접근하는지 상관 분석한다. Trust Evaluator는 인증 성공률과
+      실패 패턴을 이용하여 Identity &amp; Access Trust Score를 계산한다.
+    </p>
+    <h4>Generated Evidence</h4>
+    <p>Evidence Object는 metric=Auth_Failure, DB_Access, API_Call_Count 등으로 생성된다. severity는 Threshold
+      Policy Model에 따라 정의된다.</p>
+    <h4>Generated Trust</h4>
+    <p>Identity &amp; Access Trust Object는 인증 관련 신뢰 점수와 confidence를 포함한다. 신뢰 점수가 낮을수록
+      무단 접근 가능성이 높다.</p>
+    <h4>Generated Output</h4>
+    <p>산출된 Trust Object는 Mission Impact 평가에서 무결성, 안전성 항목에 영향을 준다.</p>
+    <h4>Interfaces</h4>
+    <ul>
+      <li><strong>Upstream:</strong> AAA 서버, OAuth/Token 서비스로부터 로그 수신.</li>
+      <li><strong>Downstream:</strong> Evidence Collector, Trust Evaluator.</li>
+      <li><strong>External:</strong> Identity & Access Management 시스템과 연동하여 계정 상태를 업데이트.</li>
+    </ul>
+    <h4>Related Threats</h4>
+    <p>Oracle Injection, web API exploit, MongoDB unauthenticated access, session hijacking.</p>
+    <h4>Related Attack Scenarios</h4>
+    <p>TM1/V1 Oracle Injection, NF‑4 web API exploit, NF‑3 MongoDB attack 등.</p>
+    <h4>Mission Contribution</h4>
+    <p>신원과 접근의 신뢰는 임무의 무결성을 보호하며, 높은 우선순위 임무에서는 인증 실패가 즉각적인 위험으로 간주된다.</p>
+    <h4>Architecture Position</h4>
+    <p>Capability Layer에 위치하며 Evidence Layer와 Trust Layer를 거쳐 Mission Impact로 전달된다.</p>
+    <h4>Capability Flow</h4>
+    <pre>
+Auth/DB/API Logs → Evidence Collector → Evidence Object(s) → Trust Evaluator → Identity &amp; Access Trust Object
+    </pre>
+    <h4>Failure Handling</h4>
+    <p>로그 누락이나 인증 시스템 장애 시 confidence가 낮아지며, 보수적(낮은 신뢰) 평가가 적용된다. 모니터링 에이전트는
+      대체 로그 경로를 사용해 지속성을 확보한다.</p>
+    <h4>Design Considerations</h4>
+    <p>명령 주입과 DB 공격은 단일 이벤트라도 치명적 결과를 유발할 수 있으므로 Threshold Policy Model에서 낮은
+      임계치를 적용한다.</p>
+
+    <!-- Session & Network Trust Capability -->
+    <h3 id="session-cap"><span class="num">4.3</span> Session &amp; Network Trust Capability</h3>
+    <h4>Purpose</h4>
+    <p>세션 상태와 네트워크 분리의 무결성을 보장하기 위해 PFCP, GTP 세션과 APN 격리 현황을 모니터링한다.</p>
+    <h4>Protected Assets</h4>
+    <p>UE–eNB–UPF 사이의 데이터 및 제어 세션, APN 구성, UE MAC/IMSI 매핑.</p>
+    <h4>Input Metrics</h4>
+    <ul>
+      <li><strong>PFCP_Delete_Attempt:</strong> 세션 삭제 시도 횟수.</li>
+      <li><strong>Session_Reset_Count:</strong> GTP Session 재설정 횟수.</li>
+      <li><strong>UE_Isolation_State:</strong> UE 격리 설정 상태(Enabled/Disabled).</li>
+      <li><strong>APN_Flow_Entropy:</strong> 동일 APN 내 트래픽 분포 변화.</li>
+      <li><strong>Session_TTL:</strong> 세션의 TTL 값 변화. 비정상적으로 짧아지면 공격 의심.</li>
+    </ul>
+    <h4>Input Objects</h4>
+    <p>UPF/MGW 로그, PFCP statistics, GTP tunnel state, APN configuration state.</p>
+    <h4>Processing Responsibility</h4>
+    <p>
+      Evidence Collector는 PFCP 삭제와 세션 재설정 이벤트를 수집하고, UE Isolation State를 주기적으로 확인한다.
+      Correlation Engine은 PFCP Delete 후 특정 APN 트래픽이 줄어든 경우를 동일 Incident로 묶는다. Trust Evaluator는
+      세션 유지 여부와 격리 상태를 평가하여 Session &amp; Network Trust Score를 계산한다.
+    </p>
+    <h4>Generated Evidence</h4>
+    <p>metric =PFCP_Delete_Attempt, Session_Reset_Count, UE_Isolation_State 등으로 Evidence Object를 생성한다.</p>
+    <h4>Generated Trust</h4>
+    <p>Session &amp; Network Trust Object는 세션 무결성 신뢰 점수와 confidence를 제공하며, 낮은 신뢰는 임무 가용성
+      감소로 이어진다.</p>
+    <h4>Generated Output</h4>
+    <p>Trust Object는 Mission Impact 평가에서 가용성 및 연속성에 반영된다.</p>
+    <h4>Interfaces</h4>
+    <ul>
+      <li><strong>Upstream:</strong> PFCP/GTP 로깅 시스템, network monitor.</li>
+      <li><strong>Downstream:</strong> Evidence Layer, Trust Layer.</li>
+    </ul>
+    <h4>Related Threats</h4>
+    <p>PFCP Delete 공격, Session Reset Flooding, UE Isolation disabled 공격.</p>
+    <h4>Related Attack Scenarios</h4>
+    <p>TM2 PFCP Session Deletion, NF‑6 Session Reset Exploit, NF‑7 UE Isolation Attack 등.</p>
+    <h4>Mission Contribution</h4>
+    <p>세션과 네트워크 안정성은 통신 가용성을 직접 결정하므로, 높은 가중치를 가진다.</p>
+    <h4>Architecture Position</h4>
+    <p>Capability Layer – Evidence Layer – Trust Layer로 이어지는 구조.</p>
+    <h4>Capability Flow</h4>
+    <pre>
+PFCP/GTP/APN Metrics → Evidence Collector → Evidence Object(s) → Trust Evaluator → Session &amp; Network Trust Object
+    </pre>
+    <h4>Failure Handling</h4>
+    <p>UE Isolation 상태를 확인하는 모듈이 실패하면 APN 트래픽 엔트로피 지표를 대신 사용한다. 로그 손실 시
+      Confidence 감소를 통해 보수적 평가를 수행한다.</p>
+    <h4>Design Considerations</h4>
+    <p>APN 격리 기능은 테스트베드에서 설정 가능한지 확인해야 하며, 현장에서 지원되지 않는 경우 다른 메트릭으로
+      대체해야 한다.</p>
+
+    <!-- Command Trust Capability -->
+    <h3 id="command-cap"><span class="num">4.4</span> Command Trust Capability</h3>
+    <h4>Purpose</h4>
+    <p>무인기의 제어 명령이 적법하며 변조되지 않았는지 확인한다. 특히 MAVLink 2.0 메시지 서명 및 명령의
+      종류, 시퀀스를 검증한다.</p>
+    <h4>Protected Assets</h4>
+    <p>무인기 비행 제어 권한, GCS → UE 명령 채널, 비행 계획.</p>
+    <h4>Input Metrics</h4>
+    <ul>
+      <li><strong>Command_Type:</strong> LAND, ARM, TAKEOFF, WAYPOINT 등.</li>
+      <li><strong>Signature_Verified:</strong> 명령 서명의 유효성 여부.</li>
+      <li><strong>Sequence_Number:</strong> 명령 시퀀스 점프나 재생 여부.</li>
+      <li><strong>Command_Source:</strong> 명령을 발신한 IP/ID.</li>
+      <li><strong>Unauthorized_Command:</strong> 승인되지 않은 명령 유형.</li>
+    </ul>
+    <h4>Input Objects</h4>
+    <p>MAVLink 메시지 로그, 명령 서명 검증 결과, GCS 및 UE ID 매핑 정보.</p>
+    <h4>Processing Responsibility</h4>
+    <p>
+      Evidence Collector는 각 명령에 대해 서명 검증, 명령 타입, 시퀀스 번호를 기록한다. Correlation Engine은
+      동일 Source가 짧은 시간에 반복적으로 동일 명령을 전송하는 경우를 Incident로 묶는다. Trust Evaluator는
+      미승인 명령과 서명 실패 비율을 기반으로 Command Trust Score를 계산한다.
+    </p>
+    <h4>Generated Evidence</h4>
+    <p>metric =Unauthorized_Command, Signature_Verified, Sequence_Anomaly, Command_Source 등으로 Evidence를 생성한다.</p>
+    <h4>Generated Trust</h4>
+    <p>Command Trust Object는 명령 채널의 신뢰 수준을 나타낸다. 신뢰가 낮으면 Mission Impact 평가에서 안전성과 무결성
+      항목에 영향을 준다.</p>
+    <h4>Generated Output</h4>
+    <p>Trust Object는 Trust Layer를 통해 Mission Impact에 전달되며, Policy Engine이 적절한 방어 조치를 결정하는 데 사용된다.</p>
+    <h4>Interfaces</h4>
+    <ul>
+      <li><strong>Upstream:</strong> MAVLink Proxy, Command Logger.</li>
+      <li><strong>Downstream:</strong> Evidence Collector, Trust Evaluator.</li>
+    </ul>
+    <h4>Related Threats</h4>
+    <p>MAVLink Replay, Unauthorized Command, Command Tampering.</p>
+    <h4>Related Attack Scenarios</h4>
+    <p>V1 Replay Attack, NF‑4 Command Injection, Signature Bypass 등.</p>
+    <h4>Mission Contribution</h4>
+    <p>명령 신뢰는 임무의 무결성과 안전성을 직접적으로 결정한다. 비행제어 명령이 변조될 경우 임무가 즉시 실패할 수 있다.</p>
+    <h4>Architecture Position</h4>
+    <p>Capability Layer에서 Command Monitor가 동작하며, Evidence와 Trust를 상위 계층으로 전달한다.</p>
+    <h4>Capability Flow</h4>
+    <pre>
+MAVLink Commands → Evidence Collector → Evidence Object(s) → Trust Evaluator → Command Trust Object
+    </pre>
+    <h4>Failure Handling</h4>
+    <p>명령 서명 검증 모듈이 실패할 경우, 신뢰 점수를 즉각적으로 낮추고 Policy Engine에 알림을 보낸다. 또한 가짜
+      명령은 Block List에 등록한다.</p>
+    <h4>Design Considerations</h4>
+    <p>Command Trust는 비행 제어 안전과 직결되므로 Threshold Policy Model에서 매우 낮은 임계치를 설정한다.</p>
+
+    <!-- Mission Trust Capability -->
+    <h3 id="mission-cap"><span class="num">4.5</span> Mission Trust Capability</h3>
+    <h4>Purpose</h4>
+    <p>임무 실행 환경과 상태를 모니터링하여 임무에 대한 신뢰를 평가한다. 임무 유형, 단계, 목표와 환경 변수의
+      일관성을 확인한다.</p>
+    <h4>Protected Assets</h4>
+    <p>임무 계획, 우선순위, 임무 수행을 위한 자원(연료, 시간), 중요 자산(UAV 상태, 페이로드).</p>
+    <h4>Input Metrics</h4>
+    <ul>
+      <li><strong>Mission_Type:</strong> Recon, Strike, Relay, Transport, Monitoring 등.</li>
+      <li><strong>Mission_Phase:</strong> Planning, Takeoff, Transit, Operation, Return, Landing.</li>
+      <li><strong>Mission_Priority:</strong> High, Medium, Low 등.</li>
+      <li><strong>Mission_Goal_Status:</strong> 목표 달성률 또는 과업 완료 여부.</li>
+      <li><strong>Operational_Constraint:</strong> 비행 금지 구역, 시간 제한, 연료/배터리 상태.</li>
+    </ul>
+    <h4>Input Objects</h4>
+    <p>Mission Plan 파일, UAV 상태 보고, 환경 센서 데이터, 정책 데이터베이스.</p>
+    <h4>Processing Responsibility</h4>
+    <p>
+      Mission Context Manager는 임무 계획에서 Mission Context Object를 생성한다. Evidence Collector와
+      Trust Evaluator로부터 받은 정보와 Mission Context를 비교하여 임무에서 예상치 못한 변칙을 탐지한다. Trust
+      Evaluator는 Mission 도메인에 대한 신뢰를 계산한다.
+    </p>
+    <h4>Generated Evidence</h4>
+    <p>Mission Trust Capability는 직접 Evidence를 생성하지 않지만, Mission Context와 Trust 결과를 이용해
+      Mission Impact를 계산한다.</p>
+    <h4>Generated Trust</h4>
+    <p>Mission Trust Object는 Mission Context와 다른 도메인 신뢰 점수를 종합하여 Mission Level 신뢰를 제공한다.</p>
+    <h4>Generated Output</h4>
+    <p>Mission Trust Object는 Mission Impact Layer로 전달되어 Overall Mission Impact를 계산하는 데 사용된다.</p>
+    <h4>Interfaces</h4>
+    <ul>
+      <li><strong>Upstream:</strong> Mission Plan System, UAV Telemetry.</li>
+      <li><strong>Downstream:</strong> Mission Impact Evaluator.</li>
+    </ul>
+    <h4>Related Threats</h4>
+    <p>Mission Hijacking, Mission Policy Violation.</p>
+    <h4>Related Attack Scenarios</h4>
+    <p>NF‑5 Mission Reassignment Attack 등.</p>
+    <h4>Mission Contribution</h4>
+    <p>임무 신뢰는 임무의 성공과 직접적으로 연결되어 있으며, 모든 도메인의 신뢰를 종합한 전반적 신뢰의 최종 단계이다.</p>
+    <h4>Architecture Position</h4>
+    <p>Mission Context Layer와 Trust Layer 사이에서 동작한다.</p>
+    <h4>Capability Flow</h4>
+    <pre>
+Mission Context Inputs → Mission Context Manager → Mission Trust Object → Mission Impact Evaluation
+    </pre>
+    <h4>Failure Handling</h4>
+    <p>Mission 계획 데이터가 없는 경우, 임무를 기본(low) 신뢰 상태로 평가한다. Mission Phase 오류나 우선순위
+      불일치가 발견되면 Policy Engine에 경보를 전달한다.</p>
+    <h4>Design Considerations</h4>
+    <p>Mission Trust Capability는 다른 도메인과 달리 직접 Evidence를 생성하지 않으므로, 신뢰 계산이 다른
+      도메인의 신뢰에 크게 의존한다. Mission Weight Model을 통해 각 Capability의 영향도를 조절한다.</p>
+  </div>
+
+  <!-- ========================
+       Chapter 5 – Evidence Architecture
+       ======================== -->
+  <h2 id="chapter-5"><span class="num">5.</span> Evidence Architecture</h2>
+  <div class="panel">
+    <h3>Overview</h3>
+    <p>
+      Evidence는 방어 아키텍처에서 가장 중요한 객체이다. 모든 판단과 신뢰 계산, 정책 적용은 Evidence에
+      기반한다. 본 장은 Evidence의 생성, 상관, 저장, 품질 관리, 수명 주기와 인터페이스를 구체적으로 설계한다.
+    </p>
+
+    <h3>Evidence Sources</h3>
+    <p>
+      Evidence는 Capability Monitor가 수집한 Raw Metrics에서 만들어진다. 예를 들어 PFCP Delete, NAS_Cipher_Order,
+      Auth_Failure, DB_Access, Command_Type, Mission_Phase 등이 이에 해당한다. 모든 메트릭은 Testbed에서
+      실시간으로 측정 가능해야 하며, Threshold Policy Model과 연계된다.
+    </p>
+
+    <h3>Evidence Collection</h3>
+    <p>
+      Evidence Collector는 Sensor Interface를 통해 Raw Metrics를 수신하고, Metric 정의에 따라 값을 검증한다.
+      Threshold Policy Model을 적용하여 Normal/Warning/Critical/Danger 구간을 구분하고 severity와 weight를
+      계산한다. Time Window Model을 활용해 현재 상태와 롤링 윈도우 평균을 비교한다.
+    </p>
+
+    <h3>Evidence Normalization</h3>
+    <p>
+      서로 다른 형식의 Raw Metrics를 일관된 구조로 변환하기 위해 Evidence Object 스키마를 사용한다. 각 Evidence는
+      고유 ID, Capability, Source, Entity, Metric, Observed Value, Expected Value, Threshold, Severity,
+      Weight, Confidence, Timestamp, TTL, Correlation ID, Description을 포함한다. 이러한 구조는 추후 Trust Evaluation
+      단계에서 자동으로 처리될 수 있도록 표준화되어 있다.
+    </p>
+
+    <h3>Evidence Correlation</h3>
+    <p>
+      상관 분석은 개별 Evidence를 Incident로 묶어 의미 있는 사건을 구성한다. Correlation Rules는 Additive
+      Design Model에서 정의되며, 시간 창, 동일 Source/Target, Capability 조합 등을 기준으로 Incident를 생성한다.
+      Correlation Score는 Incident의 심각도를 나타내며, 여러 Evidence의 severity·confidence 값을 종합하여 계산한다.
+    </p>
+
+    <h3>Incident Generation</h3>
+    <p>
+      Correlation Engine은 Correlation Rules에 따라 Incident Object를 생성한다. Incident에는 Incident_ID,
+      Evidence_List, Correlation_Score, Start_Time, End_Time, Affected_Entities, Description이 포함된다. Incident는
+      Trust Evaluation과 Mission Impact 평가에 중요한 단위를 제공한다.
+    </p>
+
+    <h3>Evidence Repository</h3>
+    <p>
+      Evidence Repository는 Evidence Objects와 Incident Records를 저장하는 중앙 저장소이다. 인덱스는 Evidence_ID,
+      Correlation_ID, Timestamp, Capability 등으로 구성되어 빠른 조회를 지원한다. TTL 필드를 통해 만료된
+      Evidence는 자동으로 삭제된다.
+    </p>
+
+    <h3>Evidence Quality</h3>
+    <p>
+      Evidence 품질은 채널 신뢰성, 데이터 완전성, 정확성에 따라 평가된다. Sensor 오류, 로그 누락 등은 낮은
+      quality로 표시되며, Confidence Model은 이를 고려하여 final confidence를 계산한다.
+    </p>
+
+    <h3>Evidence Confidence</h3>
+    <p>
+      Confidence는 Evidence의 신뢰도를 0–1 범위로 표현한다. Additive Design Model에서 정의한 요소(증거 수,
+      품질, 상관 관계, 시간 경과, conflict 여부)에 따라 계산하며, Trust Score 계산에서 weighting factor로 사용된다.
+    </p>
+
+    <h3>Evidence Lifecycle</h3>
+    <p>
+      Evidence는 수집 → 정규화 → 상관 → 저장 → 만료 순으로 흐른다. 만료되기 전에 재평가가 필요한 경우 TTL을
+      연장할 수 있다. Incident는 관련 Evidence가 만료되면 종료된다.
+    </p>
+
+    <h3>Evidence Flow Diagram</h3>
+    <pre>
+Raw Metrics → Evidence Collector → Evidence Normalization → Evidence Object → Correlation Engine
+       → Incident Object → Evidence Repository → Trust Evaluator
+    </pre>
+    
+
+    <h3>Evidence Output</h3>
+    <p>Evidence Object와 Incident Object는 Trust Evaluator와 Policy Engine에서 소비된다. 또한 Decision Trace
+      Model에 기록되어 추후 감사에 활용된다.</p>
+
+    <h3>Evidence Interface</h3>
+    <p>
+      Evidence Layer는 다음 인터페이스를 제공한다:
+    </p>
+    <ul>
+      <li><strong>StoreEvidence(Evidence Object)</strong>: Evidence Repository에 Evidence를 저장한다.</li>
+      <li><strong>QueryEvidence(query)</strong>: 특정 조건(시간, Capability, Severity 등)으로 Evidence를 조회한다.</li>
+      <li><strong>StoreIncident(Incident Object)</strong>: Incident를 저장한다.</li>
+      <li><strong>SubscribeIncident(domain)</strong>: 특정 도메인 Incident 알림을 구독한다.</li>
+    </ul>
+
+    <h3>Evidence Traceability</h3>
+    <p>
+      Evidence_ID와 Correlation_ID는 Decision Trace Model과 연계되어 최종 Mission Decision에 어떤 증거가
+      사용되었는지 확인할 수 있게 한다. 로그 시스템은 Evidence 생성부터 Decision에 이르기까지 모든 단계를 기록한다.
+    </p>
+
+    <h3>Evidence Storage Policy</h3>
+    <p>
+      Evidence와 Incident는 법적 요구 사항 및 임무 기밀성에 따라 저장 기간이 결정된다. 민감한 데이터는 암호화하고,
+      저장소 접근은 Identity &amp; Access Capability의 통제를 받는다. 데이터 보존 정책은 정책 룰로 관리되며,
+      만료 후 즉시 파기한다.
+    </p>
+  </div>
+
+  
+
+
+  <!-- Chapter 6: Trust Architecture -->
+  <h2 id="trust-architecture"><span class="num">6.</span> Trust Architecture</h2>
+  <div class="panel">
+    <h3>Purpose</h3>
+    <p>Trust Architecture의 목적은 다양한 Capability에서 생성된 Evidence와 Incident 데이터를 기반으로 각 신뢰 도메인에 대한 신뢰 점수를 산출하고, 이를 Mission Context Layer와 Mission Impact Layer로 전달하는 것이다. 신뢰는 임무가 안전하게 지속될 수 있는지를 판단하는 핵심 척도이며, 통신, 식별, 세션/네트워크, 명령, 임무의 각 도메인별로 평가된다.</p>
+
+    <h3>Why Trust Layer is Required</h3>
+    <p>테스트베드에서는 PFCP 세션 삭제, web API 무인증 접근, MongoDB 접근, NAS null 암호 설정 등 다양한 공격이 발생할 수 있다. 이러한 공격은 암호화 내부의 취약점이 아닌 인증과 분리 실패에서 비롯되며, 단일 지표로는 임무에 미치는 영향을 예측하기 어렵다. Trust Layer는 각 Evidence를 Mission Weight Model과 Threshold Policy에 따라 가중치화하고, Confidence를 반영하여 정량적 신뢰 점수를 제공함으로써 임무 위험을 판단하는 기초를 제공한다.</p>
+
+    <h3>Architecture Overview</h3>
+    <p>Trust Architecture는 Evidence Object와 Incident Object를 입력으로 받아, 도메인별로 필터링하고, 집계(Aggregation)하고, Mission Weight와 Threshold Policy를 이용해 가중치를 적용한다. 이후 Confidence를 반영하여 0~100 범위의 신뢰 점수를 계산한 후 Trust Object를 생성한다. 최종적으로 도메인별 Trust Object와 전체적인 신뢰 벡터를 Mission Context Layer로 전달한다.</p>
+
+    <h3>Trust Domains</h3>
+    <p>신뢰는 다섯 개의 도메인으로 구분된다.</p>
+    <ul>
+      <li><strong>Communication Trust:</strong> PFCP/GTP 제어 평면, ZMQ/MAVLink 통신 상태, 패킷 손실, RTT 등 통신 신뢰도를 평가한다.</li>
+      <li><strong>Identity &amp; Access Trust:</strong> UE 인증 상태, NAS 암호 우선순위, Web API 인증, MongoDB 접근 등 식별과 접근 제어의 신뢰를 평가한다.</li>
+      <li><strong>Session &amp; Network Trust:</strong> PFCP Delete Attempt, Session Reset, UE 격리, 네트워크 분리 등 세션과 네트워크 계층의 무결성을 평가한다.</li>
+      <li><strong>Command Trust:</strong> MAVLink Command, 무인증 명령 삽입, 토픽 변조 등 명령 계층의 신뢰를 평가한다.</li>
+      <li><strong>Mission Trust:</strong> GPS port 14560 변조, 임무 컨텍스트 데이터 변조 등 임무 자체에 대한 신뢰를 평가한다.</li>
+    </ul>
+
+    <h3>Trust Input Objects</h3>
+    <p>Trust Layer는 다음 객체를 입력으로 사용한다:</p>
+    <ul>
+      <li><strong>Evidence Object:</strong> 각 Capability에서 생성되는 Evidence는 metric, observed_value, expected_value, severity, weight, confidence 등을 포함한다.</li>
+      <li><strong>Incident Object:</strong> Evidence Correlation Model에서 생성된 Incident는 여러 Evidence를 하나의 사건으로 묶은 객체이며, correlation_rule과 correlation_score를 포함한다.</li>
+      <li><strong>Mission Weight:</strong> Mission Weight Model에서 정의된 도메인별 가중치 벡터.</li>
+      <li><strong>Threshold Policy:</strong> Metric별 Normal/Warning/Critical/Danger 범위와 severity factor를 포함하는 표.</li>
+      <li><strong>Confidence:</strong> Evidence Object와 Incident Object에 계산된 confidence 값. Confidence는 증거 수, 품질, 상관관계, 시간 경과 등 요인을 포함한다.</li>
+    </ul>
+
+    <h3>Trust Processing Pipeline</h3>
+    <p>Trust Architecture의 처리 흐름은 다음과 같다:</p>
+    <ol>
+      <li><strong>Filtering:</strong> Evidence Repository에서 Observation Window 내의 Evidence를 도메인에 맞추어 선택한다. TTL이 지나거나 Mission Context와 관련 없는 Evidence는 제외한다.</li>
+      <li><strong>Aggregation:</strong> 선택된 Evidence들을 동일한 metric 또는 incident 기준으로 그룹화하여 전체 severity를 계산한다. 동일한 Incident에 속한 Evidence는 Incident Object의 correlation_score를 사용해 가중합한다.</li>
+      <li><strong>Weighting:</strong> 각 Evidence의 severity에 Mission Weight Model에서 정의한 도메인별 weight를 곱한다. 예를 들어 정찰 임무에서는 Communication Trust에 높은 weight가, 공격 임무에서는 Command Trust에 높은 weight가 적용된다.</li>
+      <li><strong>Confidence Reflection:</strong> Aggregation 결과에 Evidence와 Incident의 confidence를 적용하여 신뢰 점수에 대한 조정 계수를 구한다. Confidence가 낮을수록 신뢰 점수는 보수적으로 감소한다.</li>
+      <li><strong>Trust Score:</strong> 가중치와 confidence를 적용한 severity 값을 Trust Score Model에 입력하여 0~100 사이의 신뢰 점수로 변환한다. severity가 높을수록, weight가 클수록 신뢰 점수는 낮아진다.</li>
+      <li><strong>Trust Object Generation:</strong> 각 도메인별로 <code>Trust Object</code>를 생성한다. 이 객체는 domain, trust_score, confidence, evidence_count, supporting_evidence, conflicting_evidence, calculation_result, reason 등을 포함한다.</li>
+    </ol>
+
+    <h3>Trust Score Model</h3>
+    <p>Trust Score Model은 severity와 weight의 합을 0~100 범위로 매핑한다. 아래 표는 신뢰 점수 구간과 의미를 정의한다.</p>
+    <table>
+      <thead><tr><th>Trust Range</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td>100–90</td><td><strong>Very High:</strong> 모든 증거가 정상 범위이며, 임무에 대한 위협이 거의 없음. 통신·식별·세션·명령·임무 도메인 모두 안전.</td></tr>
+        <tr><td>89–70</td><td><strong>High:</strong> 약간의 경고 수준 Evidence가 존재하지만, 통신과 세션의 기본 무결성이 유지됨. 정찰 임무나 일반 운송에 큰 지장 없음.</td></tr>
+        <tr><td>69–50</td><td><strong>Moderate:</strong> 중요한 메트릭에서 Warning 또는 Critical 수준의 Evidence가 존재하여 잠재적 위험이 높아짐. 임무 재구성 또는 감시 강화가 필요.</td></tr>
+        <tr><td>49–30</td><td><strong>Low:</strong> 여러 Critical Evidence가 동시에 발생하거나 Danger 수준의 Evidence가 확인됨. 임무에 심각한 위협이 존재하며, 재구성 또는 연쇄 복구가 요구됨.</td></tr>
+        <tr><td>29–0</td><td><strong>Very Low:</strong> 신뢰할 수 없는 상태이며, 지속적인 공격 또는 명령 변조가 발견됨. 임무 중단이나 긴급 복구가 필요하다.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Confidence Reflection</h3>
+    <p>Confidence는 신뢰 점수 계산에서 조정 계수로 사용된다. 예를 들어 신뢰 점수 계산식이 <em>Adjusted Trust = BaseTrust × Confidence</em>라고 할 때, Confidence 값이 0.8이면 신뢰 점수는 20% 감소한다. Evidence가 많고 품질이 높으며 시간적으로 가까울수록 confidence가 증가하고, 상관 규칙이 충돌하거나 오래된 Evidence일수록 confidence가 감소한다.</p>
+
+    <h3>Trust Output</h3>
+    <p>Trust Layer의 출력은 다음과 같다:</p>
+    <ul>
+      <li><strong>Trust Object:</strong> 도메인별 신뢰 결과를 포함하는 객체. 각 객체는 domain, trust_score, confidence, evidence_count, supporting_evidence, conflicting_evidence, calculation_result, reason 등 필드를 가진다.</li>
+      <li><strong>Trust Vector:</strong> 모든 도메인의 trust_score를 순서대로 나열한 배열. 예: [Comm: 85, Id: 90, Session: 70, Command: 65, Mission: 75].</li>
+      <li><strong>Trust Summary:</strong> Trust Vector에 기반하여 전체적인 임무 신뢰 수준과 위험 메시지를 요약한 보고서.</li>
+    </ul>
+
+    <h3>Trust Interface</h3>
+    <p>Trust Layer는 Mission Context &amp; Mission Impact Layer에 다음 정보를 전달한다:</p>
+    <ul>
+      <li><strong>Trust Vector</strong> (도메인별 신뢰 점수)</li>
+      <li><strong>Confidence</strong> (종합 confidence 값)</li>
+      <li><strong>Supporting Evidence List</strong> (Trust Object가 의존하는 Evidence 목록)</li>
+      <li><strong>Trust Summary</strong> (전반적 위험 수준 및 설명)</li>
+    </ul>
+
+    <h3>Trust Failure Handling</h3>
+    <p>다음과 같은 상황에 대한 실패 처리 방안을 정의한다:</p>
+    <ul>
+      <li><strong>Evidence Scarcity:</strong> Observation Window 내에 Evidence가 부족하면 직전 신뢰 점수를 유지하되 confidence를 감소시켜 Mission Context가 보수적으로 해석하도록 한다.</li>
+      <li><strong>Conflicting Evidence:</strong> 동일 도메인에서 Supporting Evidence와 Conflicting Evidence가 동시에 존재하면 correlation_score와 confidence를 사용하여 우세 증거를 선택한다.</li>
+      <li><strong>Invalid Mission Weight:</strong> Mission Weight가 존재하지 않거나 합이 100이 아닌 경우 기본 weight (균등 분배)를 사용하고, Mission Context Layer에 경고를 전달한다.</li>
+    </ul>
+
+    <h3>Design Constraints</h3>
+    <p>Trust Architecture 설계 시 고려해야 할 제약 사항:</p>
+    <ul>
+      <li>신뢰 점수는 0에서 100 사이로 정규화되어야 하며, 모든 도메인에서 동일한 척도를 사용한다.</li>
+      <li>Mission Weight와 Threshold Policy는 테스트베드와 임무 유형에 따라 동적으로 업데이트될 수 있으나, 신뢰 계산 시점에는 고정된 값이어야 한다.</li>
+      <li>Trust Layer는 이전 계층에서 정의된 데이터 모델을 변경하지 않고, Evidence Object 및 Incident Object를 읽기 전용으로 사용한다.</li>
+      <li>시간 창(Time Window Model)과 임계치(Threshold Policy Model)를 일관되게 준수해야 한다.</li>
+    </ul>
+
+    <h3>Summary</h3>
+    <p>Trust Architecture는 다양한 도메인의 Evidence를 Mission Weight, Threshold Policy, Confidence와 결합하여 신뢰 점수를 산출한다. 이 과정은 Filtering→Aggregation→Weighting→Confidence Reflection→Trust Score→Trust Object라는 파이프라인으로 구성되어 있으며, 결과물은 Mission Context Layer에 전달된다. 신뢰 점수는 임무 위험을 정량화하는 데 사용되며, 낮은 신뢰는 Mission Impact Layer와 Policy Layer에서 즉각적인 대응을 필요로 한다.</p>
+    <h4>Trust Processing Flow Diagram</h4>
+    <pre>
+Evidence (per domain)
+    |
+Filtering (select relevant Evidence within observation window)
+    |
+Aggregation (group by metric/incident and sum severity)
+    |
+Weighting (apply Mission Weight per domain)
+    |
+Confidence Reflection (adjust by confidence score)
+    |
+Trust Score Model (map to 0–100 range)
+    |
+Trust Object &amp; Trust Vector
+    |
+-> Mission Context &amp; Impact Layer
+    </pre>
+  </div>
+
+  <!-- Chapter 7: Mission Context & Mission Impact Architecture -->
+  <h2 id="mission-context-impact"><span class="num">7.</span> Mission Context &amp; Mission Impact Architecture</h2>
+  <div class="panel">
+    <h3>Purpose</h3>
+    <p>Mission Context &amp; Mission Impact Architecture의 목적은 Trust Layer에서 계산된 신뢰 점수를 임무 맥락에 따라 해석하고, 임무 성공에 대한 영향을 정량화하는 것이다. Mission Context Object는 임무의 유형과 목표, 우선순위, 환경 제약을 정의하며, Mission Impact Model은 신뢰와 Mission Weight를 기반으로 임무 가용성, 무결성, 안전, 연속성, 회복 가능성, 위험을 평가한다.</p>
+
+    <h3>Mission Context Object</h3>
+    <p>Mission Context Object는 임무의 본질을 표현하는 구조체로 다음 필드를 포함한다:</p>
+    <table>
+      <thead><tr><th>Field</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>mission_type</code></td><td>임무 유형 (예: Recon, Strike, Relay, Transport, Monitoring). 임무 유형에 따라 Mission Weight가 달라진다.</td></tr>
+        <tr><td><code>mission_phase</code></td><td>임무의 현재 단계 (예: Launch, Transit, Operation, Return).</td></tr>
+        <tr><td><code>mission_priority</code></td><td>임무의 중요도 (High/Medium/Low). Critical Asset과 연계되어 Mission Impact를 계산할 때 사용된다.</td></tr>
+        <tr><td><code>mission_goal</code></td><td>임무의 목표 (예: 특정 좌표로 정보 수집, 타깃 제거, 물자 운송 등).</td></tr>
+        <tr><td><code>critical_asset</code></td><td>임무 수행에 필수적인 자산 (예: 통신 링크, 연료, 페이로드).</td></tr>
+        <tr><td><code>operational_constraint</code></td><td>비행 금지 구역, 시간 제한, 통신 금지 구역 등 제약사항.</td></tr>
+        <tr><td><code>environment</code></td><td>기상 상황, 전자 환경, GPS 신호 강도 등 환경 변수.</td></tr>
+        <tr><td><code>mission_weight</code></td><td>Mission Weight Model에서 계산된 도메인별 가중치 벡터. 모든 weight의 합은 100이다.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Mission Context Flow</h3>
+    <p>Mission Context는 임무 계획 시스템과 연동하여 생성되고 업데이트된다. Mission Context Flow의 단계는 다음과 같다:</p>
+    <ol>
+      <li><strong>Mission Plan Retrieval:</strong> 비행 계획과 임무 목표를 읽어 mission_type, mission_goal, critical_asset을 설정한다.</li>
+      <li><strong>Phase Detection:</strong> 현재 UAV의 위치, 시간, 연료 상태를 기반으로 mission_phase를 결정한다.</li>
+      <li><strong>Priority Assignment:</strong> 임무 목표의 중요도와 critical_asset의 중요도에 따라 mission_priority를 설정한다.</li>
+      <li><strong>Constraint &amp; Environment Loading:</strong> No-Fly Zone, 시간 제한, 기상 정보를 수집하여 operational_constraint와 environment를 설정한다.</li>
+      <li><strong>Mission Weight Calculation:</strong> Mission Weight Model에서 mission_type과 mission_priority를 입력으로 받아 각 Capability의 weight를 계산한다. 예를 들어 Recon 임무에서는 Communication Trust와 Mission Trust weight가 높고, Strike 임무에서는 Command Trust와 Identity Trust weight가 높다.</li>
+    </ol>
+
+    <h3>Mission Impact Input</h3>
+    <p>Mission Impact Model은 다음 입력을 사용한다:</p>
+    <ul>
+      <li><strong>Trust Object:</strong> Trust Layer에서 도메인별로 생성된 trust_score와 confidence.</li>
+      <li><strong>Mission Context:</strong> mission_type, mission_phase, mission_priority, mission_weight, operational_constraint, environment 등.</li>
+      <li><strong>Confidence:</strong> Trust Layer의 confidence 값. 임팩트 계산에 보수/낙관 계수로 사용된다.</li>
+    </ul>
+
+    <h3>Mission Impact Model</h3>
+    <p>Mission Impact Model은 신뢰 점수와 mission_weight를 결합하여 임무 요소별 영향을 계산한다. 각 요소는 다음과 같이 정의된다:</p>
+    <ul>
+      <li><strong>Mission Availability:</strong> Communication Trust와 Session Trust의 weight가 적용된다. 신뢰 점수가 낮으면 C2 링크 끊김과 같은 가용성 감소가 발생한다.</li>
+      <li><strong>Mission Integrity:</strong> Identity Trust와 Command Trust의 weight가 적용된다. 무인증 명령이나 권한 상승 공격이 감지되면 무결성이 감소한다.</li>
+      <li><strong>Mission Safety:</strong> Mission Trust와 Command Trust의 weight가 적용된다. GPS 위변조나 위험 명령 삽입은 안전에 직접 영향을 미친다.</li>
+      <li><strong>Mission Continuity:</strong> Session &amp; Network Trust와 Mission Trust가 포함된다. PFCP Delete, Session Reset 등의 공격이 지속되면 임무 연속성이 떨어진다.</li>
+      <li><strong>Recoverability:</strong> Recovery Feasibility Model에서 계산한 expected trust recovery와 mission recovery를 반영한다. 신뢰가 낮아도 복구 성공 확률이 높으면 recoverability는 상승한다.</li>
+      <li><strong>Mission Risk:</strong> 위 요소들을 통합한 전반적 위험 점수이다. 위험 점수는 mission_weight와 trust_score를 곱한 값을 합산한 후 Confidence로 조정하여 계산된다.</li>
+    </ul>
+
+    <h3>Mission Impact Output</h3>
+    <p>Mission Impact Layer는 다음 정보를 생성한다:</p>
+    <ul>
+      <li><strong>Mission Impact Object:</strong> mission_availability, mission_integrity, mission_safety, mission_continuity, recoverability, overall_mission_impact, mission_risk 등 필드를 포함한다.</li>
+      <li><strong>Mission Summary:</strong> mission_impact 객체의 결과를 설명하는 간단한 메시지(예: "Session trust is low due to PFCP delete attempts; mission continuity at risk").</li>
+    </ul>
+
+    <h3>Mission Interface</h3>
+    <p>Mission Impact Layer는 Policy &amp; Recovery Layer에 다음 정보를 전달한다:</p>
+    <ul>
+      <li><strong>Mission Impact Object</strong></li>
+      <li><strong>Mission Context Object</strong></li>
+      <li><strong>Trust Vector &amp; Confidence</strong></li>
+      <li><strong>Mission Risk Indicator</strong> (overall risk score)</li>
+    </ul>
+
+    <h3>Mission Failure Handling</h3>
+    <p>Mission Context &amp; Mission Impact Layer는 다음 상황에 대응한다:</p>
+    <ul>
+      <li><strong>Missing Mission Context:</strong> Mission Context가 없을 때 기본 값(평균 weight, low priority)을 사용하고, Policy Layer에 경고를 전달한다.</li>
+      <li><strong>Invalid Mission Weight:</strong> mission_weight 합이 100이 되지 않으면 normalize하여 재조정하고 알림을 생성한다.</li>
+      <li><strong>Extreme Mission Risk:</strong> mission_risk가 임계치 이상이면 Policy Layer에 긴급 경보를 발생시켜 즉각적인 판단을 준비한다.</li>
+    </ul>
+
+    <h3>Design Constraints</h3>
+    <p>Mission Context &amp; Mission Impact 설계의 제약 조건:</p>
+    <ul>
+      <li>Mission Weight Model은 mission_type과 mission_priority에 따라 사전에 정의되어 있으며, 임무 실행 중 동적으로 변경할 수 없다.</li>
+      <li>Mission Impact Model은 신뢰 점수와 mission_weight를 곱하여 임팩트를 계산하므로, 신뢰와 가중치의 상관관계를 명확히 유지해야 한다.</li>
+      <li>Mission Risk 계산에는 confidence가 반드시 포함되어야 하며, 낮은 confidence는 위험을 보수적으로 증가시키는 방향으로 반영한다.</li>
+      <li>임무 안전을 위해 Mission Context Object는 실시간으로 업데이트되어야 하지만, Mission Impact 평가는 Observation Window 단위로 수행한다.</li>
+    </ul>
+
+    <h3>Summary</h3>
+    <p>Mission Context &amp; Mission Impact Architecture는 Trust Layer에서 계산된 신뢰 점수를 임무 맥락에 따라 해석하고, 임무의 각 요소에 미치는 영향을 정량화한다. Mission Context Object가 mission_type, mission_phase, mission_weight 등을 제공하며, Mission Impact Model은 availability, integrity, safety, continuity, recoverability, risk를 계산한다. 결과는 Policy &amp; Recovery Layer로 전달되어 정책과 복구 전략을 선택하는 데 사용된다.</p>
+    <h4>Mission Context &amp; Impact Flow Diagram</h4>
+    <pre>
+Mission Plan &amp; Environment Data
+    |
+Mission Context Generator
+    |
+Mission Context Object (type, phase, priority, weight, etc.)
+                |
+Trust Vector &amp; Confidence
+                |
+Mission Impact Evaluator
+                |
+Mission Impact Object (availability, integrity, safety, continuity, recoverability, risk)
+                |
+-> Policy &amp; Recovery Layer
+    </pre>
+  </div>
+
+  <!-- Chapter 8: Policy & Recovery Architecture -->
+  <h2 id="policy-recovery"><span class="num">8.</span> Policy &amp; Recovery Architecture</h2>
+  <div class="panel">
+    <h3>Purpose</h3>
+    <p>Policy &amp; Recovery Architecture의 목적은 Mission Impact Layer가 제공한 임무 위험 정보를 바탕으로 적용할 정책과 회복 전략을 선택하는 것이다. 이 계층은 정의된 Policy Rule Object와 Recovery Object를 사용하여 임무 위험을 최소화하고, 임무를 안전하게 지속하거나 재구성하거나 중지하는 데 필요한 조치를 결정한다.</p>
+
+    <h3>Policy Overview</h3>
+    <p>Policy는 미리 정의된 규칙들의 집합으로, 특정 조건이 만족될 때 취할 행동을 지정한다. Policy Rule Object는 rule_id, priority, condition, action, exception, reason 필드를 포함하며, condition은 Mission Impact Object와 Trust Vector를 기반으로 평가된다.</p>
+
+    <h3>Policy Priority</h3>
+    <p>Policy에는 우선순위가 부여되며, 여러 규칙이 동시에 조건을 만족하는 경우 priority가 높은 규칙이 선택된다. Priority 값은 정수이며, 높은 숫자가 더 높은 우선순위를 의미한다.</p>
+
+    <h3>Policy Evaluation Flow</h3>
+    <ol>
+      <li><strong>Rule Matching:</strong> Mission Impact Object와 Mission Context를 기반으로 모든 정책 규칙의 condition을 평가한다.</li>
+      <li><strong>Rule Selection:</strong> 조건을 만족하는 규칙을 priority 순으로 정렬하여 가장 높은 규칙을 선택한다. 여러 규칙이 동일 priority를 가지면 예외(condition) 필드를 통해 충돌을 해결하거나 Operator Confirmation 레벨로 넘긴다.</li>
+      <li><strong>Action Selection:</strong> 선택된 규칙의 action을 수행할 준비를 한다. action에는 Continue, Continue with Monitoring, Mission Reconfiguration, Graceful Degradation, Operator Confirmation, Mission Abort 등이 있다.</li>
+    </ol>
+
+    <h3>Policy Conflict Resolution</h3>
+    <p>여러 규칙이 동일한 priority를 가지고 동시에 조건을 만족할 경우, 다음 순서로 해결한다:</p>
+    <ol>
+      <li>규칙의 <strong>specificity</strong> 비교: 조건이 더 구체적인 규칙을 우선한다.</li>
+      <li>규칙의 <strong>exception</strong> 필드 확인: 예외가 발생하는 규칙을 배제한다.</li>
+      <li>해결되지 않으면 <strong>Operator Confirmation</strong> 단계로 보내어 사람이 직접 판단하도록 한다.</li>
+    </ol>
+
+    <h3>Action Selection</h3>
+    <p>Policy Layer가 선택할 수 있는 주요 행동과 그 조건은 다음과 같다:</p>
+    <table>
+      <thead><tr><th>Action</th><th>Applicable Condition</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>Continue</td><td>Mission Risk이 낮고 모든 trust_score가 High 이상.</td><td>임무를 정상적으로 지속한다.</td></tr>
+        <tr><td>Continue + Monitoring</td><td>Mission Risk이 Moderate이며 특정 도메인의 trust_score가 Moderate~High.</td><td>임무를 계속하지만 특정 도메인을 집중 모니터링한다.</td></tr>
+        <tr><td>Mission Reconfiguration</td><td>Mission Risk이 Moderate~High이고 Recoverability가 높음.</td><td>임무 경로나 작업을 재구성하여 위험을 완화한다.</td></tr>
+        <tr><td>Graceful Degradation</td><td>Mission Risk이 High, 복구 가능성이 제한적.</td><td>비핵심 작업을 중단하고 핵심 작업만 수행한다.</td></tr>
+        <tr><td>Operator Confirmation</td><td>Mission Risk이 High이고 정책 간 충돌이 있거나 정보가 부족함.</td><td>운영자에게 판단을 요청한다.</td></tr>
+        <tr><td>Mission Abort</td><td>Mission Risk이 Very High 또는 trust_score가 Very Low.</td><td>임무를 즉시 중단하여 자산과 안전을 보호한다.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Recovery Overview</h3>
+    <p>Recovery Architecture는 정책에서 지정된 행동과 연계하여 복구 전략을 선택한다. Recovery Object는 recovery_id, recovery_type, execution_time, mission_delay, expected_trust_recovery, expected_mission_recovery, success_probability, resource_cost, recovery_risk, recovery_score 등 필드를 포함한다.</p>
+
+    <h3>Recovery Candidates</h3>
+    <p>Possible recovery actions include:</p>
+    <ul>
+      <li><strong>Session Reestablishment:</strong> PFCP/GTP 세션을 재설정하여 C2 연결을 복구한다.</li>
+      <li><strong>Key Rotation:</strong> 세션 키 또는 인증 키를 갱신하여 identity trust를 회복한다.</li>
+      <li><strong>Command Override:</strong> 임의 명령 삽입을 무효화하고 안전한 명령 세트를 강제한다.</li>
+      <li><strong>Network Isolation:</strong> compromised UE를 격리하여 공격 확산을 방지한다.</li>
+      <li><strong>Route Replanning:</strong> 임무 경로를 재계획하여 위험 지역을 회피한다.</li>
+    </ul>
+
+    <h3>Recovery Feasibility Model</h3>
+    <p>Recovery Feasibility Model은 각 복구 후보의 실행 가능성을 평가하기 위해 다음 요소를 사용한다:</p>
+    <table>
+      <thead><tr><th>Element</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>execution_time</code></td><td>복구 조치 수행에 걸리는 시간 (초).</td></tr>
+        <tr><td><code>mission_delay</code></td><td>복구로 인해 임무가 지연되는 시간 (초).</td></tr>
+        <tr><td><code>expected_trust_recovery</code></td><td>복구 후 trust_score가 얼마나 회복될 것으로 예상되는지 (0–100).</td></tr>
+        <tr><td><code>expected_mission_recovery</code></td><td>Mission Impact 개선 정도. 예: mission_availability +20%.</td></tr>
+        <tr><td><code>success_probability</code></td><td>복구 성공 확률 (0–1).</td></tr>
+        <tr><td><code>resource_cost</code></td><td>사용되는 연료, 대역폭, 인력 등 자원의 소모 정도.</td></tr>
+        <tr><td><code>recovery_risk</code></td><td>복구 과정에서 발생할 수 있는 새로운 위험. 예: 재설정 중 서비스 일시 중단.</td></tr>
+        <tr><td><code>recovery_score</code></td><td>위 요소들을 결합하여 계산한 최종 점수. 높은 점수일수록 우선 적용된다.</td></tr>
+      </tbody>
+    </table>
+
+    <p>Recovery Score는 다음과 같이 계산한다: <em>recovery_score = (expected_trust_recovery × weight_trust + expected_mission_recovery × weight_mission) × success_probability − (recovery_risk + resource_cost + mission_delay)</em>. weight_trust와 weight_mission은 Mission Weight Model에서 정의된다.</p>
+
+    <h3>Recovery Priority &amp; Output</h3>
+    <p>Recovery Candidates는 recovery_score를 기준으로 우선순위가 정해진다. 가장 높은 점수를 받은 후보가 선택되며, 선택된 복구는 <strong>Recovery Object</strong>와 함께 Mission Decision Layer로 전달된다.</p>
+
+    <h3>Recovery Interface</h3>
+    <p>Policy &amp; Recovery Layer는 Mission Decision Layer에 다음 정보를 전달한다:</p>
+    <ul>
+      <li><strong>Selected Policy Action</strong></li>
+      <li><strong>Selected Recovery Object</strong> (회복 전략)</li>
+      <li><strong>Priority List</strong> (정렬된 복구 후보 목록)</li>
+      <li><strong>Reason</strong> (선택 배경 및 기대 효과)</li>
+    </ul>
+
+    <h3>Failure Handling</h3>
+    <p>Policy &amp; Recovery Layer에서는 다음과 같은 실패 처리를 정의한다:</p>
+    <ul>
+      <li><strong>No Rule Match:</strong> 어떤 규칙도 조건을 만족하지 않으면 default policy (Continue + Monitoring)를 적용하고 Operator Confirmation을 요청한다.</li>
+      <li><strong>No Feasible Recovery:</strong> recovery_score가 모두 낮으면 mission_delay와 mission_risk를 평가하여 Mission Decision Layer에 Graceful Degradation 또는 Mission Abort를 권고한다.</li>
+      <li><strong>Evaluation Timeout:</strong> 정책 평가나 복구 평가가 time limit 내에 끝나지 않으면 낮은 risk 행위를 택하고 Operator Confirmation을 호출한다.</li>
+    </ul>
+
+    <h3>Design Constraints</h3>
+    <p>Policy &amp; Recovery Architecture 설계 시 고려사항:</p>
+    <ul>
+      <li>Policy Rule Object와 Recovery Object는 Core Architecture Model에서 정의한 필드를 그대로 사용해야 한다.</li>
+      <li>Policy Evaluation은 deterministic 해야 하며, 동일한 입력에 대해 항상 동일한 결과를 도출해야 한다.</li>
+      <li>Recovery Feasibility Model은 테스트베드에서 실측한 실행 시간과 성공률을 기반으로 보정되어야 한다.</li>
+      <li>임무 우선순위가 높은 경우 mission_delay에 대한 penalty가 크므로 recovery_score 계산에서 반영되어야 한다.</li>
+    </ul>
+
+    <h3>Summary</h3>
+    <p>Policy &amp; Recovery Architecture는 Mission Impact를 해석하고 적절한 정책과 복구 전략을 선택하는 역할을 담당한다. Policy Evaluation Flow는 Rule Matching → Rule Selection → Action Selection의 단계를 통해 가장 적절한 행동을 결정하며, Recovery Feasibility Model은 회복 전략의 실행 가능성을 정량화한다. 결과는 Mission Decision Layer에 전달되어 최종 의사결정의 근거가 된다.</p>
+    <h4>Policy &amp; Recovery Flow Diagram</h4>
+    <pre>
+Mission Impact Object &amp; Mission Context
+    |
+Policy Evaluation:
+    - Match conditions to rules
+    - Select highest priority rule
+    - Determine action (Continue, Reconfigure, etc.)
+    |
+Recovery Evaluation:
+    - Generate recovery candidates
+    - Compute recovery_score for each
+    - Select top candidate
+    |
+-> Mission Decision Layer with selected action and recovery plan
+    </pre>
+  </div>
+
+  <!-- Chapter 9: Mission Decision Architecture -->
+  <h2 id="mission-decision"><span class="num">9.</span> Mission Decision Architecture</h2>
+  <div class="panel">
+    <h3>Purpose</h3>
+    <p>Mission Decision Architecture의 목적은 Trust Layer, Mission Context &amp; Mission Impact Layer, Policy Layer, Recovery Layer에서 제공된 정보를 종합하여 최종 임무 결정을 내리는 것이다. 이 계층은 각 데이터 객체를 기반으로 Mission Decision Object를 생성하고, 임무 지속, 재구성, 축소, 중단 등의 행동을 결정한다.</p>
+
+    <h3>Decision Input Objects</h3>
+    <p>Mission Decision Layer는 다음 객체를 입력으로 사용한다:</p>
+    <ul>
+      <li><strong>Trust Vector</strong>와 <strong>Trust Summary</strong></li>
+      <li><strong>Mission Context Object</strong></li>
+      <li><strong>Mission Impact Object</strong></li>
+      <li><strong>Selected Policy Action</strong></li>
+      <li><strong>Selected Recovery Object</strong></li>
+      <li><strong>Confidence</strong> (전반적인 confidence 값)</li>
+    </ul>
+
+    <h3>Decision Processing Flow</h3>
+    <p>Decision Layer는 다음 단계로 진행한다:</p>
+    <ol>
+      <li><strong>Compile Decision Context:</strong> Trust Vector, Mission Impact, Policy Action, Recovery Plan, Mission Context, Confidence를 하나의 결정 컨텍스트로 통합한다.</li>
+      <li><strong>Evaluate Decision Criteria:</strong> mission_risk, trust_scores, recoverability, policy_action, mission_priority 등을 비교한다.</li>
+      <li><strong>Select Decision Level:</strong> 아래 정의된 Mission Decision Levels 중 하나를 선택한다.</li>
+      <li><strong>Create Decision Object:</strong> 선택된 decision, decision_reason, supporting_evidence, supporting_trust, supporting_policy, recovery_summary, decision_confidence, timestamp 등을 기록한다.</li>
+      <li><strong>Generate Decision Trace:</strong> Decision Trace Model을 사용하여 Evidence→Trust→Mission Context→Mission Impact→Policy→Recovery→Decision의 흐름을 기록한다.</li>
+    </ol>
+
+    <h3>Mission Decision Levels</h3>
+    <p>Mission Decision Layer는 다음 여섯 가지 수준 중 하나를 선택한다. 각 수준의 적용 조건은 아래와 같다:</p>
+    <table>
+      <thead><tr><th>Decision Level</th><th>Applicable Conditions</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Continue</strong></td><td>mission_risk ≤ Low (예: mission_risk &lt 0.3), 모든 trust_score ≥ 70, Recoverability 무관.</td><td>임무를 정상적으로 지속한다. No recovery needed.</td></tr>
+        <tr><td><strong>Continue + Monitoring</strong></td><td>mission_risk ≤ Moderate (예: 0.3 ≤ mission_risk &lt 0.5), 최소 하나의 trust_score가 Moderate 구간(50–69)이고 recoverability가 높음.</td><td>임무를 계속하지만 위험 도메인을 집중 모니터링한다.</td></tr>
+        <tr><td><strong>Mission Reconfiguration</strong></td><td>mission_risk ≤ High (예: 0.5 ≤ mission_risk &lt 0.7), 특정 도메인의 trust_score가 Low(30–49)이고 recovery_score ≥ threshold.</td><td>임무 경로나 작업을 재구성하여 위험을 감소시킨다.</td></tr>
+        <tr><td><strong>Graceful Degradation</strong></td><td>mission_risk ≥ High (예: 0.7 ≤ mission_risk &lt 0.8), 여러 도메인의 trust_score가 Low이며 recoverability가 중간.</td><td>비핵심 작업을 중단하고 필수 기능만 유지한다.</td></tr>
+        <tr><td><strong>Operator Confirmation</strong></td><td>mission_risk ≥ High, 정보가 불충분하거나 policy/rules가 충돌할 때.</td><td>결정을 인간 운영자에게 위임하여 추가 지시를 받는다.</td></tr>
+        <tr><td><strong>Mission Abort</strong></td><td>mission_risk ≥ Very High (예: mission_risk ≥ 0.8), 여러 도메인의 trust_score가 Very Low(0–29) 또는 no feasible recovery.</td><td>임무를 즉시 중단하여 플랫폼과 안전을 보호한다.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Decision Output</h3>
+    <p>Decision Layer는 다음 결과를 생성한다:</p>
+    <ul>
+      <li><strong>Decision Object:</strong> decision level, decision_reason, supporting_evidence, supporting_trust, supporting_policy, recovery_summary, decision_confidence, timestamp를 포함한다.</li>
+      <li><strong>Decision Trace:</strong> Evidence→Trust→Mission Context→Mission Impact→Policy→Recovery→Decision 전체 흐름을 기록한 데이터 구조. 이는 사건 분석 및 감사에 사용된다.</li>
+    </ul>
+
+    <h3>Decision Interface</h3>
+    <p>Mission Decision Layer는 Mission Control 또는 Operator Interface에 다음을 전달한다:</p>
+    <ul>
+      <li>Decision Object</li>
+      <li>Decision Trace</li>
+      <li>Recommended Actions (if any)</li>
+    </ul>
+
+    <h3>Failure Handling</h3>
+    <p>Decision Layer 실패 처리는 다음과 같다:</p>
+    <ul>
+      <li><strong>Incomplete Data:</strong> Trust Vector, Mission Impact, Policy 또는 Recovery 정보가 없으면 Operator Confirmation을 요청한다.</li>
+      <li><strong>Conflict between Policy and Recovery:</strong> 두 계층의 행동이 충돌하면 mission_priority와 mission_risk를 기반으로 판단하거나 Operator Confirmation으로 넘긴다.</li>
+      <li><strong>Decision Trace Error:</strong> Decision Trace 생성에 실패하면 최소한 Decision Object와 관련 주요 요소를 기록하고 경고를 남긴다.</li>
+    </ul>
+
+    <h3>Design Constraints</h3>
+    <p>Mission Decision Architecture 설계 시 제약 조건:</p>
+    <ul>
+      <li>모든 결정은 deterministic해야 하며, 동일한 입력에 대해 동일한 결과를 보장한다.</li>
+      <li>결정 로직은 확률적 요소를 포함하지 않으며, 확률은 confidence와 recovery_score를 통해 반영한다.</li>
+      <li>Mission Decision Levels의 조건은 Mission Weight와 Mission Impact Model에 의해 정규화된 값에 기반한다.</li>
+      <li>Operator Confirmation 단계에서는 사람의 판단이 개입되므로 로그와 이유를 명확히 기록해야 한다.</li>
+    </ul>
+
+    <h3>Summary</h3>
+    <p>Mission Decision Architecture는 임무의 최종 행동을 결정하는 핵심 계층이다. Trust, Mission Context, Mission Impact, Policy, Recovery, Confidence를 종합하여 decision_context를 구성하고, Mission Decision Levels에 따라 Continue, Reconfigure, Degradation, Operator Confirmation, Abort 중 하나를 선택한다. 결정 결과와 이유는 Decision Object와 Decision Trace로 기록되어 Mission Control에 전달된다.</p>
+    <h4>Mission Decision Flow Diagram</h4>
+    <pre>
+Trust Vector, Mission Context, Mission Impact, Policy Action, Recovery Plan, Confidence
+     |
+Decision Context Builder
+     |
+Decision Criteria Evaluation
+     |
+Decision Level Selection (Continue, Monitoring, Reconfigure, Degradation, Operator, Abort)
+     |
+Decision Object &amp; Decision Trace
+     |
+-> Mission Control / Operator Interface
+    </pre>
+  </div>
+
+  <!-- Chapter 10: Attack Mapping & End-to-End Architecture Validation -->
+  <h2 id="attack-mapping-validation"><span class="num">10.</span> Attack Mapping &amp; End‑to‑End Architecture Validation</h2>
+  <div class="panel">
+    <h3>Purpose</h3>
+    <p>이 장의 목적은 12개의 공격 시나리오가 설계된 Mission‑Centric Defense Architecture 내에서 어떻게 처리되는지 자세히 설명하고, 전체 파이프라인의 유효성을 검증하는 것이다. Attack Mapping은 공격을 Capability, Evidence, Trust, Mission Impact, Policy, Recovery, Decision 단계에 매핑하고, End‑to‑End Validation은 아키텍처가 각 공격을 적절히 탐지하고 대응하는지 논리적으로 검증한다.</p>
+
+    <h3>Attack Mapping Philosophy</h3>
+    <p>Attack Mapping은 개별 공격을 별도의 탐지기로 처리하지 않고, 공통 Security Failure와 Capability를 기반으로 통합적으로 대응한다는 설계 철학을 반영한다. 공격을 분류하여 각 Capability가 감지해야 할 메트릭을 식별하고, 이후 Evidence → Trust → Mission Impact → Policy → Recovery → Decision의 연속적 흐름으로 처리한다.</p>
+
+    <h3>Attack Classification</h3>
+    <p>12개의 공격 시나리오를 다음과 같이 분류한다:</p>
+    <ul>
+      <li><strong>Transmission Layer Attack:</strong> PFCP Session Delete, GTP teardown 시도로 세션을 끊는 공격.</li>
+      <li><strong>Identity &amp; Access Attack:</strong> web API 무인증 호출, MongoDB 접근, NAS null 암호 설정 등 인증·권한 부여 실패를 노리는 공격.</li>
+      <li><strong>Session &amp; Network Attack:</strong> UE 격리 우회, GTP 브리징, NAS 암호 우선순위 오류, PFCP Add/Modify 메시지 위조.</li>
+      <li><strong>Command Attack:</strong> MAVLink Replay, Unauthorized Command Injection, Command Format Abuse 등 명령 수준 공격.</li>
+      <li><strong>Mission Attack:</strong> GPS Spoofing, Mission Plan Tampering, Environment Sensor Manipulation 등 임무 컨텍스트에 직접 영향을 주는 공격.</li>
+    </ul>
+
+    <h3>Capability Mapping</h3>
+    <p>각 공격은 하나 이상의 Capability에 할당된다. 예를 들어 PFCP Session Delete는 Session &amp; Network Trust Capability에서 탐지되고, web API Injection은 Identity &amp; Access Trust Capability에서 처리된다. MAVLink Replay는 Command Trust Capability, GPS Spoofing은 Mission Trust Capability에 대응된다.</p>
+
+    <h3>Evidence Mapping</h3>
+    <p>Capability에서 수집하는 메트릭과 Evidence Object는 다음과 같이 매핑된다:</p>
+    <table>
+      <thead><tr><th>Attack Scenario</th><th>Key Metric</th><th>Evidence Description</th><th>Related Capability</th></tr></thead>
+      <tbody>
+        <tr><td>PFCP Session Delete</td><td>PFCP_Delete_Attempt</td><td>5초 내 PFCP Delete 메시지 발생 횟수</td><td>Session &amp; Network</td></tr>
+        <tr><td>Web API Injection</td><td>Unauthorized_Command</td><td>인증 없이 web API endpoint 호출</td><td>Identity &amp; Access</td></tr>
+        <tr><td>MongoDB Access</td><td>DB_Access</td><td>MongoDB 포트에 대한 비인가 접근 횟수</td><td>Identity &amp; Access</td></tr>
+        <tr><td>NAS Null Cipher</td><td>NAS_Cipher_Order</td><td>NAS 암호 순서 변경 감지</td><td>Identity &amp; Access</td></tr>
+        <tr><td>MAVLink Replay</td><td>Unauthorized_Command</td><td>지난 명령 패킷과 동일한 시퀀스 번호 탐지</td><td>Command</td></tr>
+        <tr><td>GPS Spoofing</td><td>GPS_Signal_Deviation</td><td>GPS 좌표 변화량이 기대값을 초과</td><td>Mission</td></tr>
+      </tbody>
+    </table>
+    <p>각 메트릭은 Threshold Policy Model에 따라 severity가 부여되고, Evidence Object에 저장되어 Trust Layer의 입력으로 사용된다.</p>
+
+    <h3>Trust Mapping</h3>
+    <p>Evidence가 입력되면 각 도메인의 Trust Layer는 해당 증거를 사용하여 신뢰 점수를 감소시킨다. 예를 들어 PFCP Delete 시도가 여러 번 감지되면 Session Trust score가 낮아지고, Mission Impact에서 mission_continuity가 감소한다. 마찬가지로 GPS Spoofing 증거는 Mission Trust를 낮춰 mission_safety와 mission_integrity에 영향을 준다.</p>
+
+    <h3>Mission Impact Mapping</h3>
+    <p>Trust Score가 낮아질수록 Mission Impact Model은 mission_availability, mission_integrity 등 요소를 감소시키고 mission_risk를 증가시킨다. 예를 들어 Session Trust가 Very Low이면 mission_continuity가 크게 감소하여 Mission Risk가 High 이상으로 상승한다. Identity Trust가 낮으면 mission_integrity가 감소하고 Critical Asset 보호가 어려워진다.</p>
+
+    <h3>Policy Mapping</h3>
+    <p>Mission Impact 값에 따라 Policy Layer는 적절한 규칙을 선택한다. 예를 들어 PFCP Session Delete 공격에서 mission_risk가 Moderate이면 Continue + Monitoring 정책을 적용하고, 매우 낮은 Session Trust가 반복되면 Mission Reconfiguration이나 Graceful Degradation을 선택한다. GPS Spoofing으로 mission_safety가 Low가 되면 Mission Abort가 고려된다.</p>
+
+    <h3>Recovery Mapping</h3>
+    <p>Policy에서 선택한 행동과 함께 Recovery Layer는 적절한 복구를 선택한다. PFCP Delete의 경우 Session Reestablishment가 주요 복구이며, web API 공격에는 Key Rotation과 Access Control 강화가 포함된다. MAVLink Replay에 대해서는 Command Override와 시퀀스 번호 재동기화가 적용된다.</p>
+
+    <h3>Mission Decision Mapping</h3>
+    <p>정책과 복구를 거친 후 Mission Decision Layer는 mission_risk, trust_scores, recoverability를 평가하여 Decision Level을 결정한다. 예를 들어 PFCP Session Delete 반복이 감지되어 mission_risk가 High로 상승하면 Mission Reconfiguration 또는 Graceful Degradation이 선택되고, GPS Spoofing이 지속되면 Mission Abort로 이어질 수 있다.</p>
+
+    <h3>Response Mapping</h3>
+    <p>Mission Decision 단계 이후에는 선택된 정책을 실제 시스템에 적용해야 한다. <strong>Response Controller</strong>는 방화벽 규칙, Docker API, Mission API, PX4 명령, 네트워크 컨트롤러 등을 호출하여 결정된 행동을 실행한다. 아래 Attack Mapping Table의 마지막 열은 각 공격 시나리오에 대해 일반적으로 수행되는 <em>Response</em>를 요약한다. 실제 명령어는 구현 시 정의되며 본 문서에서는 구조만을 설명한다.</p>
+
+    <h3>Attack Mapping Table</h3>
+    <p>아래 표는 12개 공격 시나리오가 아키텍처 각 계층에서 어떻게 처리되는지 요약한다. 각 행은 하나의 공격 시나리오를 나타내며, <em>Capability→Evidence→Trust→Mission Impact→Policy→Recovery→Decision→Response</em>의 전체 흐름을 보여준다.</p>
+    <table>
+      <thead>
+        <tr><th>Attack Scenario</th><th>Capability</th><th>Evidence Metric</th><th>Trust Domain &amp; Impact</th><th>Mission Impact</th><th>Policy Action</th><th>Recovery Candidate</th><th>Decision Level</th><th>Response</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>PFCP Session Delete</td><td>Session &amp; Network</td><td>PFCP_Delete_Attempt &gt; 0</td><td>Session Trust ↓</td><td>Continuity ↓, Risk ↑</td><td>Continue + Monitoring → Reconfiguration</td><td>Session Reestablishment</td><td>Continue + Monitoring → Mission Reconfiguration</td><td>Firewall rule to block malicious PFCP traffic and re‑initiate PFCP session</td></tr>
+        <tr><td>Web API Injection</td><td>Identity &amp; Access</td><td>Unauthorized_Command &gt; 0</td><td>Identity Trust ↓</td><td>Integrity ↓, Risk ↑</td><td>Continue + Monitoring</td><td>Key Rotation / Access Control</td><td>Continue + Monitoring</td><td>Apply API access control updates, rotate credentials, block malicious source via firewall</td></tr>
+        <tr><td>MongoDB Access</td><td>Identity &amp; Access</td><td>DB_Access &gt; 0</td><td>Identity Trust ↓</td><td>Integrity ↓, Risk ↑</td><td>Continue + Monitoring</td><td>Access Control Reinforcement</td><td>Continue + Monitoring</td><td>Enforce database authentication, restrict network access to DB, rotate DB credentials</td></tr>
+        <tr><td>NAS Null Cipher</td><td>Identity &amp; Access</td><td>NAS_Cipher_Order = EEA0</td><td>Identity Trust ↓</td><td>Integrity ↓, Risk ↑</td><td>Graceful Degradation</td><td>Key Rotation</td><td>Graceful Degradation</td><td>Reconfigure MME to enforce encrypted NAS order and rotate encryption keys</td></tr>
+        <tr><td>MAVLink Replay</td><td>Command</td><td>Unauthorized_Command (Replay)</td><td>Command Trust ↓</td><td>Safety ↓, Risk ↑</td><td>Mission Reconfiguration</td><td>Command Override / Sequence Reset</td><td>Mission Reconfiguration</td><td>Override suspicious commands, reset MAVLink sequence numbers via PX4 and update autopilot state</td></tr>
+        <tr><td>GPS Spoofing</td><td>Mission</td><td>GPS_Signal_Deviation &gt; threshold</td><td>Mission Trust ↓</td><td>Safety ↓, Risk ↑</td><td>Mission Abort</td><td>Route Replanning (if possible)</td><td>Mission Abort</td><td>Trigger route replanning using Mission API or abort flight; update geofencing and fall back to inertial navigation</td></tr>
+        <tr><td>UE Isolation Bypass</td><td>Session &amp; Network</td><td>Session_Reset &gt; 0</td><td>Session Trust ↓</td><td>Continuity ↓, Risk ↑</td><td>Continue + Monitoring</td><td>Network Isolation</td><td>Continue + Monitoring</td><td>Apply APN isolation policies or SDN flows to segregate compromised UE and restore isolation</td></tr>
+        <tr><td>GTP Bridge Attack</td><td>Session &amp; Network</td><td>GTP_Bridge_Attempt &gt; 0</td><td>Session Trust ↓</td><td>Continuity ↓, Risk ↑</td><td>Graceful Degradation</td><td>Network Isolation</td><td>Mission Reconfiguration / Degradation</td><td>Reconfigure network routing to block GTP bridging and isolate affected tunnels</td></tr>
+        <tr><td>Command Format Abuse</td><td>Command</td><td>Invalid_Command_Format</td><td>Command Trust ↓</td><td>Integrity ↓, Risk ↑</td><td>Mission Reconfiguration</td><td>Command Override</td><td>Mission Reconfiguration</td><td>Override malformed commands and enforce valid command formats via PX4/Mission API</td></tr>
+        <tr><td>Key Exposure</td><td>Identity &amp; Access</td><td>Key_Exposure_Detected</td><td>Identity Trust ↓</td><td>Integrity ↓, Risk ↑</td><td>Graceful Degradation</td><td>Key Rotation</td><td>Graceful Degradation</td><td>Perform key rotation across affected services and revoke compromised credentials</td></tr>
+        <tr><td>SITL Serial Port Injection</td><td>Command</td><td>Unauthorized_Command on tcp/5762</td><td>Command Trust ↓</td><td>Safety ↓, Risk ↑</td><td>Mission Abort / Operator Confirmation</td><td>Command Override</td><td>Operator Confirmation / Mission Abort</td><td>Block or close the exposed serial port and override injected commands using firewall or PX4 API</td></tr>
+        <tr><td>Environment Sensor Spoofing</td><td>Mission</td><td>Env_Sensor_Deviation</td><td>Mission Trust ↓</td><td>Safety ↓, Risk ↑</td><td>Mission Abort</td><td>Route Replanning / Abort</td><td>Mission Abort</td><td>Recalibrate or ignore compromised sensor inputs; replan mission or abort based on updated sensor fusion</td></tr>
+      </tbody>
+    </table>
+    <h3>Attack Processing Details</h3>
+    <p>
+      Attack Mapping Table은 각 공격의 Capability, Evidence, Trust, Mission Impact, Policy, Recovery, Decision, Response를 한 줄로 요약한다. 그러나 실제 구현에서는 각 단계에서 어떤 Collector가 데이터를 수집하고 어떻게 Evidence가 생성되며, 신뢰와 임무 영향이 어떻게 평가되고 어떤 정책·복구·응답이 선택되는지 세부적인 흐름이 중요하다. 다음 표는 12개 공격 시나리오 각각이 <em>Collector→Evidence→Trust→Mission Impact→Policy→Recovery→Response</em> 흐름을 따라 어떻게 처리되는지 구체적으로 설명한다.
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th>Attack Scenario</th>
+          <th>Collector(s)</th>
+          <th>Evidence Process</th>
+          <th>Trust Impact</th>
+          <th>Mission Impact Assessment</th>
+          <th>Policy &amp; Recovery</th>
+          <th>Response</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>PFCP Session Delete</td>
+          <td>Network Collector monitors PFCP control plane</td>
+          <td>Raw PFCP_Delete_Attempt events exceeding threshold become Evidence; repeated incidents correlate within time window</td>
+          <td>Session Trust decreases; confidence reduced</td>
+          <td>mission_continuity ↓, mission_risk ↑</td>
+          <td>Policy: Continue + Monitoring; Recovery: Session Reestablishment</td>
+          <td>Block malicious PFCP traffic via firewall, re-initiate session using network controller</td>
+        </tr>
+        <tr>
+          <td>Web API Injection</td>
+          <td>Web Backend Collector &amp; MongoDB Collector monitor unauthorized API calls</td>
+          <td>Unauthorized_Command events generate Evidence; repeated patterns correlate into incidents</td>
+          <td>Identity Trust decreases</td>
+          <td>mission_integrity ↓, mission_risk ↑</td>
+          <td>Policy: Continue + Monitoring; Recovery: Key Rotation / Access Control</td>
+          <td>Enforce API authentication, rotate credentials, update firewall rules</td>
+        </tr>
+        <tr>
+          <td>MongoDB Access</td>
+          <td>MongoDB Collector monitors DB_Access attempts</td>
+          <td>Untrusted access attempts become Evidence; correlation groups repeated queries</td>
+          <td>Identity Trust decreases</td>
+          <td>mission_integrity ↓, mission_risk ↑</td>
+          <td>Policy: Continue + Monitoring; Recovery: Access Control Reinforcement</td>
+          <td>Restrict network access, enforce DB authentication, rotate DB credentials</td>
+        </tr>
+        <tr>
+          <td>NAS Null Cipher</td>
+          <td>Network Collector observes NAS encryption order</td>
+          <td>EEA0 ordering events generate Evidence; correlated with key management incidents</td>
+          <td>Identity Trust decreases</td>
+          <td>mission_integrity ↓, mission_risk ↑</td>
+          <td>Policy: Graceful Degradation; Recovery: Key Rotation</td>
+          <td>Reconfigure MME to enforce strong encryption; rotate keys</td>
+        </tr>
+        <tr>
+          <td>MAVLink Replay</td>
+          <td>UAV Collector &amp; GCS Collector monitor command sequences</td>
+          <td>Replay or duplicated sequence numbers become Evidence; correlation identifies repeated replay pattern</td>
+          <td>Command Trust decreases</td>
+          <td>mission_safety ↓, mission_risk ↑</td>
+          <td>Policy: Mission Reconfiguration; Recovery: Command Override / Sequence Reset</td>
+          <td>Override suspicious commands via PX4, reset MAVLink sequences, update autopilot state</td>
+        </tr>
+        <tr>
+          <td>GPS Spoofing</td>
+          <td>Mission Context Collector monitors GPS deviation and mission planning anomalies</td>
+          <td>GPS_Signal_Deviation Evidence triggers when deviation exceeds threshold; correlation with other sensor anomalies</td>
+          <td>Mission Trust decreases</td>
+          <td>mission_safety ↓, mission_integrity ↓, mission_risk ↑</td>
+          <td>Policy: Mission Abort; Recovery: Route Replanning if feasible</td>
+          <td>Replan mission trajectory or abort flight; engage inertial navigation fallback</td>
+        </tr>
+        <tr>
+          <td>UE Isolation Bypass</td>
+          <td>Network Collector monitors Session_Reset and isolation events</td>
+          <td>Session_Reset or cross‑APN traffic becomes Evidence; correlated to confirm isolation breach</td>
+          <td>Session Trust decreases</td>
+          <td>mission_continuity ↓, mission_risk ↑</td>
+          <td>Policy: Continue + Monitoring; Recovery: Network Isolation</td>
+          <td>Apply APN isolation via SDN flows; segregate compromised UE; reconfigure network segmentation</td>
+        </tr>
+        <tr>
+          <td>GTP Bridge Attack</td>
+          <td>Network Collector observes abnormal GTP bridging attempts</td>
+          <td>GTP_Bridge_Attempt events become Evidence; correlation groups repeated bridging attempts</td>
+          <td>Session Trust decreases</td>
+          <td>mission_continuity ↓, mission_risk ↑</td>
+          <td>Policy: Graceful Degradation; Recovery: Network Isolation</td>
+          <td>Reconfigure network routing to block bridging; isolate affected tunnels</td>
+        </tr>
+        <tr>
+          <td>Command Format Abuse</td>
+          <td>UAV Collector &amp; GCS Collector inspect command syntax</td>
+          <td>Invalid_Command_Format events become Evidence; correlation distinguishes malicious formatting from benign errors</td>
+          <td>Command Trust decreases</td>
+          <td>mission_integrity ↓, mission_risk ↑</td>
+          <td>Policy: Mission Reconfiguration; Recovery: Command Override</td>
+          <td>Enforce valid command structure via PX4/Mission API; override malformed commands</td>
+        </tr>
+        <tr>
+          <td>Key Exposure</td>
+          <td>Web Backend Collector &amp; Mission Context Collector detect key leaks and unauthorized access patterns</td>
+          <td>Key_Exposure_Detected events become Evidence; correlation cross‑references access logs and unusual API usage</td>
+          <td>Identity Trust decreases</td>
+          <td>mission_integrity ↓, mission_risk ↑</td>
+          <td>Policy: Graceful Degradation; Recovery: Key Rotation</td>
+          <td>Rotate compromised keys; revoke credentials; update policies across systems</td>
+        </tr>
+        <tr>
+          <td>SITL Serial Port Injection</td>
+          <td>UAV Collector monitors tcp/5762 port; GCS Collector monitors serial commands</td>
+          <td>Unauthorized_Command on serial port becomes Evidence; correlation detects repeated injection attempts</td>
+          <td>Command Trust decreases</td>
+          <td>mission_safety ↓, mission_risk ↑</td>
+          <td>Policy: Mission Abort / Operator Confirmation; Recovery: Command Override</td>
+          <td>Block exposed port via firewall; override injected commands; involve operator for confirmation</td>
+        </tr>
+        <tr>
+          <td>Environment Sensor Spoofing</td>
+          <td>Mission Context Collector &amp; UAV Collector monitor environmental sensor values</td>
+          <td>Env_Sensor_Deviation Evidence triggers when sensor readings diverge from expected values; correlation ensures anomaly persistence</td>
+          <td>Mission Trust decreases</td>
+          <td>mission_safety ↓, mission_integrity ↓, mission_risk ↑</td>
+          <td>Policy: Mission Abort; Recovery: Route Replanning or Abort</td>
+          <td>Recalibrate or ignore compromised sensors; replan mission or abort based on updated sensor fusion</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>End‑to‑End Data Flow</h3>
+    <p>아래 다이어그램은 공격 발생부터 Mission Decision에 이르기까지 데이터가 어떻게 흐르는지 요약한다:</p>
+    <pre>
+Attack Trigger
+    |
+Capability Monitors (collect metrics)
+    |
+Evidence Generation &amp; Normalization
+    |
+Evidence Correlation -> Incident Creation
+    |
+Trust Layer (filter, aggregate, weight, confidence, score)
+    |
+Trust Objects -> Mission Context &amp; Impact Layer
+    |
+Mission Impact Evaluation (availability, integrity, safety, continuity, recoverability, risk)
+    |
+Policy Evaluation &amp; Recovery Assessment
+    |
+Mission Decision Layer (compile context, select level, create decision and trace)
+    |
+Decision Output (Continue, Monitoring, Reconfigure, Degradation, Operator, Abort)
+    </pre>
+
+    <h3>Architecture Validation</h3>
+    <p>Architecture Validation은 각 공격이 위와 같은 경로를 통해 적절히 탐지되고 대응되는지 논리적으로 검증한다. 예를 들어 PFCP Session Delete는 Session &amp; Network Capability에서 PFCP_Delete_Attempt 메트릭으로 탐지되며, Threshold Policy가 Warning 이상일 때 Evidence를 생성하고 Incident로 그룹화한다. Trust Layer는 Session Trust를 낮추고 Mission Impact에서 mission_continuity를 감소시킨다. Policy Layer는 Continue + Monitoring 또는 Mission Reconfiguration을 선택하고, Recovery Layer는 Session Reestablishment를 제안한다. Mission Decision Layer는 mission_risk와 recoverability를 평가하여 Continue + Monitoring 또는 Reconfiguration을 결정한다. 이와 같이 모든 공격은 Capability→Evidence→Trust→Mission Impact→Policy→Recovery→Decision의 경로를 따라 처리되며, 임무 위험과 신뢰를 일관되게 평가한다.</p>
+
+    <h3>Summary</h3>
+    <p>Attack Mapping &amp; End‑to‑End Architecture Validation Chapter는 12개의 공격 시나리오를 설계된 아키텍처의 각 계층에 매핑하고, 공격 발생부터 Mission Decision에 이르는 전체 데이터 흐름을 설명한다. Threat Classification, Capability Mapping, Evidence Mapping, Trust Mapping, Mission Impact Mapping, Policy Mapping, Recovery Mapping, Decision Mapping을 통해 각 공격이 어떻게 처리되는지 보여주며, Attack Mapping Table과 End‑to‑End Flow 다이어그램을 통해 아키텍처의 일관성과 완전성을 검증한다.</p>
+
+    <h3>Overall System Workflow</h3>
+    <p>
+      본 문서의 마지막으로, 구현 가능한 전체 시스템 흐름을 ASCII 다이어그램으로 제시한다. 테스트베드에서 발생한 이벤트가 Collector를 거쳐 MDG로 전달되고, 분석과 판단을 통해 Response Controller가 실제 시스템에 조치를 수행하며, 그 결과가 다시 테스트베드에 반영되는 폐루프 구조를 나타낸다.
+    </p>
+    <pre>
+Testbed
+   ↓
+Collectors (UAV Collector, GCS Collector, Network Collector, Web Backend Collector, MongoDB Collector, Mission Context Collector)
+   ↓
+Mission Defense Gateway (Collector Manager → Evidence Engine → Correlation Engine → Trust Engine → Mission Context Manager → Mission Impact Engine → Policy Engine → Recovery Engine → Decision Engine → Response Controller)
+   ↓
+Response Controller
+   ↓
+Testbed (UAV / GCS / Network / Backend / DB)
+    </pre>
+  </div>
+
+
+</div>
+</body>

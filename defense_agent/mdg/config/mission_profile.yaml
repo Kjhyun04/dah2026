@@ -1,0 +1,38 @@
+# mission_profile.yaml — Mission Context (M1~M3·M8 정본, FIXED_VALUE)
+# 미션서버/플래너 부재 → 상수 프로필로 공급해야 파이프라인 수학 성립 (FEASIBILITY §3).
+mission_type: "Recon"                    # M2: single token
+mission_phase: "En-route"
+mission_priority: "High"
+mission_goal: "Area surveillance sector B3"
+critical_asset: "UAV+camera"
+environment: "clear/urban"
+
+# M1: Weight표 Recon행으로 통일. identity_access 키 통일(E20). 합 100 (recovery 제외분 100).
+mission_weight: {communication: 30, identity_access: 10, session_network: 20, command: 20, mission: 20, recovery: 0}
+
+# P0 panel-3: criticality floor (weight-INDEPENDENT safety tier). Per domain a list of
+# [distrust_threshold, floor] pairs (distrust = 100-trust), evaluated high->low, first
+# match wins else 0. overall_impact = max(weighted_mean, max_d floor). Fires even if the
+# domain's mission_weight is 0, so a compensatory mean / config tampering cannot dilute a
+# fully-compromised safety-critical domain to Green. NOTE: the 71/45 thresholds are NOT free
+# seeds — they are band-cut-derived LOCK constants (upper floor 71 ≡ impact_bands.Red[0];
+# lower floor 45 ∈ Yellow[31,70]). network-vuln-detector panel validated & locked (P3-Q4).
+# Config-only tunable (crit_floor takes the table as an arg -> retune = zero code diff);
+# do NOT re-invent the values. The real accuracy anchor is the compute_trust distrust input
+# mapping (unauthenticated actuation observation -> distrust>=71), NOT this magnitude.
+criticality_floor:
+  command:         [[71, 71], [40, 45]]   # command hijack -> Red floor 71; degraded -> 45
+  session_network: [[71, 71], [40, 45]]   # PFCP/session teardown -> Red floor
+  identity_access: [[71, 45]]             # subscriber-DB compromise -> Yellow floor
+  communication:   []                     # no safety floor (availability signal only)
+  mission:         []                     # rolled-up domain (E22); no independent floor
+
+operational_constraints: {max_alt_m: 120, rtl_on_link_loss: true, rtb_min: 30}   # M3
+
+session_ttl_s: 3240                      # Open5GS T3412 default (54 min)
+flight_modes: {GUIDED: 4, LOITER: 5, RTL: 6, LAND: 9}   # ArduPilot (PX4 아님)
+
+config_version: "mdg-cfg-2026-07-07"     # X7: 결정마다 핀; hot-reload는 다음 사이클부터
+
+bootstrap: {mode: "assume_clean", clean_window_s: 60, until_operator_ack: true}   # E14
+ntp: {required: true, max_skew_ms: 200, on_exceed: "widen_or_disable_time_join"}  # E16

@@ -1,0 +1,52 @@
+# recovery_priors.yaml — Recovery Feasibility priors (FEASIBILITY §3, FIXED_VALUE)
+# "Historical Success Data" 없음(신규 데모) → 실행가능 타입별 prior.
+# rank_recovery(결정론)가 이 표로 chosen_action / chosen_action_risk(=max) / reversible(=all) 산출 (PA-4).
+# risk=HIGH(비행행동) => escalate(operator). MED/LOW reversible => auto act.
+recovery_priors:
+  signed_land:      {success_probability: 0.90, expected_trust_recovery: {command: 40},         risk: HIGH, reversible: false, response_tool: send_signed_mode, flight: true,  enforce_at: gcs_proxy}
+  signed_rtl:       {success_probability: 0.90, expected_trust_recovery: {command: 40},         risk: HIGH, reversible: false, response_tool: send_signed_mode, flight: true,  enforce_at: gcs_proxy}
+  signed_guided:    {success_probability: 0.90, expected_trust_recovery: {command: 40},         risk: HIGH, reversible: false, response_tool: send_signed_mode, flight: true,  enforce_at: gcs_proxy}
+  backdoor_pause:   {success_probability: 0.95, expected_trust_recovery: {command: 30},         risk: MED,  reversible: true,  response_tool: docker_pause,      flight: false, enforce_at: web_backend}
+  backdoor_drop:    {success_probability: 0.85, expected_trust_recovery: {command: 30},         risk: MED,  reversible: true,  response_tool: nsenter_input_drop, flight: false, enforce_at: uav_ue}
+  # OPERATOR-ONLY / NON-AUTONOMOUS (Q-D-1, unresolvable-chokepoint). pfcp_firewall is a LIVE
+  # rtype (select_policy _INCIDENT_RECOVERY["CR01"]) but its enforce_at=gcs_proxy CANNOT resolve
+  # a real PFCP chokepoint: PFCP lives in net_core, gcs_proxy (command-plane entry) never carries
+  # it, and epc_smf/upf are log-tail containers, not resolvable enforcement ROLES. gcs_proxy DOES
+  # resolve to a verified binding, so the plan is not inert — but a DROP in gcs_proxy netns does
+  # NOT chokepoint a net_core PFCP flow (ineffective no-op, never a mis-DROP). Left AS-IS and
+  # marked operator-only: a resolvable role (e.g. adding a upf role) is DELIBERATELY NOT added
+  # because it would newly enable an AUTO-tier nsenter DROP (response_tool=nsenter_input_drop is
+  # AUTO) through an UNVERIFIED PFCP chokepoint — a widening of the autonomous surface. Value/
+  # tier UNCHANGED; PFCP enforcement is operator-go. Does NOT touch the backdoor_drop path.
+  pfcp_firewall:    {success_probability: 0.80, expected_trust_recovery: {session_network: 20}, risk: MED,  reversible: true,  response_tool: nsenter_input_drop, flight: false, enforce_at: gcs_proxy}
+  # OPERATOR-ONLY / NON-AUTONOMOUS (Q-D-2, triple-dead: orphan + role-mismatch + unverified).
+  # mongo_acl is an ORPHAN rtype: no _INCIDENT_RECOVERY kind maps to it, so select_policy never
+  # emits it as a candidate (it can never be selected/ranked/acted autonomously). enforce_at=
+  # web_backend is a role-mismatch for Mongo (27017 lives on the RAN/cellular bridge, not
+  # web_backend netns), and same-bridge inter-container DROP effectiveness is UNVERIFIED (E4
+  # br_netfilter absent — see DEFENSE_VERIFICATION_MATRIX). NOT removed: string "mongo_acl" is
+  # referenced by tests (test_p4_response.py absent-rule example) and mirrored in defaults.py, so
+  # deletion would break a test. Kept as an operator-only registry stub; value/tier UNCHANGED.
+  mongo_acl:        {success_probability: 0.85, expected_trust_recovery: {identity_access: 20}, risk: MED,  reversible: true,  response_tool: nsenter_input_drop, flight: false, enforce_at: web_backend}
+  command_override: {success_probability: 0.90, expected_trust_recovery: {command: 30},         risk: HIGH, reversible: false, response_tool: send_signed_mode, flight: true,  enforce_at: gcs_proxy}
+
+# enforce_at = P4-2 enforcement-chokepoint ROLE KEY (netns whose INPUT filters the attacker source;
+# DISTINCT from the source). Config-sourced so core carries no role/container literal (P2-3/A-1).
+default_enforce_at: gcs_proxy      # fallback chokepoint role key (command plane entry)
+
+success_prob_feasible_min: 0.70    # success_probability FLOOR for feasibility (M6/E-2 resolution).
+# This gate compares success_probability (0.80-0.95), NOT recovery_score. The 20-40pt
+# trust-delta priors cap recovery_score at ~0.14-0.38, so a recovery_score>=0.7 gate makes
+# every response permanently infeasible. recovery_score below is RANKING-ONLY (orders
+# feasible candidates); never re-gate on it. (key renamed from feasible_min so a future
+# refactor cannot silently re-point the gate at recovery_score.)
+# recovery_score = clamp(succ*(0.6·Σtrust_rec/100 + 0.4·mission_rec/100)*(1-risk_w)/(1+cost), 0, 1)
+# Q-D-4 DOCUMENTATION-ONLY: score_weights is UNUSED config (no loader/scoring reader — grep
+# confirmed). scoring.recovery_score hardcodes the 0.6·trust + 0.4·mission split inline; this key
+# only DOCUMENTS those literals for auditors and is never loaded. Kept (harmless orphan) and NOT
+# wired to scoring so the recovery_score weights cannot be silently re-pointed at config. Do NOT
+# change these numbers — the live weights are the 0.6/0.4 literals in scoring.recovery_score.
+score_weights: {trust: 0.6, mission: 0.4}
+
+# 7 실행가능 enum만; key_rotation/replan/reconfiguration = 거부(actuator 부재, 운영자-권고)
+rejected_types: ["key_rotation", "route_replan", "mission_replan", "network_apn_reconfig", "graceful_degradation"]

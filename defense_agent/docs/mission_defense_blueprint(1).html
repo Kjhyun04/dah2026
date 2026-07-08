@@ -1,0 +1,394 @@
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mission‑Centric Defense Architecture Blueprint</title>
+  <!--
+    This document is the blueprint for a mission‑centric defense architecture for
+    an LTE/5G UAV C2 environment. It reuses the UI style from the provided
+    template without introducing any new colours, fonts or components.  The
+    focus of this blueprint is on data flow and decision logic, not on
+    implementation details such as algorithms, threshold values or code.  Each
+    chapter describes its purpose, inputs, outputs and role in the overall
+    pipeline.  Citations reference evidence from the testbed guide and attack
+    scenario documents showing why a capability‑centric approach is necessary.
+  -->
+  <style>
+    :root{
+      --bg:#0d1117; --panel:#161b22; --panel2:#1c2430; --line:#30363d;
+      --ink:#e6edf3; --sub:#9da7b3; --muted:#6e7681;
+      --cell:#3b82f6; --core:#a855f7; --sgi:#22c55e; --ran:#f59e0b; --air:#ef4444; --atk:#f43f5e;
+      --accent:#58a6ff; --ok:#3fb950; --warn:#d29922; --bad:#f85149; --plain:#f59e0b; --ct:#22c55e;
+      --code:#0b0f14;
+    }
+    *{box-sizing:border-box}
+    html{-webkit-text-size-adjust:100%}
+    body{margin:0;background:var(--bg);color:var(--ink);
+      font-family:"Segoe UI","Malgun Gothic",-apple-system,system-ui,sans-serif;line-height:1.65;font-size:15px}
+    .wrap{max-width:1080px;margin:0 auto;padding:32px 22px 90px}
+    code,kbd,.mono{font-family:"Cascadia Code",Consolas,"D2Coding",monospace}
+
+    header.hero{border:1px solid var(--line);border-radius:14px;overflow:hidden;
+      background:linear-gradient(135deg,#12203a 0%,#161b22 55%,#101a2c 100%)}
+    .hero-in{padding:26px 28px}
+    .kw-badge{display:inline-flex;align-items:center;gap:8px;background:#0b1220;border:1px solid var(--accent);
+      color:#cbe3ff;border-radius:999px;padding:6px 14px;font-size:12.5px;font-weight:600;letter-spacing:.3px;
+      box-shadow:0 0 0 3px rgba(88,166,255,.08)}
+    .kw-badge .dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px 2px rgba(63,185,80,.7)}
+    .scope{display:inline-block;margin-left:8px;font-size:11.5px;font-weight:700;color:#8fd0ff;background:#0b1220;border:1px solid #274b6e;border-radius:999px;padding:5px 12px}
+    h1{margin:14px 0 6px;font-size:25px;line-height:1.3}
+    .sub{color:var(--sub);font-size:14px}
+    .meta{display:flex;flex-wrap:wrap;gap:8px 10px;margin-top:16px}
+    .chip{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 11px;font-size:12.5px;color:var(--sub)}
+    .chip b{color:var(--ink);font-weight:600} .chip .mono{color:#cbe3ff}
+
+    h2{margin:46px 0 14px;font-size:20px;border-bottom:1px solid var(--line);padding-bottom:8px;scroll-margin-top:16px}
+    h2 .num{color:var(--accent);font-variant-numeric:tabular-nums;margin-right:10px}
+    h3{margin:26px 0 10px;font-size:16px;color:#dbe6f2}
+    p{margin:10px 0} .lead{color:var(--sub);font-size:15px}
+
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:16px 0}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+    .tag{font-family:"Cascadia Code",Consolas,monospace;font-size:11.5px;padding:3px 9px;border-radius:999px;color:#08111e;font-weight:700}
+    .tag.cell{background:var(--cell)} .tag.core{background:var(--core)} .tag.sgi{background:var(--sgi)}
+    .tag.ran{background:var(--ran)} .tag.air{background:var(--air)} .tag.atk{background:var(--atk)}
+
+    .zone{border-radius:12px;padding:14px 16px;border:1px solid var(--line);background:var(--panel2);margin:12px 0}
+    .zone-h{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-weight:700;font-size:14px;flex-wrap:wrap}
+    .nodes{display:flex;flex-wrap:wrap;gap:8px}
+    .node{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:8px 11px;font-size:12.5px;min-width:118px}
+    .node b{display:block;font-family:"Cascadia Code",Consolas,monospace;color:#e6edf3;font-size:12.5px}
+    .node span{color:var(--muted);font-size:11px;font-family:"Cascadia Code",Consolas,monospace}
+    .node.evil{border-color:var(--atk);box-shadow:inset 0 0 0 1px rgba(244,63,94,.2)}
+
+    table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13px}
+    th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+    th{background:var(--panel2);color:#cbd5e1;font-weight:600;font-size:12.5px}
+    td .mono,code{background:var(--code);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:12px;color:#8fd0ff}
+    tr:nth-child(even) td{background:rgba(255,255,255,.015)}
+
+    .pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px}
+    .pill.ok{background:rgba(63,185,80,.15);color:var(--ok);border:1px solid rgba(63,185,80,.4)}
+    .pill.bad{background:rgba(248,81,73,.14);color:var(--bad);border:1px solid rgba(248,81,73,.4)}
+    .pill.warn{background:rgba(210,153,34,.14);color:var(--warn);border:1px solid rgba(210,153,34,.4)}
+
+    .callout{border-left:4px solid var(--accent);background:var(--panel2);border-radius:0 10px 10px 0;padding:12px 16px;margin:16px 0}
+    .callout.bad{border-left-color:var(--bad)} .callout.warn{border-left-color:var(--warn)} .callout.ok{border-left-color:var(--ok)}
+    .callout b{color:#e6edf3}
+
+    pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px 16px;overflow-x:auto;
+      font-size:12.5px;line-height:1.55;color:#cdd9e5}
+    pre .c{color:var(--muted)} pre .g{color:#3fb950} pre .b{color:#8fd0ff}
+
+    ol.flow{list-style:none;counter-reset:s;padding:0;margin:14px 0}
+    ol.flow li{counter-increment:s;position:relative;padding:12px 14px 12px 52px;border:1px solid var(--line);
+      border-radius:10px;margin:9px 0;background:var(--panel2)}
+    ol.flow li::before{content:counter(s);position:absolute;left:12px;top:12px;width:28px;height:28px;border-radius:8px;
+      background:var(--accent);color:#04101f;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px}
+    ol.flow li b{color:#dbe6f2} ol.flow li .mono{color:#8fd0ff}
+
+    figure{margin:18px 0;background:var(--code);border:1px solid var(--line);border-radius:12px;padding:14px 12px}
+    figure svg{width:100%;height:auto;display:block}
+    figcaption{color:var(--muted);font-size:12px;text-align:center;margin-top:10px}
+    .fig-scroll{overflow-x:auto}
+
+    .encap{display:flex;flex-direction:column;gap:0;margin:16px 0;font-size:12.5px}
+    .encap .lay{border:1px solid var(--line);border-radius:8px;padding:9px 12px;margin:5px 0;font-family:"Cascadia Code",monospace}
+    .encap .lay small{color:var(--muted);font-family:"Segoe UI",sans-serif;font-size:11px;float:right}
+
+    .gloss{border:1px solid var(--line);border-radius:10px;padding:2px 0;margin:14px 0;overflow:hidden}
+    .gloss dt{background:var(--panel2);padding:8px 16px;font-weight:700;font-family:"Cascadia Code",monospace;font-size:13px;color:#9fd0ff;border-top:1px solid var(--line)}
+    .gloss dt:first-child{border-top:0}
+    .gloss dd{margin:0;padding:9px 16px 12px;color:var(--sub);font-size:13.5px}
+
+    footer{margin-top:56px;border-top:1px solid var(--line);padding-top:22px;color:var(--muted);font-size:12.5px}
+    .kw-foot{background:#0b1220;border:1px dashed var(--accent);border-radius:10px;padding:14px 18px;margin:12px 0;
+      font-family:"Cascadia Code",Consolas,monospace;color:#cbe3ff;word-break:break-all}
+    .kw-foot .lbl{color:var(--muted);font-family:inherit;font-size:11px;display:block;margin-bottom:6px;letter-spacing:1px}
+    .kw-foot .big{font-size:16px;font-weight:700;color:#9fd0ff}
+    a{color:var(--accent)}
+    .toc{columns:2;column-gap:26px;font-size:13.5px}
+    @media(max-width:640px){.toc{columns:1}}
+    .toc a{display:block;padding:3px 0;color:var(--sub);text-decoration:none} .toc a:hover{color:var(--accent)}
+    .disc{font-size:12px;color:var(--muted);margin-top:8px}
+    .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--sub);margin:8px 2px}
+    .legend span{display:inline-flex;align-items:center;gap:6px}
+    .sw{width:14px;height:10px;border-radius:3px;display:inline-block}
+    .scopebox{border:1px solid #274b6e;background:#0d1a2a;border-radius:10px;padding:12px 16px;margin:14px 0;font-size:13.5px;color:#bcd7f0}
+
+    /* additional styles for blueprint diagrams and captions */
+    .diagram{background:var(--code);border:1px solid var(--line);border-radius:12px;padding:14px 16px;overflow-x:auto;margin:16px 0;}
+    .diagram pre{margin:0;font-family:"Cascadia Code",Consolas,"D2Coding",monospace;font-size:12.5px;line-height:1.55;color:#cdd9e5;}
+    .cap{font-size:12px;color:var(--muted);text-align:center;margin:6px 0 2px;}
+
+    /* ensure pill badges in the document meta look like chips */
+    .pill{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 11px;font-size:12.5px;color:var(--sub);display:inline-block;}
+    .pill b{color:var(--ink);font-weight:600;}
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="doc">
+    <h1>Mission‑Centric Defense Architecture Blueprint</h1>
+    <div class="sub">LTE/5G 기반 UAV C2 환경을 위한 임무 중심 방어 아키텍처 설계 (2026‑07‑04)</div>
+    <div class="meta">
+      <span class="pill">프로젝트 <b>Mission‑Centric Defense Architecture</b></span>
+      <span class="pill">환경 <b>4G/5G UAV C2 Testbed</b></span>
+      <span class="pill">버전 <b>Blueprint Stage</b></span>
+      <span class="pill">철학 <b>Capability‑Driven, Mission‑Aware</b></span>
+    </div>
+  </header>
+
+  <!-- ──────── 1. Table of Contents ──────── -->
+  <h2 id="toc">1. 전체 목차</h2>
+  <p class="lede">Blueprint 본문에서 사용하는 모든 장(Chapter)과 설계 항목에 대한 안내입니다.</p>
+  <ul>
+    <li><a href="#philosophy">2. Architecture Philosophy</a></li>
+    <li><a href="#flow-diagram">3. Architecture Flow Diagram</a></li>
+    <li><a href="#dependency">4. Chapter Dependency Diagram</a></li>
+    <li><a href="#summary-table">5. Chapter Summary Table</a></li>
+    <li><a href="#data-flow">6. Data Flow Overview</a></li>
+    <li><a href="#roadmap">7. Document Writing Roadmap</a></li>
+  </ul>
+
+  <!-- ──────── 2. Architecture Philosophy ──────── -->
+  <h2 id="philosophy">2. Architecture Philosophy</h2>
+  <p class="lede">본 설계는 개별 공격에 맞춘 탐지기를 만드는 것이 아니라, 공통 <em>Security Property</em>와 실패 원인에 기반한 방어 능력(capability)을 정의하여 임무 중심의 의사결정을 지원하는 것을 목표로 한다. 실제 공격 캠페인에서 드러난 취약점은 암호 알고리즘이 아닌 <strong>신뢰 경계·라우팅·인증·키 관리</strong> 설계에서 발생하였다. 동일 APN 풀에서 UE 간 격리가 부재하고, PFCP/GTP-C 제어 평면은 인증되지 않으며, 평문 오라클·웹 API·가입자 DB가 무인증으로 노출되는 등 시스템은 다층적인 허점을 가진다. 또한 테스트베드는 C2 데이터와 GPS를 분리한 3개 네트워크 구조를 사용하지만, UPF hairpin으로 인해 UE 간 직접 도달이 가능하여 공격 표면이 확대된다.
+  </p>
+  <p>따라서 방어 시스템은 다음과 같은 철학을 따른다:</p>
+  <ul>
+    <li><strong>Capability‑Driven.</strong> 12개의 공격을 12개의 탐지기로 대응하지 않는다. 모든 공격을 관통하는 보안 속성(인증, 인가, 무결성, 격리, 키 관리 등)을 식별하고, 이를 보장하는 다섯 가지 <em>Defense Capability</em>를 정의한다.</li>
+    <li><strong>Evidence‑Based.</strong> 각 Capability는 관찰한 데이터를 <em>Evidence</em> 형태로 생성한다. Evidence는 표준화된 레코드 형태로 저장되고, 후속 신뢰 평가와 임무 평가에 사용된다.</li>
+    <li><strong>Mission Context Aware.</strong> 단순히 “위협을 탐지”하는 것이 아니라, 신뢰 수준이 임무에 미치는 영향을 정량화한다. 임무 유형, 환경과 중요도에 따라 동일한 결함의 영향도가 달라지므로 <em>Mission Context</em>와 <em>Mission Impact</em>를 명시적으로 평가한다.</li>
+    <li><strong>Pipeline Integration.</strong> 각 단계의 출력은 다음 단계의 입력으로 흘러가는 파이프라인 구조다. 독립적인 모듈은 존재하지 않으며, <em>Threat Analysis → Defense Capability → Evidence Architecture → Trust Architecture → Mission Context → Mission Impact → Policy → Recovery → Mission Decision → Attack Mapping → End‑to‑End Architecture</em> 순으로 흐른다.</li>
+    <li><strong>Transparency and Non‑Abstraction.</strong> 모든 장에서 입력 데이터, 평가 모델, 판단 기준, 출력물을 구체적으로 정의한다. “신뢰를 계산한다”와 같은 추상적 표현을 사용하지 않고, 어떤 데이터에 대해 왜, 어떻게, 어떤 기준으로 판단하는지 명시한다.</li>
+  </ul>
+
+  <!-- ──────── 3. Architecture Flow Diagram ──────── -->
+  <h2 id="flow-diagram">3. Architecture Flow Diagram</h2>
+  <p class="lede">아래 다이어그램은 Threat Analysis부터 Mission Decision까지의 전 과정과 데이터 흐름을 요약한 것이다. 각 단계의 출력이 다음 단계의 입력으로 전달되는 파이프라인 구조를 강조한다.</p>
+  <div class="diagram">
+    <pre>
+┌───────────────┐    ┌───────────────────┐    ┌───────────────┐
+│ Threat Analysis│──→│ Defense Capability│──→│ Evidence       │
+│  (identify    │    │  (derive 5 caps) │    │ Architecture   │
+│  security    │    │                   │    │  (normalize    │
+│  failures)    │    └───────────────────┘    │  evidence)     │
+└───────────────┘                              └───────────────┘
+       │                                              │
+       ▼                                              ▼
+┌───────────────┐    ┌───────────────────┐    ┌───────────────┐
+│ Trust         │──→│ Mission Context    │──→│ Mission Impact │
+│ Architecture  │    │  (map trust to    │    │  (compute      │
+│  (compute     │    │   mission type)   │    │   impact)      │
+└───────────────┘    └───────────────────┘    └───────────────┘
+       │                                              │
+       ▼                                              ▼
+┌───────────────┐    ┌───────────────────┐    ┌───────────────┐
+│ Policy        │──→│ Recovery           │──→│ Mission Decision│
+│  (choose      │    │  (evaluate        │    │  (final mission│
+│   actions)    │    │   options)        │    │   action)      │
+└───────────────┘    └───────────────────┘    └───────────────┘
+       │
+       ▼
+┌───────────────┐
+│ Attack Mapping│
+│  & End‑to‑End │
+│  Architecture │
+└───────────────┘
+    </pre>
+  </div>
+  <p class="cap">Architecture Flow Diagram summarizing the mission‑centric defense pipeline.</p>
+
+  <!-- ──────── 4. Chapter Dependency Diagram ──────── -->
+  <h2 id="dependency">4. Chapter Dependency Diagram</h2>
+  <p class="lede">각 Chapter의 입력과 출력 관계를 상하 방향으로 표현하였다. 화살표는 정보가 다음 Chapter로 전달됨을 나타낸다.</p>
+  <div class="diagram">
+    <pre>
+Threat Analysis
+    ↓
+Defense Capability
+    ↓
+Evidence Architecture
+    ↓
+Trust Architecture
+    ↓
+Mission Context
+    ↓
+Mission Impact
+    ↓
+Policy
+    ↓
+Recovery
+    ↓
+Mission Decision
+    ↓
+Attack Mapping
+    ↓
+End‑to‑End Architecture
+    </pre>
+  </div>
+  <p class="cap">Dependency diagram – each layer depends on the output of the previous layer.</p>
+
+  <!-- ──────── 5. Chapter Summary Table ──────── -->
+  <h2 id="summary-table">5. Chapter Summary Table</h2>
+  <p class="lede">각 Chapter가 어떤 역할을 수행하는지, 어떤 데이터를 입력받아 무엇을 출력하는지, 그리고 다음 Chapter에 어떤 정보를 제공하는지를 요약한 표이다.  긴 설명은 본문에서 다루고, 표에서는 핵심 키워드만 나열한다.</p>
+  <table>
+    <thead>
+      <tr><th>Chapter</th><th>Purpose & Rationale</th><th>Input</th><th>Output</th><th>Next</th><th>Data Object</th><th>Decision Target</th><th>Role</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Threat Analysis</td>
+        <td>Identify exposures and derive common security properties; avoid attack‑specific design</td>
+        <td>Attack scenarios, kill chain report, testbed description</td>
+        <td>Security property list; failure list; exposure map</td>
+        <td>Defense Capability</td>
+        <td>Security Property list; Failure map</td>
+        <td>Properties needing protection</td>
+        <td>Baselining vulnerabilities</td>
+      </tr>
+      <tr>
+        <td>Defense Capability</td>
+        <td>Define five capabilities addressing properties (communication, identity & access, session & network, command, mission)</td>
+        <td>Security failure list</td>
+        <td>Capability definitions; monitored metrics</td>
+        <td>Evidence Architecture</td>
+        <td>Capability description objects</td>
+        <td>Aspects evaluated by each capability</td>
+        <td>Produce evidence from raw data</td>
+      </tr>
+      <tr>
+        <td>Evidence Architecture</td>
+        <td>Normalize, correlate and store evidence generated by capabilities</td>
+        <td>Raw evidence events from capabilities</td>
+        <td>Normalized evidence records; evidence repository</td>
+        <td>Trust Architecture</td>
+        <td>Evidence record; Repository; Aggregator</td>
+        <td>Convert metrics into evidence</td>
+        <td>Bridge between capability outputs and trust</td>
+      </tr>
+      <tr>
+        <td>Trust Architecture</td>
+        <td>Evaluate trust levels using evidence; generate trust vector</td>
+        <td>Aggregated evidence</td>
+        <td>Trust vector per domain; trust evaluation summary</td>
+        <td>Mission Context</td>
+        <td>Trust vector</td>
+        <td>Trust levels (high/medium/low)</td>
+        <td>Assess system health across domains</td>
+      </tr>
+      <tr>
+        <td>Mission Context</td>
+        <td>Map trust levels to mission type, environment and criticality</td>
+        <td>Trust vector; Mission plan and parameters</td>
+        <td>Mission context classification; weightings</td>
+        <td>Mission Impact</td>
+        <td>Mission context object</td>
+        <td>Mission criticality and tolerance</td>
+        <td>Provide contextual weighting for impact</td>
+      </tr>
+      <tr>
+        <td>Mission Impact</td>
+        <td>Quantify how trust deficits affect mission objectives using context</td>
+        <td>Mission context; Trust vector</td>
+        <td>Impact scores per domain; Risk categories</td>
+        <td>Policy</td>
+        <td>Impact assessment record</td>
+        <td>Severity of risk</td>
+        <td>Translate trust to risk</td>
+      </tr>
+      <tr>
+        <td>Policy</td>
+        <td>Select appropriate high‑level actions based on mission risk (e.g., continue, restrict, degrade)</td>
+        <td>Impact scores; Risk categories</td>
+        <td>Policy recommendation</td>
+        <td>Recovery</td>
+        <td>Policy selection</td>
+        <td>Allowed or restricted actions</td>
+        <td>Normative decision making</td>
+      </tr>
+      <tr>
+        <td>Recovery</td>
+        <td>Evaluate recovery options to restore trust or operate safely</td>
+        <td>Policy recommendation; Trust deficits; Impact scores</td>
+        <td>Recovery options; Selected recovery action</td>
+        <td>Mission Decision</td>
+        <td>Recovery candidate list</td>
+        <td>Feasibility of recovery actions</td>
+        <td>Plan for safe continuation or degradation</td>
+      </tr>
+      <tr>
+        <td>Mission Decision</td>
+        <td>Make final mission‑level decision combining policy and recovery</td>
+        <td>Policy recommendation; Recovery action; Impact scores</td>
+        <td>Mission decision object; Rationale</td>
+        <td>Attack Mapping</td>
+        <td>Mission decision record</td>
+        <td>Mission continuation or abort</td>
+        <td>Deliver final actionable decision</td>
+      </tr>
+      <tr>
+        <td>Attack Mapping</td>
+        <td>Map attacks to capabilities; ensure coverage</td>
+        <td>Attack scenarios; Capability definitions</td>
+        <td>Attack‑to‑capability mapping table</td>
+        <td>End‑to‑End Architecture</td>
+        <td>Mapping matrix</td>
+        <td>Coverage gaps</td>
+        <td>Accountability and assessment</td>
+      </tr>
+      <tr>
+        <td>End‑to‑End Architecture</td>
+        <td>Integrate all components into a holistic view of the defense pipeline</td>
+        <td>All previous outputs</td>
+        <td>Integrated architecture view</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>Provide overarching understanding</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ──────── 6. Data Flow Overview ──────── -->
+  <h2 id="data-flow">6. Data Flow Overview</h2>
+  <p class="lede">본 섹션에서는 주요 데이터 객체와 그 흐름을 요약한다. 데이터는 한 장에서 다른 장으로 연속적으로 전달되며, 임무 결정에 이르기까지 점점 높은 수준의 의미를 갖는다.</p>
+  <ul>
+    <li><strong>Attack & Threat Data.</strong> 테스트베드 토폴로지, 취약점 보고서 및 공격 시나리오가 Threat Analysis로 입력되어 <em>Security Property</em>와 <em>Failure</em> 리스트로 정제된다.</li>
+    <li><strong>Capability Metrics.</strong> 각 Defense Capability는 자신이 담당하는 영역(통신, 신원·접근, 세션·네트워크, 명령, 임무)에 대한 원시 로그와 상태 정보를 수집한다. 예를 들어, PFCP/GTP-C 세션 로그와 UE간 hairpin 트래픽은 Session & Network Trust Capability로, 평문 오라클 및 API 호출은 Command Trust Capability로 제공된다.</li>
+    <li><strong>Evidence Records.</strong> Capability가 생성한 원시 정보는 Evidence Architecture에서 표준화된다. 각 레코드는 발생 시간, 관련 객체(UE, eNB, GCS 등), 속성(예: 인증 실패), 메트릭 값, 심각도 등을 포함한다. Evidence Repository는 이러한 레코드를 지속적으로 축적하고 시간순으로 정렬한다.</li>
+    <li><strong>Trust Vector.</strong> Trust Architecture는 Evidence 레코드를 평가 모델에 넣어 각 Capability 영역별 신뢰 점수를 생성한다. 신뢰 벡터에는 통신·신원·세션·명령·임무의 신뢰 수준(높음/중간/낮음)이 포함된다.</li>
+    <li><strong>Mission Context Object.</strong> Mission Context는 신뢰 벡터와 임무 계획(임무 유형, 중요도, 환경 조건)을 결합하여 각 영역의 가중치를 설정한다. 예를 들어, 정찰 임무에서는 명령 신뢰보다 통신 신뢰가 더 중요할 수 있다.</li>
+    <li><strong>Impact Assessment.</strong> Mission Impact 단계에서는 신뢰 벡터와 컨텍스트 가중치를 사용하여 각 영역의 영향 점수를 계산하고 위험 등급을 할당한다. 결과는 Policy에서 사용할 수 있는 정량적 위험 프로필로 전달된다.</li>
+    <li><strong>Policy Recommendation.</strong> Policy 단계는 임무 영향 및 조직 정책에 따라 가능한 행동 옵션(계속, 제한, 감시 강화, 임무 중단)을 평가한다. 선택된 정책과 그 근거가 Recovery 단계로 전달된다.</li>
+    <li><strong>Recovery Options.</strong> Recovery 단계에서는 정책에 따라 시스템을 복구할 수 있는 구체적인 후보(재인증, 세션 재설정, 대체 링크로 전환 등)를 평가하고 실행 가능성이 높은 방안을 선택한다.</li>
+    <li><strong>Mission Decision.</strong> 최종적으로 Mission Decision 단계에서 정책과 복구안을 종합하여 임무 수행 여부, 조건부 수행(부분 임무), 또는 중단을 결정한다. 결정과 근거가 기록된다.</li>
+    <li><strong>Attack Mapping & End‑to‑End.</strong> 임무 결정 이후 각 공격 시나리오가 어느 Capability와 Evidence에 의해 탐지되고 완화될 수 있는지 평가하며, 전체 방어 체계를 명확하게 이해한다.</li>
+  </ul>
+
+  <!-- ──────── 7. Document Writing Roadmap ──────── -->
+  <h2 id="roadmap">7. Document Writing Roadmap</h2>
+  <p class="lede">Blueprint 이후의 상세 설계 문서 작성 계획이다. 각 단계는 이전 단계의 결과를 기반으로 상세 스펙, 평가 모델, 임계값 등을 정의한다.</p>
+  <ol>
+    <li><strong>Threat Analysis Details.</strong> 공격 시나리오와 취약점 보고서를 세부적으로 분석하여 Security Property 카테고리를 정의하고, 실패 사례를 체계적으로 도출한다. 이를 위해 표적 포트, 네트워크 토폴로지, 인증 메커니즘 등 구체적인 데이터를 재검토한다.</li>
+    <li><strong>Capability Specification.</strong> 다섯 가지 Defense Capability에 대한 상세 설계를 작성한다. 각 Capability의 입력 데이터 소스, 관찰 메트릭, 평가 모델, 출력 Evidence 구조를 정의하며, testbed에서 수집 가능한 로그를 기반으로 한다.</li>
+    <li><strong>Evidence Schema & Repository.</strong> Evidence Architecture의 데이터 모델을 설계한다. Evidence 레코드의 필드, 인덱싱 전략, 타임스탬프 처리, 저장소 구조(예: 데이터베이스 또는 파일 시스템)를 정의한다.</li>
+    <li><strong>Trust Evaluation Model.</strong> 신뢰 평가 모델을 수학적으로 정의한다. 각 Evidence가 신뢰 점수에 어떻게 기여하는지(가중치, 누적 방식), 임계값과 신뢰 등급 구간을 설정한다.</li>
+    <li><strong>Mission Context Definition.</strong> 임무 유형별 가중치 매핑, 환경 파라미터 및 중요도 척도를 정의한다. UAV 임무(정찰, 항로 지정, 물자 운송 등)에 따라 가중치가 어떻게 달라지는지 명확하게 규정한다.</li>
+    <li><strong>Mission Impact Calculation.</strong> 임무 영향 계산식을 설계한다. 신뢰 벡터와 컨텍스트 가중치를 결합하여 영향 점수를 생성하는 수식을 정의하고, 위험 등급(예: 녹색/황색/적색)을 결정하는 기준을 마련한다.</li>
+    <li><strong>Policy Rules.</strong> 조직의 방어 정책을 분석하여 Mission Impact에 따른 행동 옵션을 체계화한다. 정책 규칙, 조건, 예외를 정의하고 예시 시나리오를 검토한다.</li>
+    <li><strong>Recovery Logic.</strong> 복구 단계에서 고려할 수 있는 구체적인 절차와 알고리즘을 설계한다. 예를 들어, 세션 재설정, 재인증, 대체 통신 경로 설정 등의 세부 절차를 문서화한다.</li>
+    <li><strong>Mission Decision Logic.</strong> 정책과 복구 정보를 통합하여 최종 임무 결정을 생성하는 로직을 설계한다. 결정 근거를 기록하는 메커니즘과 Auditing 요구사항을 포함한다.</li>
+    <li><strong>Attack Mapping Matrix.</strong> 각 공격 시나리오와 Capability의 대응 관계를 표 형태로 정리한다. 탐지할 Evidence, 관련 신뢰 영역, 예상 정책·복구 선택을 표기한다.</li>
+    <li><strong>End‑to‑End Architecture.</strong> 최종 문서에서 모든 설계 요소를 종합한 시스템 아키텍처를 작성하고, 데이터 흐름·모듈 상호작용을 상세하게 기술한다.</li>
+  </ol>
+
+  <footer>
+    본 Blueprint는 하드코딩된 탐지기를 설계하는 것이 아니라, 데이터와 임무 맥락에 기반하여 스스로 판단할 수 있는 방어 체계를 설계하기 위한 기초 문서이다.  취약점은 암호나 프로토콜 내부가 아닌 신뢰 경계, 격리, 인증, 키 관리의 실패에서 발생한다는 사실을 명심해야 한다.  이후 단계에서는 각 장을 상세히 설계하고, 평가 모델 및 임계값을 정의하여 자동 방어 모듈이 구현될 수 있도록 한다.
+  </footer>
+
+</div>
+</body>

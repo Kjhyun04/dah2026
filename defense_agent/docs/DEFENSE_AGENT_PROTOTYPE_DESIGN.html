@@ -1,0 +1,507 @@
+<!doctype html>
+<title>MDG 방어 AI 에이전트 — 최종 설계 v2 (DAH 2026)</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{
+  --bg:#0a0e15; --panel:#111826; --panel2:#0d1420; --panel3:#0b1019; --line:#1f2c3e; --line2:#2b3b52;
+  --ink:#d7e2ed; --muted:#8299b0; --dim:#5a7088;
+  --accent:#22d3ee; --obs:#38bdf8; --ort:#a78bfa; --dec:#f59e0b; --act:#fb7185; --vfy:#34d399; --ctl:#94a3b8;
+  --breach:#fb5c6b; --hold:#34d399; --warn:#f59e0b; --fixed:#c084fc; --remove:#64748b; --modify:#38bdf8; --impl:#34d399;
+  --mono:ui-monospace,"SFMono-Regular","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.7;-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(1100px 480px at 78% -8%, #12233010, transparent 70%);}
+.wrap{max-width:1180px;margin:0 auto;padding:42px 24px 90px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.19em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+h1{font-size:clamp(25px,3.6vw,38px);font-weight:820;letter-spacing:-.02em;margin:0 0 10px;text-wrap:balance}
+.sub{color:var(--muted);font-size:15px;margin:0 0 16px;max-width:80ch}
+.metabar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.badge{font-family:var(--mono);font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:6px;padding:4px 9px;background:var(--panel2)}
+.badge b{color:var(--ink)}
+.badge.v2{border-color:#34d39955;color:var(--hold)}
+h2{font-size:20px;font-weight:770;margin:52px 0 6px;padding-bottom:9px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:11px;scroll-margin-top:14px}
+h2 .n{font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:700}
+h3{font-size:15px;font-weight:720;margin:26px 0 8px;color:var(--ink)}
+h4{font-size:13px;font-weight:700;margin:16px 0 6px;color:var(--muted);font-family:var(--mono);letter-spacing:.04em}
+p{font-size:14px;color:#a9bccd;margin:9px 0}
+strong{color:var(--ink)}
+a{color:var(--accent);text-decoration:none}
+code{font-family:var(--mono);font-size:12px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:#9fe7f2}
+.fix{font-family:var(--mono);font-size:9.5px;font-weight:700;color:#0a0e15;background:var(--hold);border-radius:4px;padding:1px 5px;vertical-align:middle}
+.lead{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:11px;padding:16px 20px;margin:16px 0;font-size:14.5px}
+.lead b{color:var(--ink)}
+.toc{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 4px}
+.toc a{font-family:var(--mono);font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:7px;padding:6px 11px;background:var(--panel2)}
+.toc a:hover{border-color:var(--accent);color:var(--ink)}
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:11px;margin:20px 0}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px}
+.stat .v{font-family:var(--mono);font-size:23px;font-weight:750;line-height:1;color:var(--accent)}
+.stat .l{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.4}
+.chip{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;white-space:nowrap;vertical-align:middle}
+.c-impl{background:#34d39920;color:var(--impl);border:1px solid #34d39955}
+.c-modify{background:#38bdf820;color:var(--modify);border:1px solid #38bdf855}
+.c-fixed{background:#c084fc20;color:var(--fixed);border:1px solid #c084fc55}
+.c-remove{background:#64748b25;color:#9fb0c4;border:1px solid #64748b66}
+.c-auto{background:#34d39920;color:var(--hold);border:1px solid #34d39955}
+.c-oper{background:#f59e0b20;color:var(--warn);border:1px solid #f59e0b55}
+.c-ro{background:#38bdf820;color:var(--modify);border:1px solid #38bdf855}
+.c-breach{background:#fb5c6b20;color:var(--breach);border:1px solid #fb5c6b55}
+.tag{font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:4px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+.net-band{border:1px solid var(--line);border-radius:12px;margin:12px 0;padding:12px 14px;background:linear-gradient(180deg,var(--panel),var(--panel2))}
+.net-band .nl{font-family:var(--mono);font-size:11px;letter-spacing:.05em;color:var(--accent);margin-bottom:9px;text-transform:uppercase}
+.net-band.sgi .nl{color:#34d399}.net-band.core .nl{color:#c084fc}.net-band.cell .nl{color:#38bdf8}
+.row{display:flex;flex-wrap:wrap;gap:9px}
+.node{flex:1 1 190px;min-width:180px;background:var(--panel3);border:1px solid var(--line2);border-radius:9px;padding:10px 11px}
+.node .nk{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.node .nn{font-size:13px;font-weight:700;margin:2px 0 3px}
+.node .ni{font-family:var(--mono);font-size:11px;color:var(--accent)}
+.node .nd{font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.45}
+.node.col{border-color:#38bdf855}.node.mdg{border-color:var(--accent);box-shadow:0 0 0 1px #22d3ee44}
+.node.gate{border-color:#f59e0b66}.node.act{border-color:#fb718566}.node.vfy{border-color:#34d39966}.node.tb{border-color:var(--line);opacity:.9}
+.legendrow{display:flex;flex-wrap:wrap;gap:14px;margin:10px 0;font-size:11.5px;color:var(--muted)}
+.legendrow span{display:inline-flex;align-items:center;gap:6px}
+.dot{width:10px;height:10px;border-radius:3px;flex:0 0 auto}
+.ooda{display:flex;flex-wrap:wrap;align-items:stretch;gap:8px;margin:14px 0}
+.ostage{flex:1 1 150px;min-width:140px;border:1px solid var(--line2);border-radius:10px;padding:11px 12px;background:var(--panel)}
+.ostage h5{margin:0 0 6px;font-size:12px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase}
+.ostage.obs{border-color:var(--obs)}.ostage.obs h5{color:var(--obs)}
+.ostage.ort{border-color:var(--ort)}.ostage.ort h5{color:var(--ort)}
+.ostage.dec{border-color:var(--dec)}.ostage.dec h5{color:var(--dec)}
+.ostage.act{border-color:var(--act)}.ostage.act h5{color:var(--act)}
+.ostage.vfy{border-color:var(--vfy)}.ostage.vfy h5{color:var(--vfy)}
+.ostage .ag{font-size:11.5px;color:#a9bccd;margin:3px 0;line-height:1.4}
+.ostage .ag b{color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin:14px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px 15px}
+.card.obs{border-left:3px solid var(--obs)}.card.ort{border-left:3px solid var(--ort)}
+.card.dec{border-left:3px solid var(--dec)}.card.act{border-left:3px solid var(--act)}
+.card.vfy{border-left:3px solid var(--vfy)}.card.ctl{border-left:3px solid var(--ctl)}
+.card .ci{font-family:var(--mono);font-size:11px;color:var(--accent)}
+.card .cn{font-size:14px;font-weight:720;margin:2px 0 6px}
+.card .cr{font-size:12.5px;color:#a9bccd;line-height:1.5}
+.card .kv{font-size:11.5px;color:var(--muted);margin-top:7px;line-height:1.5}
+.card .kv b{color:var(--ink)}
+.toollist{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-top:6px;word-break:break-word}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:11px;margin:14px 0}
+table{width:100%;border-collapse:collapse;font-size:12.3px;min-width:720px}
+th{background:var(--panel2);color:var(--muted);text-align:left;padding:9px 11px;font-size:10.5px;letter-spacing:.03em;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0}
+td{padding:9px 11px;border-bottom:1px solid var(--line);color:#a9bccd;vertical-align:top}
+tr:last-child td{border-bottom:none}
+td.mono,.mono{font-family:var(--mono);font-size:11px}
+tbody tr:hover{background:#16202e55}
+.filterbar{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0 4px}
+.fbtn{font-family:var(--mono);font-size:11.5px;color:var(--muted);background:var(--panel2);border:1px solid var(--line2);border-radius:7px;padding:6px 12px;cursor:pointer;transition:.15s}
+.fbtn:hover{border-color:var(--accent)}
+.fbtn[aria-pressed="true"]{border-color:var(--accent);color:var(--ink);box-shadow:0 0 0 1px var(--accent)}
+details{border:1px solid var(--line);border-radius:9px;margin:9px 0;background:var(--panel2);overflow:hidden}
+details>summary{cursor:pointer;padding:10px 14px;font-family:var(--mono);font-size:12px;color:var(--ink);list-style:none;display:flex;justify-content:space-between;align-items:center;gap:10px}
+details>summary::-webkit-details-marker{display:none}
+details>summary::after{content:"▸";color:var(--dim);transition:.15s}
+details[open]>summary::after{transform:rotate(90deg)}
+details>summary:hover{background:#16202e}
+pre{margin:0;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:11px;color:#9fd7e6;line-height:1.65;white-space:pre;border-top:1px solid var(--line);background:var(--panel3)}
+.ascii{background:var(--panel3);border:1px solid var(--line);border-radius:10px;padding:14px;overflow-x:auto;font-family:var(--mono);font-size:11px;color:#8fb8c9;line-height:1.5;white-space:pre;margin:12px 0}
+.note{border-radius:10px;padding:12px 15px;margin:11px 0;font-size:13px;border:1px solid}
+.note.crit{background:#fb5c6b12;border-color:#fb5c6b55}
+.note.crit b{color:#ff8f9b}
+.note.ok{background:#34d39912;border-color:#34d39944}
+.note.warn{background:#f59e0b12;border-color:#f59e0b44}
+.note .h{font-weight:750;color:var(--ink);margin-bottom:3px}
+ul{margin:9px 0;padding-left:20px}li{font-size:13px;color:#a9bccd;margin:4px 0}li b{color:var(--ink)}
+footer{margin-top:56px;border-top:1px solid var(--line);padding-top:16px;font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1.75}
+.arrow{color:var(--dim)}
+@media(max-width:820px){.stats{grid-template-columns:repeat(2,1fr)}.wrap{padding:30px 15px 60px}}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">DAH 2026 · 방어 AI 에이전트 · 최종 설계 v2 (배점 ③ 25점)</div>
+  <h1>Mission Defense Gateway — 방어 에이전트 시스템 설계 <span class="badge v2">v2 · 검증 반영</span></h1>
+  <p class="sub">라이브 UAV-C2 테스트베드(<TESTBED-IP>) 실측 대조 + <b>3중 검증(자체 레드팀 E1~E24 · OpenAI codex · agy)</b> 반영본. <b>어디에·어떤 에이전트를 두고 · 어떤 툴을 정의하며 · 각 에이전트/툴의 입출력·로그 파싱을 어떻게 계약하고 · 방어 에이전트 자신을 어떻게 지키는지</b>까지 확정. 공격 에이전트 <code>agent_v2</code> 4계층 미러링. <span class="fix">FIX</span> 배지 = v1 대비 정정 지점.</p>
+  <div class="metabar">
+    <span class="badge">근거: <b>FEASIBILITY_AUDIT</b> + 라이브 실측</span>
+    <span class="badge">검증: <b>DESIGN_VERIFICATION (E1~E24 + X1~X13)</b></span>
+    <span class="badge">교차: <b>codex 0.142.5 · agy 1.0.8</b></span>
+    <span class="badge v2">개정 <b>2026-07-07</b></span>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="v">6</div><div class="l">Collector 에이전트 (Observe)</div></div>
+    <div class="stat"><div class="v">14</div><div class="l">총 에이전트 (OODA 5단계)</div></div>
+    <div class="stat"><div class="v">27</div><div class="l">닫힌 툴 (ingest_verify 추가)</div></div>
+    <div class="stat"><div class="v">19</div><div class="l">로그/메트릭 파서 (14560 텔레 추가)</div></div>
+    <div class="stat"><div class="v">10</div><div class="l">데이터 객체 (keys.yaml 추가)</div></div>
+    <div class="stat"><div class="v">37</div><div class="l">해소된 검증항목 (E+X)</div></div>
+  </div>
+  <div class="toc">
+    <a href="#s0">0 · 원칙</a><a href="#s1">1 · 배치</a><a href="#s2">2 · 에이전트/OODA</a>
+    <a href="#s3">3 · 툴</a><a href="#s4">4 · I/O·키</a><a href="#s5">5 · config·수식</a>
+    <a href="#s6">6 · 파서</a><a href="#s7">7 · 추가요소</a><a href="#s8">8 · 공방추적</a><a href="#s9">9 · 정직성</a><a href="#s10">10 · 검증 해소로그</a>
+  </div>
+</header>
+
+<!-- 0 -->
+<h2 id="s0"><span class="n">00</span> 설계 원칙 (v2 확정)</h2>
+<div class="lead">
+<b>구조 요지.</b> 단일 <code>mdg_core</code>(3망 멀티홈) + <b>비판단 Collector 6</b> + in-process 파이프라인 + <b>2단 게이트</b> + <b>grep0 독립 Verifier</b> + 호스트 특권 액추에이터 <code>act_host</code>. Collector는 read-only 원시 Evidence만. v2에서 확정된 4대 안전축: <span style="color:var(--hold)">①관측/진실 평면 정합(명령=14556, 텔레·비행모드=14560)</span> · <span style="color:var(--hold)">②집행은 전부 nsenter로 대상 netns INPUT</span> · <span style="color:var(--hold)">③방어 자신 보호(ingest mTLS·전체 봉투 MAC·키 3분리·서명 shim)</span> · <span style="color:var(--hold)">④비행행동은 항상 운영자 승인 + N틱 디바운스 + 원자 번들</span>.
+</div>
+<div class="grid">
+  <div class="card ctl"><div class="cn">Capability-Driven · Mission-Aware</div><div class="cr">12 공격 → 5 Trust 도메인. 탐지가 아니라 신뢰 저하의 임무영향을 0-100으로 정량화.</div></div>
+  <div class="card ctl"><div class="cn">Determinism vs Judgment</div><div class="cr">Observe/Act/Orchestrate=결정론. Orient/Decide=LLM. <b>수식이 수치·게이팅의 권위</b>; LLM은 근거·주의상향·신규성만, 더 관대한 행동 자동유발 불가(E12). LLM은 Yellow/Red·모호성에서만 발화, 5s 초과 시 결정론 결정 확정(E13).</div></div>
+  <div class="card ctl"><div class="cn">방어 에이전트 = 최소 새 공격표면</div><div class="cr">ingest 무인증 금지(E9/X1), 키 확산 금지(E11/X9), LLM 프롬프트 인젝션·null-byte 파서 방어(E10/X11). 방어가 새 취약점이 되지 않게.</div></div>
+  <div class="card ctl"><div class="cn">정직성 (과장 방지)</div><div class="cr">V4 키위조=탐지불가(봉쇄만) · 5762 호스트 iptables 무력 · NAS EEA0-first 상시결함 · GPS/env/GTP/미션재할당=미검증 미래과제. 3모델이 교차 확인.</div></div>
+</div>
+<div class="legendrow" style="margin-top:14px">
+  <span><span class="chip c-impl">IMPL</span> 그대로</span><span><span class="chip c-modify">MODIFY</span> 메커니즘 교체</span>
+  <span><span class="chip c-fixed">FIXED</span> 고정값</span><span><span class="chip c-remove">REMOVE</span> 제외</span>
+  <span><span class="chip c-auto">AUTO</span> 자동</span><span><span class="chip c-oper">OPER</span> 운영자</span><span><span class="chip c-ro">RO</span> read-only</span>
+  <span><span class="fix">FIX</span> v2 정정</span>
+</div>
+
+<!-- 1 -->
+<h2 id="s1"><span class="n">01</span> 배치 토폴로지 — 어디에 무엇을</h2>
+<p>기존 19 컨테이너 <b>무수정</b>. <span class="fix">FIX E1</span> 명령은 <code>gcs_proxy:14556</code>(상행 진입점), 텔레메트리·비행모드는 <code>web_backend:14560</code>(하행 fan-out). <span class="fix">FIX E3/E4</span> 모든 iptables 집행은 컨테이너에 바이너리가 없어 <code>act_host</code>가 <b>nsenter로 대상 netns에 호스트 iptables 주입</b>.</p>
+
+<div class="net-band sgi"><div class="nl">net_sgi 172.30 — 관제 평면</div>
+<div class="row">
+  <div class="node tb"><div class="nk">testbed</div><div class="nn">gcs_proxy / gcs_c2</div><div class="ni">172.30.0.10</div><div class="nd"><b>plain-listen 14556 = 상행 명령 진입</b>(gcs_c2 서명·오라클·공격자 주입 전부 여기) · cipher 14555 · gcs_c2 /sign.key</div></div>
+  <div class="node tb"><div class="nk">testbed</div><div class="nn">web_backend</div><div class="ni">172.30.0.20</div><div class="nd">:8080 무인증 POST /api/cmd(오라클) · <b>:14560 = 하행 텔레메트리 fan-out</b>(HEARTBEAT/custom_mode/GPS)</div></div>
+  <div class="node col"><div class="nk">collector · sidecar-netns</div><div class="nn">col_gcs <span class="fix">FIX</span></div><div class="ni">netns gcs_proxy</div><div class="nd"><b>14556 상행 명령탭</b> → Command_Type/Seq/Source + incompat_flag로 unsigned 판별 (Command 도메인 1차 관측점)</div></div>
+  <div class="node col"><div class="nk">collector · sidecar-netns</div><div class="nn">col_web <span class="fix">FIX</span></div><div class="ni">netns web_backend</div><div class="nd">8080 /api/cmd pcap + <b>14560 텔레메트리(HEARTBEAT.custom_mode·GPS·링크연속성)</b></div></div>
+  <div class="node mdg"><div class="nk">MDG · net_sgi leg</div><div class="nn">mdg_core</div><div class="ni">172.30.0.30</div><div class="nd">gRPC :50051 <b>mTLS 수신</b> · signer-shim 요청→gcs_c2</div></div>
+</div></div>
+
+<div class="net-band core"><div class="nl">net_core 10.50 — 제어 평면 (PFCP·:9090 metrics)</div>
+<div class="row">
+  <div class="node tb"><div class="nk">testbed</div><div class="nn">epc_smf/mme/upf</div><div class="ni">.4 / .2 / .7</div><div class="nd">PFCP 8805 · :9090/metrics · INFO 로그</div></div>
+  <div class="node tb"><div class="nk">testbed</div><div class="nn">epc_mongo</div><div class="ni">.5 (+10.44.0.2)</div><div class="nd">27017 무인증 · mongod.log NETWORK 연결로그</div></div>
+  <div class="node col"><div class="nk">collector · multihomed</div><div class="nn">col_net</div><div class="ni">10.50.0.41 (+10.44.0.41)</div><div class="nd">:9090 폴링 + SMF/MME/UPF 로그 + mme.yaml 1회</div></div>
+  <div class="node mdg"><div class="nk">MDG · net_core leg</div><div class="nn">mdg_core</div><div class="ni">10.50.0.40</div><div class="nd">PFCP/metrics Evidence 수신</div></div>
+</div></div>
+
+<div class="net-band cell"><div class="nl">net_cellular 10.44 / UE-pool 10.45 — 사용자 평면 (드론 netns)</div>
+<div class="row">
+  <div class="node tb"><div class="nk">testbed</div><div class="nn">uav_ue / uav_sitl</div><div class="ni">10.44.0.30 · 10.45.0.3</div><div class="nd"><b>tcp 0.0.0.0:5762 백도어</b> · lo:14550 평문 · udp:14540 GPS · <b>iptables 바이너리 없음</b></div></div>
+  <div class="node col"><div class="nk">collector · sidecar</div><div class="nn">col_uav</div><div class="ni">netns uav_ue</div><div class="nd">lo:14550 · ss 5762(Port_State만) · uav_proxy 서명드롭 · ping(RTT/loss)</div></div>
+  <div class="node col"><div class="nk">collector · host-agent</div><div class="nn">col_mongo</div><div class="ni">10.44.0.42</div><div class="nd">mongod.log tail · 10.44 출처 플래그</div></div>
+  <div class="node vfy"><div class="nk">verify · grep0</div><div class="nn">verifier <span class="fix">FIX E2</span></div><div class="ni">netns uav_ue (독립 소켓)</div><div class="nd"><b>비행모드=14560 HEARTBEAT</b>(5762 아님, 봉쇄시 실명 방지) + ss5762 + 서명드롭. MDG 내부 미참조</div></div>
+  <div class="node mdg"><div class="nk">MDG · net_cellular leg</div><div class="nn">mdg_core</div><div class="ni">10.44.0.40</div><div class="nd">UAV/Mongo Evidence · col_mission(config) in-process</div></div>
+</div></div>
+
+<div class="net-band"><div class="nl" style="color:#fb7185">Execution Plane — 게이트 & 호스트 액추에이터</div>
+<div class="row">
+  <div class="node gate"><div class="nk">control</div><div class="nn">2-Tier Gate</div><div class="ni">mdg_core 내부</div><div class="nd">화이트리스트∧legality∧티어∧<b>config 버전핀∧디바운스∧verifier-up</b> 확인 후 집행</div></div>
+  <div class="node act"><div class="nk">execution · host-agent</div><div class="nn">act_host <span class="fix">FIX E3/E4</span></div><div class="ni">host ns</div><div class="nd">passwordless sudo iptables + docker.sock. gate가 localhost 소켓으로만 호출. <b>모든 iptables는 nsenter로 대상 netns INPUT</b>(호스트 FORWARD·컨테이너 iptables 불가)</div></div>
+</div>
+<div class="legendrow" style="margin-top:10px">
+  <span><span class="dot" style="background:var(--obs)"></span> Collector</span><span><span class="dot" style="background:var(--accent)"></span> mdg_core</span>
+  <span><span class="dot" style="background:var(--vfy)"></span> Verifier</span><span><span class="dot" style="background:var(--act)"></span> Execution</span><span><span class="dot" style="background:var(--dim)"></span> testbed(무수정)</span>
+</div></div>
+
+<div class="note ok"><span class="h">v2 배치 정정 요약</span> <b>E1</b> col_gcs↔14556(명령)·col_web↔14560(텔레). <b>E2</b> Verifier 비행모드는 14560. <b>E3/E4</b> 집행은 act_host의 nsenter(대상 netns INPUT) — 컨테이너엔 iptables 없고 호스트 FORWARD는 br_netfilter 부재로 inter-container 미필터. <b>E9/X1</b> gRPC :50051 mTLS + 전체봉투 MAC.</div>
+
+<!-- 2 -->
+<h2 id="s2"><span class="n">02</span> 에이전트 로스터 & OODA (v2)</h2>
+<div class="ooda">
+  <div class="ostage obs"><h5>OBSERVE · 결정론</h5><div class="ag"><b>col_uav</b> netns 사이드카</div><div class="ag"><b>col_gcs</b> 14556 명령탭 <span class="fix">FIX</span></div><div class="ag"><b>col_net</b> :9090+로그</div><div class="ag"><b>col_web</b> 14560 텔레+8080 <span class="fix">FIX</span></div><div class="ag"><b>col_mongo</b> 연결로그</div><div class="ag"><b>col_mission</b> config</div></div>
+  <div class="ostage ort"><h5>ORIENT · LLM*</h5><div class="ag"><b>ort-correlate</b> 시간창</div><div class="ag"><b>ort-trust</b> 5도메인(패치수식)</div><div class="ag"><b>ort-impact</b> 0-100 G/Y/R</div></div>
+  <div class="ostage dec"><h5>DECIDE · LLM*</h5><div class="ag"><b>dec-policy</b> 규칙+디바운스</div><div class="ag"><b>dec-recovery</b> 실행가능+원자번들</div><div class="ag"><b>dec-decision</b> 6단계+게이트</div></div>
+  <div class="ostage act"><h5>ACT · 결정론(게이트)</h5><div class="ag"><b>act-exec</b> 서명MAV·nsenter·pause</div><div class="ag"><b>act_host</b> 특권 실행</div></div>
+  <div class="ostage vfy"><h5>VERIFY · grep0</h5><div class="ag"><b>vfy-supervisor</b> 14560 진실</div><div class="ag">effect-claim 반증</div><div class="ag">down=fail-closed</div></div>
+</div>
+<p class="mono" style="font-size:11px;color:var(--dim)">* LLM(ort/dec)은 <b>매틱 호출 안 함</b>: 결정론 파이프라인이 매틱(ms), LLM은 밴드변화/에스컬레이션(Yellow/Red)·모호성에서만. LLM 5s 초과 또는 불가 시 결정론 결정 확정(E13). 수식이 권위, LLM은 오버라이드 불가(E12).</p>
+
+<div class="ascii">┌── ORCHESTRATOR (상태기계, phase≠agent) ─────────────────────────────────────────────┐
+│ SENSE→CORRELATE→ASSESS→[디바운스 N틱]→DECIDE→[GATE auto|operator]→ACT(원자번들)→VERIFY→LOOP │
+│                          Green → Continue → LOOP        advisory → recommend → LOOP      │
+│ VERIFY  effective→ 위협해소 T초 지속 시 가역규칙 auto-revert(비행모드는 revert 금지)         │
+│         mismatch/ineffective → PIVOT → DECIDE(한 단계 에스컬레이트)                        │
+│ config: 각 결정에 config_version 핀(hot-reload는 다음 사이클부터, X7)                       │
+│ replay: 다운타임 재생 Evidence는 stale 표기 → 액추에이션 금지(X8)                          │
+│ verifier down/timeout → AUTO 집행 보류, 운영자 에스컬레이트(fail-closed, X10)              │
+└───────────────────────────────────────────────────────────────────────────────────────┘
+        ═════ grep0 barrier: supervisor는 자기 소켓(14560·ss5762·:9090·uav_proxy log)만, MDG 내부 미참조 ═════</div>
+
+<h3>에이전트 카드 (14)</h3>
+<div class="grid">
+  <div class="card obs"><div class="ci">obs · 결정론</div><div class="cn">col_uav — UAV 사이드카</div><div class="cr">uav_ue netns. lo:14550 파싱 + ss 5762(Port_State만) + 서명드롭 tail + ping.</div><div class="kv"><b>out</b> Port_5762_State, Signature_Verify_Fail, RTT/Packet_Loss</div><div class="toollist">netns_sidecar · read_port_state · tail_signing_drops · probe_rtt_loss · emit_raw_evidence</div></div>
+  <div class="card obs"><div class="ci">obs · 결정론</div><div class="cn">col_gcs — 명령 관측 <span class="fix">FIX E1</span></div><div class="cr"><b>14556 상행 명령탭</b>(gcs_proxy netns). Command 도메인 1차 관측점. incompat_flag&0x01로 unsigned 즉시 판별(진위는 서명드롭 로그 병행, E17).</div><div class="kv"><b>out</b> Command_Type/Sequence/Source, Invalid_Command_Format, Unauthorized(unsigned uplink)</div><div class="toollist">tap_mavlink_cmd(14556) · mav_parse · emit_raw_evidence</div></div>
+  <div class="card obs"><div class="ci">obs · 결정론</div><div class="cn">col_net — 코어/RAN</div><div class="cr">멀티홈. :9090 1s diff + SMF/MME/UPF 로그. NAS_Cipher_Order 1회.</div><div class="kv"><b>out</b> PFCP_Delete_Attempt, Session_Reset, S1AP, NAS_Cipher_Order, AntiSpoof</div><div class="toollist">scrape_pfcp_metrics · tail_pfcp_smflog · tail_mme_log · read_nas_cipher · tail_upf_antispoof</div></div>
+  <div class="card obs"><div class="ci">obs · 결정론</div><div class="cn">col_web — 텔레·API <span class="fix">FIX E1</span></div><div class="cr"><b>14560 하행 텔레메트리</b>(HEARTBEAT.custom_mode·GPS·연속성) + 8080 /api/cmd pcap(netns join).</div><div class="kv"><b>out</b> Flight_Mode(telemetry), Telemetry_Rate, Unauthorized_API_Call</div><div class="toollist">netns_sidecar_web · tap_telemetry_14560 · sniff_web_api · emit_raw_evidence</div></div>
+  <div class="card obs"><div class="ci">obs · 결정론</div><div class="cn">col_mongo — DB 연결</div><div class="cr">mongod.log NETWORK 연결수락. 10.44 출처=이상. 연결단위만(per-query 불가).</div><div class="kv"><b>out</b> DB_Access(ran_adjacent)</div><div class="toollist">tail_mongo_conn · emit_raw_evidence</div></div>
+  <div class="card obs"><div class="ci">obs · 결정론(FIXED)</div><div class="cn">col_mission — Config 로더</div><div class="cr">미션서버 없음 → 정본 config(M1~M8·bootstrap 클린창·키). in-process, gRPC 아님.</div><div class="kv"><b>out</b> MissionContext, ThresholdTable, MissionWeight(Recon), bootstrap 상태</div><div class="toollist">load_mission_profile</div></div>
+  <div class="card ort"><div class="ci">ort · hybrid(Sonnet)</div><div class="cn">ort-correlate — 상관</div><div class="cr">시간창 동시발생 join만(평면 상이). correlation_score=weight×mean(sev)×(n≥2)(E19). V4=봉쇄전용 플래그.</div><div class="kv"><b>out</b> IncidentRecord{score, containment_only_flag}</div><div class="toollist">query_evidence · store_evidence · correlate_window</div></div>
+  <div class="card ort"><div class="ci">ort · hybrid(Sonnet)</div><div class="cn">ort-trust — 신뢰 <span class="fix">FIX E5/E6/E7</span></div><div class="cr"><b>trust=100×(1−conf×min(Σw·sev·dev,1))</b>. idle=100(공격없으면 conf 무관). band→(sev,dev) 매핑표. 고정 weight Σ≤1.</div><div class="kv"><b>out</b> TrustObject{5×0-100, confidence 별도필드}</div><div class="toollist">query_evidence · compute_trust · compute_confidence</div></div>
+  <div class="card ort"><div class="ci">ort · hybrid(Sonnet)</div><div class="cn">ort-impact — 임무영향 <span class="fix">FIX E8</span></div><div class="cr">0-100(높을수록 나쁨) G0-30/Y31-70/R71-100. confidence는 <b>1회만</b>(저신뢰=밴드 1단 보수적 상향, 곱셈 이중페널티 제거).</div><div class="kv"><b>out</b> MissionImpactObject{overall, band}</div><div class="toollist">compute_impact · query_evidence</div></div>
+  <div class="card dec"><div class="ci">dec · LLM(Opus)</div><div class="cn">dec-policy — 정책 <span class="fix">FIX X5</span></div><div class="cr">규칙평가(우선순위 낮은수=높음). <b>물리행동 전 N틱 지속성(디바운스)</b> 요구. tie→exception→운영자.</div><div class="kv"><b>out</b> PolicyDecision{action, enforcement, debounce_met}</div><div class="toollist">select_policy · query_evidence</div></div>
+  <div class="card dec"><div class="ci">dec · hybrid(Sonnet)</div><div class="cn">dec-recovery — 복구 <span class="fix">FIX X6</span></div><div class="cr">FIXED prior 점수화 + 실제 액추에이터 매핑만. <b>원자 번들</b>: 복구명령+공격경로차단을 1 트랜잭션(X4/X6).</div><div class="kv"><b>out</b> RecoveryObject{ranked, bundle[], bound_actuator}</div><div class="toollist">rank_recovery · query_evidence</div></div>
+  <div class="card dec"><div class="ci">dec · LLM(Opus)</div><div class="cn">dec-decision — 결정 <span class="fix">FIX X2</span></div><div class="cr">6단계 통합. <b>비행행동(RTL/LAND)은 항상 operator-confirm</b>(auto-Abort 모순 해소). Trace 해시체인+HMAC(audit키, config_version 기록).</div><div class="kv"><b>out</b> MissionDecisionObject{decision, enforcement, config_version, trace}</div><div class="toollist">decide_mission · emit_trace · store_incident · request_operator_gate</div></div>
+  <div class="card act"><div class="ci">act · 결정론(게이트)</div><div class="cn">act-exec / act_host <span class="fix">FIX E3/X3</span></div><div class="cr">게이트 후 닫힌 액추에이터만. <b>모든 iptables=nsenter 대상 netns INPUT</b>. 서명명령은 <b>gcs_c2 signer-shim</b>(키 미마운트) + <b>timestamp 연속</b>(미래점프 금지→락아웃 방지).</div><div class="kv"><b>in</b> MissionDecision(post-gate) · <b>out</b> EnforcedAction+claim→Verify</div><div class="toollist">send_signed_mode · docker_pause · nsenter_input_drop · docker_net_disconnect</div></div>
+  <div class="card vfy"><div class="ci">vfy · grep0(Sonnet)</div><div class="cn">vfy-supervisor <span class="fix">FIX E2/X10</span></div><div class="cr">자기 소켓만. <b>비행모드=14560 HEARTBEAT</b>. custom_mode 실제변경? 5762 연결종료? pfcp 회복? <b>down=fail-closed</b>(AUTO 보류). 결정권 0.</div><div class="kv"><b>out</b> TruthJSON{action_effective, mismatch_flag}</div><div class="toollist">sup_observe_comms · sup_check_portstate · sup_check_metrics · emit_truth_json</div></div>
+</div>
+
+<!-- 3 -->
+<h2 id="s3"><span class="n">03</span> 닫힌 툴 카탈로그 (27, v2)</h2>
+<p>gate_evaluate가 화이트리스트∧legality∧티어∧<b>config버전∧디바운스∧verifier-up</b> 통과 후에만 RESPONSE 집행. REMOVED 능력(5762 호스트 iptables·key rotation·SDN·mission-API·PX4)은 카탈로그 부재. <span class="fix">FIX</span> 표시가 v2 정정 툴.</p>
+<div class="filterbar" id="toolfilter">
+  <button class="fbtn" data-cat="all" aria-pressed="true">전체 27</button>
+  <button class="fbtn" data-cat="sensor" aria-pressed="false">sensor 11</button>
+  <button class="fbtn" data-cat="analysis" aria-pressed="false">analysis 9</button>
+  <button class="fbtn" data-cat="response" aria-pressed="false">response 4</button>
+  <button class="fbtn" data-cat="control" aria-pressed="false">control 3</button>
+</div>
+<div class="scroll"><table id="tooltable">
+<tr><th>tool_id</th><th>owner</th><th>cat</th><th>backend</th><th>목적 (v2)</th><th>tier</th><th>legality / 정정</th></tr>
+<tr data-cat="sensor"><td class="mono">tap_mavlink_cmd <span class="fix">FIX</span></td><td class="mono">col_gcs</td><td>sensor</td><td class="mono">pymavlink</td><td><b>gcs_proxy:14556 상행 명령</b> 파싱 → Command_Type/Seq/Source; incompat_flag&0x01=unsigned. (v1의 14560 아님)</td><td><span class="chip c-ro">RO</span></td><td>recv-only, send 금지. 진위는 P-SIG-01 병행(E17)</td></tr>
+<tr data-cat="sensor"><td class="mono">tap_telemetry_14560 <span class="fix">FIX</span></td><td class="mono">col_web</td><td>sensor</td><td class="mono">pymavlink</td><td><b>web_backend:14560 하행 텔레</b> → HEARTBEAT.custom_mode(비행모드)·GPS·pos_rate 연속성</td><td><span class="chip c-ro">RO</span></td><td>recv-only. null-byte/길이상한 정제(X11)</td></tr>
+<tr data-cat="sensor"><td class="mono">tail_signing_drops</td><td class="mono">col_uav</td><td>sensor</td><td class="mono">log-tail</td><td>uav_proxy '⛔ 서명검증 실패 → SITL 차단 (누적 N)' → 서명 <b>진위</b> 신호</td><td><span class="chip c-ro">RO</span></td><td>logs RO, /sign.key 미접근</td></tr>
+<tr data-cat="sensor"><td class="mono">read_port_state</td><td class="mono">col_uav</td><td>sensor</td><td class="mono">ss</td><td>uav_ue netns ss: 5762 LISTEN + ESTAB(백도어 연결). conntrack 병행(단일점 보완)</td><td><span class="chip c-ro">RO</span></td><td>5762 connect 금지(상태만)</td></tr>
+<tr data-cat="sensor"><td class="mono">scrape_pfcp_metrics</td><td class="mono">col_net</td><td>sensor</td><td class="mono">prometheus</td><td>:9090 1s scrape s5c_rx_deletesession·pfcp_peers_active diff</td><td><span class="chip c-ro">RO</span></td><td>GET만, 8805 무주입</td></tr>
+<tr data-cat="sensor"><td class="mono">tail_pfcp_smflog</td><td class="mono">col_net</td><td>sensor</td><td class="mono">log-tail</td><td>SMF 'PFCP de-associated [10.50.0.7]:8805'+IMSI</td><td><span class="chip c-ro">RO</span></td><td>재assoc 트리거 금지 · ANSI strip</td></tr>
+<tr data-cat="sensor"><td class="mono">tail_mme_log</td><td class="mono">col_net</td><td>sensor</td><td class="mono">log-tail</td><td>MME 'UE Context Release [Action:N]'·IMSI·Attach</td><td><span class="chip c-ro">RO</span></td><td>RO · ANSI strip · null-safe</td></tr>
+<tr data-cat="sensor"><td class="mono">read_nas_cipher</td><td class="mono">col_net</td><td>sensor</td><td class="mono">docker-sdk</td><td>mme.yaml ciphering_order 1회. EEA0-first=상시 posture 결함(반복경보 아님)</td><td><span class="chip c-ro">RO</span></td><td>yaml write·MME restart 금지</td></tr>
+<tr data-cat="sensor"><td class="mono">tail_upf_antispoof</td><td class="mono">col_net</td><td>sensor</td><td class="mono">log-tail</td><td>UPF '[DROP] Source IP-4 Spoofing' → UE격리 보강</td><td><span class="chip c-ro">RO</span></td><td>corroboration만</td></tr>
+<tr data-cat="sensor"><td class="mono">probe_rtt_loss <span class="fix">FIX</span></td><td class="mono">col_uav</td><td>sensor</td><td class="mono">ping</td><td>uav_ue netns→gcs_proxy ping(유일 통계 baseline). owner=col_uav(netns 소유, v1의 col_net 오류)</td><td><span class="chip c-ro">RO</span></td><td>화이트리스트 GW만, attacker_ue 프로브 금지</td></tr>
+<tr data-cat="sensor"><td class="mono">tail_mongo_conn</td><td class="mono">col_mongo</td><td>sensor</td><td class="mono">mongod-log</td><td>NETWORK 'Connection accepted' remote. 10.44=이상</td><td><span class="chip c-ro">RO</span></td><td>mongosh 미접속, per-query 불가</td></tr>
+<tr data-cat="analysis"><td class="mono">build_evidence</td><td class="mono">evidence_engine</td><td>analysis</td><td class="mono">asyncio</td><td>정규화 + band→(sev,dev) 매핑(E7) + TTL. <b>임계트립+trust스냅샷만 저장</b>(전 텔레 아님, E21)</td><td><span class="chip c-ro">RO</span></td><td>thresholds에 있는 metric만, REMOVED drop</td></tr>
+<tr data-cat="analysis"><td class="mono">correlate_window <span class="fix">FIX</span></td><td class="mono">correlation_engine</td><td>analysis</td><td class="mono">asyncio</td><td>5s 시간창 Incident. <b>correlation_score=weight×mean(sev_factor)×(n≥2?1:0)</b>(E19). 동시 다중 incident=최대심각도 집계(E23)</td><td><span class="chip c-ro">RO</span></td><td>join=timestamp만(NTP 전제, skew>창이면 비활성 E16)</td></tr>
+<tr data-cat="analysis"><td class="mono">compute_trust <span class="fix">FIX</span></td><td class="mono">trust_engine</td><td>analysis</td><td class="mono">asyncio</td><td><b>trust=100×(1−conf×min(Σw·sev·dev,1))</b>. idle=100(E5). 고정 weight Σ≤1, 포화(E6). band→dev(E7)</td><td><span class="chip c-ro">RO</span></td><td>dev·score clamp, weight 재정규화 안 함</td></tr>
+<tr data-cat="analysis"><td class="mono">compute_confidence</td><td class="mono">trust_engine</td><td>analysis</td><td class="mono">asyncio</td><td>conf=avg_q×corr×decay×(1−conflict). 채널 prior. <b>별도 필드</b>(trust 곱셈 아님, E5/E8)</td><td><span class="chip c-ro">RO</span></td><td>permanent-null 도메인 제외</td></tr>
+<tr data-cat="analysis"><td class="mono">compute_impact <span class="fix">FIX</span></td><td class="mono">mission_impact_engine</td><td>analysis</td><td class="mono">asyncio</td><td>0-100 높을수록 나쁨 G/Y/R. <b>confidence 1회만</b>=저신뢰면 밴드 1단 보수적 상향(곱셈 이중페널티 제거, E8)</td><td><span class="chip c-ro">RO</span></td><td>Recon weight, GPS/env 기여 없음</td></tr>
+<tr data-cat="analysis"><td class="mono">select_policy <span class="fix">FIX</span></td><td class="mono">policy_engine</td><td>analysis</td><td class="mono">asyncio</td><td>규칙평가(낮은수=높음). <b>물리행동 전 N틱 디바운스</b>(X5). Reconfig/Degradation=권고</td><td><span class="chip c-ro">RO</span></td><td>action∈닫힌집합; SDN/replan 없음</td></tr>
+<tr data-cat="analysis"><td class="mono">rank_recovery <span class="fix">FIX</span></td><td class="mono">recovery_engine</td><td>analysis</td><td class="mono">asyncio</td><td>FIXED prior 점수. <b>원자 번들 구성</b>: 복구+공격경로차단(X4/X6). 각 타입→등록 response 툴</td><td><span class="chip c-ro">RO</span></td><td>7 실행가능 enum만; key_rotation/replan 거부</td></tr>
+<tr data-cat="analysis"><td class="mono">decide_mission <span class="fix">FIX</span></td><td class="mono">decision_engine</td><td>analysis</td><td class="mono">asyncio</td><td>6단계 통합. <b>비행행동=항상 operator</b>(X2). LLM은 수식 오버라이드 불가(E12). stale Evidence 배제(X8)</td><td><span class="chip c-ro">RO</span></td><td>flight action auto 금지</td></tr>
+<tr data-cat="analysis"><td class="mono">emit_trace <span class="fix">FIX</span></td><td class="mono">decision_engine</td><td>analysis</td><td class="mono">asyncio</td><td>Decision Trace 해시체인+HMAC(<b>전용 audit키</b>). <b>config_version 기록</b>(X7). WORM 대체</td><td><span class="chip c-ro">RO</span></td><td>IMSI·키 마스킹, append-only</td></tr>
+<tr data-cat="response"><td class="mono">send_signed_mode <span class="fix">FIX X3/X9</span></td><td class="mono">response_controller</td><td>response</td><td class="mono">signer-shim</td><td>서명 DO_SET_MODE LAND9/RTL6/GUIDED4. <b>mdg_core는 키 미마운트</b> → gcs_c2 <b>인증된 signer-shim</b>에 요청. <b>timestamp 연속</b>(gcs_c2 서명상태 이어받음, 미래점프 금지→락아웃 방지)</td><td><span class="chip c-oper">OPER</span></td><td>mode∈{4,6,9}, 서명경로만(5762 금지), shim mTLS+운영자토큰, 원자번들로 공격경로 동시차단</td></tr>
+<tr data-cat="response"><td class="mono">nsenter_input_drop <span class="fix">FIX E3/E4/X12</span></td><td class="mono">act_host</td><td>response</td><td class="mono">nsenter+iptables</td><td>대상 netns INPUT DROP(호스트 바이너리 주입). 5762=UE풀 소스(10.45/16)만, <b>127.0.0.1 보존</b>(SITL 내부 유지). PFCP/mongo도 동일 방식(호스트 FORWARD·컨테이너 iptables 불가)</td><td><span class="chip c-auto">AUTO</span>*</td><td>대상 netns 확인, 5762/8805/27017만, revert 쌍. *효력 런타임 실검증 선행</td></tr>
+<tr data-cat="response"><td class="mono">docker_pause <span class="fix">FIX E18</span></td><td class="mono">act_host</td><td>response</td><td class="mono">docker-sdk</td><td>UE풀 우회 봉쇄(iptables 불가 경로)·V4 봉쇄전용. <b>사전구축 IP→컨테이너 맵</b>(부팅시, arp 즉석 아님)</td><td><span class="chip c-oper">OPER</span></td><td>containment 화이트리스트만; flight/EPC/GCS 절대 금지</td></tr>
+<tr data-cat="response"><td class="mono">docker_net_disconnect</td><td class="mono">act_host</td><td>response</td><td class="mono">docker-sdk</td><td>rogue-UE 망 분리(pause 대안, 가역)</td><td><span class="chip c-oper">OPER</span></td><td>화이트리스트만</td></tr>
+<tr data-cat="control"><td class="mono">gate_evaluate <span class="fix">FIX</span></td><td class="mono">orchestrator</td><td>control</td><td class="mono">asyncio</td><td>집행 전: 화이트리스트∧precondition∧티어∧<b>config_version∧디바운스충족∧verifier-up∧멱등성</b>(이미 적용시 skip, E24) 확인 + rollback 기록</td><td><span class="chip c-ro">RO</span></td><td>미등록·REMOVED·verifier-down시 AUTO 거부</td></tr>
+<tr data-cat="control"><td class="mono">operator_confirm <span class="fix">FIX X9</span></td><td class="mono">operator_interface</td><td>control</td><td class="mono">operator-ws(mTLS)</td><td>운영자 승인. <b>운영자 신원검증(mTLS 클라이언트 인증)</b>+단회 토큰(decision+tool 바인딩·TTL)</td><td><span class="chip c-oper">OPER</span></td><td>anti-spoof, 자동승인 없음, 비행행동 필수</td></tr>
+<tr data-cat="control"><td class="mono">ingest_verify <span class="fix">NEW E9/X1</span></td><td class="mono">collector_manager</td><td>control</td><td class="mono">mTLS+HMAC</td><td><b>Collector→MDG ingest 검증</b>: per-agent mTLS + <b>정본 봉투 전체 HMAC</b>(payload뿐 아니라 agent_id/ts/seq 포함) + seq 단조성 + rate-limit</td><td><span class="chip c-ro">RO</span></td><td>미인증·재사용seq·과속 envelope drop; ingest키≠audit키≠sign키</td></tr>
+</table></div>
+
+<!-- 4 -->
+<h2 id="s4"><span class="n">04</span> I/O 계약 · 키 분리 (v2)</h2>
+<div class="ascii">Collector(정본봉투) ──gRPC:50051 mTLS──▶ [ingest_verify] ──▶ Evidence→Correlation→Trust→Impact→Policy→Recovery→Decision
+   Decision ──[2-Tier Gate: config핀·디바운스·verifier-up·멱등]──▶ Response(원자번들) ──▶ EnforcedAction
+   Decision ──DecisionTrace(hash-chain+HMAC audit키, config_version)──▶ Repo(mongo TTL, 트립+스냅샷만)
+   ══ grep0 ══ Verifier(14560 독립 tap) ──▶ TruthJSON ──▶ Viewer/보고서 (MDG로 되먹임 안 함)</div>
+
+<div class="note crit"><span class="h">키 3분리 (E9/X1/X2/E11/X9)</span> 절대 혼용 금지: <b>ingest_key</b>(per-collector, ingest HMAC/mTLS) · <b>audit_key</b>(DecisionTrace HMAC) · <b>MAVLink /sign.key</b>(비행명령, mdg_core 미마운트 — gcs_c2 shim만 보유) · <b>operator mTLS cert</b>(운영자 인증). ingest 침해가 audit/비행키를 오염시키지 않음.</div>
+
+<details open><summary>▎ MessageEnvelope — sig는 정본 봉투 전체를 덮음 (v2 FIX X1)</summary><pre>{
+  "agent_id": enum["col_uav","col_gcs","col_net","col_web","col_mongo"],  // col_mission은 in-process(비 gRPC), enum 제외 (E20)
+  "ts":"RFC3339 UTC(NTP)", "seq":int(per-agent 단조; gap→confidence 감쇠·재사용→drop),
+  "schema_version":"mdg/v2", "corr_id":str|null, "config_version":str,   // 결정 재현용(X7)
+  "payload":{ raw-event; Collector는 비추론 raw만 },
+  "confidence":0..1 (channel prior, 판정 아님),
+  "sig":"HMAC-SHA256( canonical(agent_id|ts|seq|schema_version|corr_id|config_version|payload), ingest_key )"
+        // v1은 payload만 덮어 메타 위조 가능 → v2는 정본 전체 MAC + per-agent mTLS
+}</pre></details>
+
+<details><summary>▎ TrustObject · MissionImpactObject (v2 수식 FIX E5/E6/E7/E8)</summary><pre>TrustObject {
+  "domain":enum[communication,identity_access,session_network,command,mission],
+  "trust_score":0..100 = clamp(100×(1 − confidence×min(Σ(w_i·sev_i·dev_i),1)), 0,100),
+     // idle(Σ=0) ⇒ 100 (confidence 무관, E5).  weight 고정 Σ≤1·포화(E6).  dev=band→값(E7)
+  "trust_level":enum[very_high90+,high70,moderate50,low30,very_low0],
+  "confidence":0..1 (별도 필드 — impact가 1회만 사용, E8),
+  "reason":str, "supporting":[], "conflicting":[] }
+
+MissionImpactObject {  // 0-100 정수, 높을수록 나쁨 (M5/M7)
+  "availability|integrity|safety|continuity":0-100, "recoverability":0-100(RecoveryObject서, M8),
+  "overall_impact":0-100, "mission_risk":enum[Green0-30,Yellow31-70,Red71-100],
+  "confidence_band_shift":int (저신뢰 시 밴드 +1단 보수적, 곱셈 아님 — E8) }</pre></details>
+
+<details><summary>▎ MissionDecisionObject · RecoveryObject (v2 안전 FIX X2/X6)</summary><pre>MissionDecisionObject {
+  "decision":enum[Continue,Continue+Monitoring,Mission Reconfiguration,Graceful Degradation,Operator Confirmation,Mission Abort],
+  "enforcement":enum["auto","operator_confirm"],  // 비행상태 변경(Abort의 RTL/LAND 포함)=항상 operator_confirm (X2 모순해소)
+  "debounce_ticks":int, "config_version":str, "supporting_evidence":[](stale 제외 X8),
+  "trust_summary":{}, "mission_impact":{0-100}, "confidence":0..1, "timestamp":dt }
+
+RecoveryObject {
+  "recovery_type":enum[signed_land,signed_rtl,signed_guided,backdoor_pause,pfcp_firewall,mongo_acl,command_override],
+  "bundle":[actuator...],   // 원자 번들: 복구+공격경로차단 1 트랜잭션 (X4/X6); 부분실패→전체 rollback
+  "success_probability":0..1, "expected_trust_recovery":{}, "recovery_score":0..1, "requires_confirm":bool,
+  "signer":"gcs_c2 shim(mTLS)", "sign_ts":"gcs_c2 link 연속(미래점프 금지, X3)" }</pre></details>
+
+<!-- 5 -->
+<h2 id="s5"><span class="n">05</span> 정본 config · 수식 (v2)</h2>
+<details open><summary>▎ thresholds.yaml — band→(severity,dev) 매핑 추가 (FIX E7)</summary><pre>severity_factor: {info:0.0, low:0.1, medium:0.3, high:0.6, critical:1.0}
+# band→(severity,dev) 매핑 (v2 신규): dev가 밴드 내 스케일 — obs>0 일괄 dev=1.0 폐기
+band_map:
+  normal:   {severity: info,     dev: 0.0}
+  warning:  {severity: medium,   dev: 0.4}
+  critical: {severity: high,     dev: 0.7}
+  danger:   {severity: critical, dev: 1.0}
+metrics:   # weight는 도메인 내 합 ≤ 1 (E6, 재정규화 안 함)
+  PFCP_Delete_Attempt:  {domain: session_network, normal:[0,0], warning:[1,1], critical:[2,3], danger:[4,inf], weight:0.40}
+  Unauthorized_Command: {domain: command, normal:[0,0], warning:[1,1], critical:[2,inf], weight:0.35}
+  Signature_Verify_Fail:{domain: command, warning:[1,3], critical:[4,inf], weight:0.20}  # 진위 신호
+  Port_5762_State:      {domain: command, normal:"LISTEN_NO_ESTAB", danger:"ESTAB_PRESENT", weight:0.45}
+  DB_Access:            {domain: identity_access, normal:[0,0], warning:[1,2], critical:[3,inf], weight:0.35}
+  Packet_Loss:          {domain: communication, normal:[0,1], warning:[2,5], critical:[6,20], danger:[21,100], weight:0.30}
+  RTT:                  {domain: communication, normal:[0,40], warning:[41,80], critical:[81,150], weight:0.20}
+  NAS_Cipher_Order:     {domain: communication, danger_if:"EEA0 first", weight:0.15, once:true}
+trust_bands: {very_high:[90,100], high:[70,89], moderate:[50,69], low:[30,49], very_low:[0,29]}
+impact_bands: {Green:[0,30], Yellow:[31,70], Red:[71,100]}
+debounce: {physical_action_min_ticks: 3}          # X5: LAND/RTL 전 N틱 지속
+deescalation: {revert_reversible_after_quiet_s: 120, flight_action_auto_revert: false}  # E15
+correlation_rules:
+  CR01: {metrics:[PFCP_Delete_Attempt, Unauthorized_Command], max_time_diff_s:5, join:"time_only",
+         score: "weight * mean(member.severity_factor) * (n>=2 ? 1 : 0)"}   # E19</pre></details>
+
+<details><summary>▎ mission_profile.yaml · keys.yaml · bootstrap (FIX E14/X7/키분리)</summary><pre># mission_profile.yaml (M1~M3·M8 정본 — 변경 없음)
+mission_type: "Recon"; mission_phase: "En-route"; mission_priority: "High"
+mission_weight: {communication:30, identity_access:10, session_network:20, command:20, mission:20, recovery:0}  # identity_access 통일(E20)
+operational_constraints: {max_alt_m:120, rtl_on_link_loss:true, rtb_min:30}
+session_ttl_s: 3240; flight_modes: {GUIDED:4, LOITER:5, RTL:6, LAND:9}   # ArduPilot
+config_version: "mdg-cfg-2026-07-07"          # X7: 결정마다 핀; hot-reload는 다음 사이클부터
+
+# keys.yaml (키 3분리, 절대 혼용 금지 — E9/X1/E11/X9)
+keys:
+  ingest_key:  "per-collector HMAC/mTLS (Collector→MDG ingest)"     # ingest_verify
+  audit_key:   "DecisionTrace HMAC (WORM 대체)"                     # emit_trace
+  sign_key:    "MAVLink /sign.key — gcs_c2 shim만, mdg_core 미마운트"  # send_signed_mode
+  operator_cert:"운영자 mTLS 클라이언트 인증"                        # operator_confirm
+
+# bootstrap (E14)
+bootstrap: {mode: "assume_clean", clean_window_s: 60, until_operator_ack: true}  # 기동시 공격중 baseline 오염 방지
+ntp: {required: true, max_skew_ms: 200, on_exceed: "widen_or_disable_time_join"}  # E16</pre></details>
+
+<h3>수식 패치 (v2 최종)</h3>
+<div class="grid">
+<div class="card ort"><div class="cn">① Trust (E5+E6+E7)</div><div class="cr"><code>dev = band_map[band].dev</code>(밴드 스케일, 0-분모 없음). 도메인 내 <b>고정 weight Σ≤1</b>(재정규화 금지). <code>trust = clamp(100×(1 − <b>confidence×</b>min(Σ w·sev·dev, 1)), 0, 100)</code>. idle(Σ=0)→100. 단일 critical이 도메인 0으로 만들지 않음(Σ≤1·포화).</div></div>
+<div class="card ort"><div class="cn">② Impact (E8/M5/M7)</div><div class="cr">0-100 정수, 높을수록 나쁨, G/Y/R. confidence는 <b>여기서 1회만</b>: 도메인 confidence 낮으면 mission_risk 밴드를 <b>1단 보수적 상향</b>(곱셈 이중페널티 제거). recoverability는 RecoveryObject서(M8).</div></div>
+<div class="card dec"><div class="cn">③ Policy·Recovery (M4/M6/E19/X5)</div><div class="cr">priority 낮은수=높음, min 선택. recovery_score=clamp(succ×(0.6·Σtrust_rec/100+0.4·mission_rec/100)×(1−risk)/(1+cost),0,1), ≥0.7 실현가능. correlation_score=weight×mean(sev)×(n≥2). 물리행동 前 3틱 디바운스.</div></div>
+<div class="card act"><div class="cn">④ 안전 게이트 (X2/X3/X6/X10)</div><div class="cr">비행행동=항상 operator. 서명 timestamp는 gcs_c2 link 연속(미래점프 금지). 복구+공격차단=원자 번들(부분실패→rollback). verifier-down→AUTO 보류(fail-closed). 멱등(이미 적용시 skip).</div></div>
+</div>
+
+<!-- 6 -->
+<h2 id="s6"><span class="n">06</span> 로그/메트릭 파서 (19, v2)</h2>
+<div class="note warn"><span class="h">전역 규칙</span> Open5GS 로그 ANSI SGR strip(<code>\x1b\[[0-9;]*m</code>). <b>모든 파서는 바이너리-세이프</b>: null-byte(<code>\x00</code>)·구분자 주입에 스트림 절단 금지, 필드 길이상한(X11). <span class="fix">FIX</span>=v2 정정.</div>
+<div class="scroll"><table>
+<tr><th>parser</th><th>source (v2)</th><th>method</th><th>→ Evidence / 정정</th></tr>
+<tr><td class="mono">P-CMD-01 <span class="fix">FIX</span></td><td class="mono">gcs_proxy:14556 (상행)</td><td>pymavlink</td><td>Command_Type/Source. v1의 14560→14556(E1)</td></tr>
+<tr><td class="mono">P-CMD-02 <span class="fix">FIX</span></td><td class="mono">gcs_proxy:14556</td><td>pymavlink+seq</td><td>Sequence 단조성(replay 보조). 진짜 replay는 서명 timestamp(P-SIG-02)</td></tr>
+<tr><td class="mono">P-CMD-03 <span class="fix">FIX</span></td><td class="mono">gcs_proxy:14556</td><td>parse-error</td><td>Invalid_Command_Format(REMOVE→IMPL). null-safe</td></tr>
+<tr><td class="mono">P-SIG-01</td><td class="mono">uav_proxy stderr</td><td>regex</td><td>서명검증 실패 누적 N → <b>진위</b> 신호(incompat_flag 보완, E17)</td></tr>
+<tr><td class="mono">P-SIG-02*</td><td class="mono">14555 (verifier)</td><td>HMAC 재계산</td><td>per-packet PASS + timestamp 단조성(락아웃 감시)</td></tr>
+<tr><td class="mono">P-TLM-01 <span class="fix">NEW</span></td><td class="mono">web_backend:14560 (하행)</td><td>pymavlink</td><td><b>HEARTBEAT.custom_mode(비행모드)</b>·armed·GPS·pos_rate 연속성 (E1/E2)</td></tr>
+<tr><td class="mono">P-MODE-01 <span class="fix">FIX</span></td><td class="mono">14560 HEARTBEAT (verifier)</td><td>pymavlink</td><td>Verifier 지상진실 비행모드. v1의 5762→14560(E2, 봉쇄시 실명 방지)</td></tr>
+<tr><td class="mono">P-PORT-01</td><td class="mono">uav_ue netns ss</td><td>ss-parse</td><td>5762 LISTEN/ESTAB(백도어). conntrack 병행</td></tr>
+<tr><td class="mono">P-PFCP-01</td><td class="mono">:9090/metrics</td><td>prom-parse</td><td>PFCP_Delete_Attempt(counter diff)</td></tr>
+<tr><td class="mono">P-PFCP-02/03</td><td class="mono">epc_smf/upf log</td><td>regex</td><td>PFCP de-associated·Session_Reset(+IMSI)</td></tr>
+<tr><td class="mono">P-S1AP-01</td><td class="mono">epc_mme log</td><td>regex</td><td>UE Context Release·Attach·IMSI(시간 join만)</td></tr>
+<tr><td class="mono">P-NAS-01</td><td class="mono">mme.yaml (1회)</td><td>yaml</td><td>NAS_Cipher_Order EEA0-first 상시결함</td></tr>
+<tr><td class="mono">P-SPOOF-01</td><td class="mono">epc_upf ERROR</td><td>regex</td><td>AntiSpoof_Drop(UE격리 보강)</td></tr>
+<tr><td class="mono">P-NET-01</td><td class="mono">uav_ue ping</td><td>ping-parse</td><td>Packet_Loss/RTT(유일 통계 baseline)</td></tr>
+<tr><td class="mono">P-DB-01</td><td class="mono">mongod.log</td><td>json</td><td>DB_Access 연결단위(10.44=이상)</td></tr>
+<tr><td class="mono">P-WEB-01</td><td class="mono">web_backend netns pcap 8080</td><td>HTTP</td><td>Unauthorized_API_Call(오라클). null-safe</td></tr>
+<tr><td class="mono">P-WEB-02</td><td class="mono">GET :8080/stats</td><td>json</td><td>연속성(pos_rate)</td></tr>
+<tr><td class="mono">P-ARIA-01</td><td class="mono">14555 ciphertext</td><td>len/timing</td><td>Cipher_Anomaly(advisory)</td></tr>
+</table></div>
+<p class="mono" style="font-size:11px;color:var(--dim)">* P-SIG-02·P-MODE-01 = 독립 Verifier 평면 전용. V4 key-forge = 파서 없음(탐지불가·봉쇄전용). REMOVED(GPS/env/GTP-bridge/mission-tamper/Session_Token) 파서 없음.</p>
+
+<!-- 7 -->
+<h2 id="s7"><span class="n">07</span> 추가 요소 (v2 강화)</h2>
+<div class="grid">
+<div class="card ctl"><div class="cn">Evidence Repository (mongo TTL)</div><div class="cr">TTL 인덱스. <b>임계트립 이벤트 + 주기 trust 스냅샷만</b> 저장(전 텔레 아님, E21). StoreEvidence/QueryEvidence.</div></div>
+<div class="card vfy"><div class="cn">Decision Trace 해시체인 + config_version</div><div class="cr">prev_hash + HMAC(전용 audit키). <b>config_version 기록</b>(X7 재현). WORM 대체.</div></div>
+<div class="card act"><div class="cn">Operator Confirmation (mTLS+토큰)</div><div class="cr"><b>운영자 신원 mTLS 검증</b>+단회 토큰(decision+tool 바인딩·TTL·anti-spoof, X9). 비행행동 필수(X2).</div></div>
+<div class="card ctl"><div class="cn">Config 버전핀 (X7)</div><div class="cr">hot-reload는 <b>다음 사이클부터</b>. 각 결정은 로드시 config_version 고정 → TOCTOU·중간조작 방지.</div></div>
+<div class="card ctl"><div class="cn">Stale 리플레이 가드 (X8)</div><div class="cr">다운타임 후 재생 Evidence는 <b>stale 표기 → 액추에이션 금지</b>(뒤늦은 Abort/봉쇄 방지). trust 재계산엔 사용, 행동엔 미사용.</div></div>
+<div class="card vfy"><div class="cn">독립 Verifier + fail-closed (X10)</div><div class="cr">grep0 격리. down/timeout 시 <b>AUTO 집행 보류→운영자 에스컬레이트</b>(fail-open 금지). 수동 수집은 지속.</div></div>
+<div class="card act"><div class="cn">원자 행동 번들 + 멱등 (X6/E24)</div><div class="cr">복구+공격차단을 1 트랜잭션(부분실패→rollback). 이미 적용된 규칙 재발화 시 skip. 상충행동은 안전우선 해소.</div></div>
+<div class="card obs"><div class="cn">Viewer 3패널 + heartbeat</div><div class="cr">action log/comms/evaluation(read-only·redacted). Collector heartbeat→손실시 confidence 감쇠·버퍼 재생(단 stale 가드).</div></div>
+</div>
+
+<!-- 8 -->
+<h2 id="s8"><span class="n">08</span> 공방 추적 매트릭스 (v2)</h2>
+<div class="scroll"><table>
+<tr><th>실증 공격</th><th>Collector·파서 (v2)</th><th>결정</th><th>대응 (v2)</th><th>Verifier</th><th>상태</th></tr>
+<tr><td>PFCP delete (TM2)</td><td class="mono">col_net · P-PFCP-01/02</td><td>Continue+Monitoring</td><td class="mono">nsenter INPUT 8805(대상 netns)</td><td>pfcp_peers 회복</td><td><span class="chip c-impl">완결</span></td></tr>
+<tr><td>MAVLink replay (V1)</td><td class="mono">col_gcs · P-CMD-02 / P-SIG-02</td><td>Operator Confirmation</td><td class="mono">command_override(서명, ts연속)</td><td>custom_mode(14560) 재확립</td><td><span class="chip c-impl">완결</span></td></tr>
+<tr><td>TM1 web-oracle</td><td class="mono">col_web · P-WEB-01</td><td>+Monitoring→Operator</td><td class="mono">nsenter INPUT 8080</td><td>8080 접근 차단</td><td><span class="chip c-modify">단일점(heartbeat)</span></td></tr>
+<tr><td><b>5762 백도어</b></td><td class="mono">col_uav · P-PORT-01</td><td>Operator (디바운스)</td><td class="mono"><b>nsenter INPUT 5762(UE풀 소스만) + docker_pause</b> 원자번들</td><td>ss 5762 ESTAB 종료(14560 모드 유지)</td><td><span class="chip c-modify">v2 정정</span></td></tr>
+<tr><td>rogue-UE recon</td><td class="mono">col_mongo · P-DB-01</td><td>Continue+Monitoring</td><td class="mono">nsenter 27017 / docker_pause(맵)</td><td>anti-spoof 로그</td><td><span class="chip c-impl">완결</span></td></tr>
+<tr><td><b>V4 키위조</b></td><td class="mono">— (탐지불가)</td><td>봉쇄 결정만</td><td class="mono">docker_pause(봉쇄전용)</td><td>—</td><td><span class="chip c-breach">탐지불가·정직</span></td></tr>
+<tr><td>공격 지속 중 복구</td><td class="mono">(전 파서)</td><td>원자번들</td><td class="mono"><b>복구명령+공격경로차단 동시</b>(X4 모드플래핑 방지)</td><td>모드 안정 확인</td><td><span class="chip c-impl">v2 신규</span></td></tr>
+</table></div>
+
+<!-- 9 -->
+<h2 id="s9"><span class="n">09</span> 정직성 가드레일 (3모델 확인)</h2>
+<div class="note crit"><span class="h">보고서에 그대로 (과장 방지)</span>
+<ul>
+<li><b>tcp/5762 호스트 iptables 무력</b> — UE풀 GTP-U 유저스페이스 스위칭이 호스트 netfilter 우회. 유일 유효=nsenter netns-INPUT(UE풀 소스만)/docker pause.</li>
+<li><b>V4 키위조 탐지불가</b> — 서명+소스 통과, 봉쇄전용.</li>
+<li><b>inter-container iptables 효력</b> — br_netfilter 부재로 호스트 FORWARD 미적용 → nsenter로 대상 netns INPUT, <b>코딩 전 실 DROP 1건 가역 검증 선행</b>.</li>
+<li><b>서명 timestamp 락아웃</b> — 복구 서명은 gcs_c2 link 연속만(미래점프 금지). 미준수 시 운영자 영구 락아웃.</li>
+<li><b>NAS EEA0-first</b> 상시 posture 결함(1회) · <b>UE 격리</b> 미격리 상수 · <b>GPS/env/GTP/미션재할당</b> 미검증 미래과제.</li>
+</ul></div>
+<div class="note ok"><span class="h">3중 검증 결과</span> 자체 레드팀 E1~E24 + <b>codex·agy 독립 교차검증</b>: 두 모델이 E1~E24를 거의 전부 확인(codex만 E17 PARTIAL: incompat_flag≠authenticity→진위는 서명드롭 로그), 신규 X1~X13 추가. 본 v2가 P0(E1·E3·E4·E9)+통합최우선 5축을 전부 반영. 파이프라인 골격 유효.</div>
+
+<!-- 10 -->
+<h2 id="s10"><span class="n">10</span> 검증 해소 로그 (E1~E24 · X1~X13)</h2>
+<p>각 검증 항목의 <b>해소 결정</b>과 <b>반영 위치</b>. 상세 근거는 <code>DEFENSE_AGENT_DESIGN_VERIFICATION_20260706.md</code>.</p>
+<div class="scroll"><table>
+<tr><th>ID</th><th>문제</th><th>v2 해소 결정</th><th>반영</th></tr>
+<tr><td class="mono">E1</td><td>14560=텔레(명령 아님)</td><td>명령=col_gcs@14556, 텔레=col_web@14560</td><td>§1 §2 §3(tap_mavlink_cmd) §6(P-CMD)</td></tr>
+<tr><td class="mono">E2</td><td>Verifier 5762 자기봉쇄</td><td>비행모드=14560 HEARTBEAT</td><td>§1 verifier §6(P-MODE-01)</td></tr>
+<tr><td class="mono">E3</td><td>uav_ue iptables 없음</td><td>act_host nsenter 대상 netns INPUT</td><td>§3(nsenter_input_drop) §1</td></tr>
+<tr><td class="mono">E4</td><td>br_netfilter 부재</td><td>inter-container도 nsenter INPUT + 런타임 실검증</td><td>§3 §9</td></tr>
+<tr><td class="mono">E5</td><td>idle trust&lt;100</td><td>confidence를 적대항에만: 100×(1−conf×Σ)</td><td>§4 §5 수식①</td></tr>
+<tr><td class="mono">E6</td><td>단일 critical→도메인0</td><td>고정 weight Σ≤1 + min() 포화, 재정규화 폐지</td><td>§5 thresholds·수식①</td></tr>
+<tr><td class="mono">E7</td><td>dev=1 일괄·매핑부재</td><td>band→(severity,dev) 매핑표</td><td>§5 band_map</td></tr>
+<tr><td class="mono">E8</td><td>confidence 이중페널티</td><td>trust서 1회(적대항), impact는 밴드 1단 상향</td><td>§4 §5 수식②</td></tr>
+<tr><td class="mono">E9</td><td>무인증 ingest</td><td>mTLS + 전체봉투 HMAC + seq + rate-limit</td><td>§3(ingest_verify) §4</td></tr>
+<tr><td class="mono">E10/X11</td><td>프롬프트/null-byte 주입</td><td>구조화 JSON만·이스케이프·길이상한·바이너리세이프 파서</td><td>§0 §6 전역규칙</td></tr>
+<tr><td class="mono">E11/X9</td><td>키 확산·서명오라클</td><td>키 3분리, /sign.key mdg 미마운트→gcs_c2 shim(mTLS)</td><td>§4 keys.yaml §3(send_signed_mode)</td></tr>
+<tr><td class="mono">E12</td><td>LLM 권한경계</td><td>수식이 권위, LLM은 상향·근거만(오버라이드 불가), temp=0</td><td>§0 §2</td></tr>
+<tr><td class="mono">E13</td><td>LLM 지연 vs 1s</td><td>결정론 매틱, LLM은 Y/R만·5s초과시 결정론 확정</td><td>§2</td></tr>
+<tr><td class="mono">E14</td><td>baseline 오염</td><td>assume_clean 부트창 + 운영자 ack</td><td>§5 bootstrap</td></tr>
+<tr><td class="mono">E15/X8</td><td>롤백·stale</td><td>위협해소 T초 후 가역 auto-revert(비행 제외), stale는 액추 금지</td><td>§2 §5 §7</td></tr>
+<tr><td class="mono">E16</td><td>NTP</td><td>NTP 필수, skew&gt;창→시간join 비활성</td><td>§5 ntp §3</td></tr>
+<tr><td class="mono">E17</td><td>서명검출</td><td>incompat_flag&0x01=unsigned, 진위는 서명드롭 로그(codex PARTIAL 반영)</td><td>§3 §6(P-SIG-01)</td></tr>
+<tr><td class="mono">E18/X13</td><td>컨테이너 식별</td><td>부팅시 IP→컨테이너 맵, arp 즉석 아님</td><td>§3(docker_pause)</td></tr>
+<tr><td class="mono">E19</td><td>correlation_score</td><td>weight×mean(sev)×(n≥2)</td><td>§5 CR01</td></tr>
+<tr><td class="mono">E20</td><td>proto/enum</td><td>col_net 통일, col_mission enum 제외, identity_access 통일</td><td>§4 envelope</td></tr>
+<tr><td class="mono">E21</td><td>저장 부하</td><td>트립+trust 스냅샷만 persist</td><td>§3(build_evidence) §7</td></tr>
+<tr><td class="mono">E22</td><td>mission trust</td><td>고정 context+타도메인 rollup(라이브 아님)</td><td>§5 mission_weight</td></tr>
+<tr><td class="mono">E23</td><td>동시 공격</td><td>다중 incident 최대심각도 집계</td><td>§3(correlate_window)</td></tr>
+<tr><td class="mono">E24/X6</td><td>멱등·원자</td><td>이미 적용 skip + 원자 번들(부분실패 rollback)</td><td>§3(gate) §7</td></tr>
+<tr><td class="mono">X1</td><td>MAC payload만</td><td>정본 봉투 전체 HMAC + per-agent mTLS</td><td>§4 envelope</td></tr>
+<tr><td class="mono">X2</td><td>auto-Abort 모순</td><td>비행행동은 항상 operator_confirm</td><td>§2 §3 §4</td></tr>
+<tr><td class="mono">X3</td><td>서명 timestamp 락아웃</td><td>gcs_c2 link 연속만, 미래점프 금지</td><td>§3(send_signed_mode) §4</td></tr>
+<tr><td class="mono">X4</td><td>모드 플래핑</td><td>복구+공격경로차단 원자 동시(번들)</td><td>§3 §8 §7</td></tr>
+<tr><td class="mono">X5</td><td>히스테리시스</td><td>물리행동 前 N틱(3) 디바운스</td><td>§5 debounce §3(select_policy)</td></tr>
+<tr><td class="mono">X7</td><td>hot-reload TOCTOU</td><td>결정별 config_version 핀, 다음 사이클 반영</td><td>§4 §5 §7</td></tr>
+<tr><td class="mono">X10</td><td>verifier-down</td><td>fail-closed(AUTO 보류→운영자)</td><td>§2 §3(gate) §7</td></tr>
+<tr><td class="mono">X12</td><td>5762 범위</td><td>UE풀 소스(10.45/16)만, 127.0.0.1 보존</td><td>§3(nsenter_input_drop)</td></tr>
+</table></div>
+
+<footer>
+DAH 2026 · MDG 방어 에이전트 최종 설계 <b>v2</b> · 테스트베드 한정·가역·인가 샌드박스 · 실기체/실이동통신망 아님.<br>
+근거: FEASIBILITY_AUDIT_20260706 · 라이브 실측(<TESTBED-IP>) · DESIGN_VERIFICATION(E1~E24) · 교차검증 codex 0.142.5 + agy 1.0.8(X1~X13).<br>
+코딩 전 필수 실검증: ① inter-container nsenter DROP 실효(E4) ② 서명 timestamp 연속성(X3) ③ ingest 위조 envelope drop(E9). 키·서명키 마스킹.
+</footer>
+</div>
+
+<script>
+(function(){
+  var bar=document.getElementById('toolfilter'), tbl=document.getElementById('tooltable');
+  if(!bar||!tbl) return;
+  var rows=Array.prototype.slice.call(tbl.querySelectorAll('tr[data-cat]'));
+  bar.addEventListener('click',function(e){
+    var b=e.target.closest('.fbtn'); if(!b) return;
+    var cat=b.getAttribute('data-cat');
+    Array.prototype.forEach.call(bar.querySelectorAll('.fbtn'),function(x){x.setAttribute('aria-pressed', x===b?'true':'false');});
+    rows.forEach(function(r){
+      r.style.display = (cat==='all'|| r.getAttribute('data-cat')===cat) ? '' : 'none';
+    });
+  });
+})();
+</script>

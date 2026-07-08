@@ -1,0 +1,279 @@
+<!doctype html>
+<title>MDG 방어 에이전트 — 개발 워크플로우 & Phase별 검증 (DAH 2026)</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{
+  --bg:#0a0e15;--panel:#111826;--panel2:#0d1420;--panel3:#0b1019;--line:#1f2c3e;--line2:#2b3b52;
+  --ink:#d7e2ed;--muted:#8299b0;--dim:#5a7088;--accent:#22d3ee;
+  --p0:#a78bfa;--p1:#fb7185;--p2:#38bdf8;--p3:#f59e0b;--p4:#fb923c;--p5:#34d399;--p6:#22d3ee;
+  --g0:#a78bfa;--g1:#fb7185;--g2:#34d399;
+  --mono:ui-monospace,"Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.65;-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(1200px 500px at 80% -10%,#12233012,transparent 70%)}
+.wrap{max-width:1180px;margin:0 auto;padding:40px 22px 80px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.19em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+h1{font-size:clamp(23px,3.3vw,34px);font-weight:820;letter-spacing:-.02em;margin:0 0 8px}
+.sub{color:var(--muted);font-size:14.5px;margin:0 0 14px;max-width:88ch}.sub b{color:var(--ink)}
+h2{font-size:19px;font-weight:760;margin:46px 0 8px;padding-bottom:8px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center}
+h2 .n{font-family:var(--mono);font-size:12px;color:var(--accent)}
+p{font-size:13.5px;color:#a9bccd}
+code{font-family:var(--mono);font-size:11.5px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:#9fe7f2}
+.lead{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:11px;padding:15px 18px;margin:14px 0;font-size:14px}
+.lead b{color:var(--ink)}
+.toc{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 4px}
+.toc a{font-family:var(--mono);font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:7px;padding:6px 11px;background:var(--panel2)}
+.toc a:hover{border-color:var(--accent);color:var(--ink)}
+
+/* timeline */
+.timeline{display:flex;flex-wrap:wrap;gap:0;margin:16px 0;align-items:stretch;overflow-x:auto}
+.tphase{flex:1 1 130px;min-width:120px;border:1px solid var(--line2);border-radius:9px;padding:9px 10px;margin-right:22px;position:relative;background:var(--panel)}
+.tphase::after{content:"▶";position:absolute;right:-17px;top:50%;transform:translateY(-50%);color:var(--dim);font-size:12px}
+.tphase:last-child{margin-right:0}.tphase:last-child::after{display:none}
+.tphase .tp{font-family:var(--mono);font-size:11px;font-weight:700}
+.tphase .tn{font-size:12px;font-weight:700;margin:3px 0}
+.tphase .tg{font-family:var(--mono);font-size:9px;margin-top:5px;padding:2px 6px;border-radius:4px;display:inline-block}
+.tphase.p0{border-top:3px solid var(--p0)}.tphase.p0 .tp{color:var(--p0)}
+.tphase.p1{border-top:3px solid var(--p1)}.tphase.p1 .tp{color:var(--p1)}
+.tphase.p2{border-top:3px solid var(--p2)}.tphase.p2 .tp{color:var(--p2)}
+.tphase.p3{border-top:3px solid var(--p3)}.tphase.p3 .tp{color:var(--p3)}
+.tphase.p4{border-top:3px solid var(--p4)}.tphase.p4 .tp{color:var(--p4)}
+.tphase.p5{border-top:3px solid var(--p5)}.tphase.p5 .tp{color:var(--p5)}
+.tphase.p6{border-top:3px solid var(--p6)}.tphase.p6 .tp{color:var(--p6)}
+.g0b{background:#a78bfa20;color:var(--g0);border:1px solid #a78bfa55}
+.g1b{background:#fb718520;color:var(--g1);border:1px solid #fb718555}
+.g2b{background:#34d39920;color:var(--g2);border:1px solid #34d39955}
+.domb{background:#94a3b820;color:#c7d3e0;border:1px solid #94a3b855}
+
+/* phase card */
+.pcard{border:1px solid var(--line);border-radius:13px;margin:16px 0;overflow:hidden;background:var(--panel)}
+.pcard>.ph{padding:13px 16px;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline;border-bottom:1px solid var(--line)}
+.pcard.p0>.ph{background:linear-gradient(90deg,#a78bfa16,transparent)}.pcard.p1>.ph{background:linear-gradient(90deg,#fb718516,transparent)}
+.pcard.p2>.ph{background:linear-gradient(90deg,#38bdf816,transparent)}.pcard.p3>.ph{background:linear-gradient(90deg,#f59e0b16,transparent)}
+.pcard.p4>.ph{background:linear-gradient(90deg,#fb923c16,transparent)}.pcard.p5>.ph{background:linear-gradient(90deg,#34d39916,transparent)}.pcard.p6>.ph{background:linear-gradient(90deg,#22d3ee16,transparent)}
+.pcard .pid{font-family:var(--mono);font-size:13px;font-weight:800}
+.pcard.p0 .pid{color:var(--p0)}.pcard.p1 .pid{color:var(--p1)}.pcard.p2 .pid{color:var(--p2)}.pcard.p3 .pid{color:var(--p3)}.pcard.p4 .pid{color:var(--p4)}.pcard.p5 .pid{color:var(--p5)}.pcard.p6 .pid{color:var(--p6)}
+.pcard .pt{font-size:15px;font-weight:750}
+.pcard .pmeta{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-left:auto}
+.pcard .pbody{padding:12px 16px 15px}
+.pcard .plabel{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:10px 0 5px}
+.pcard .pout{font-size:12.5px;color:#c7d6e6;line-height:1.5}.pcard .pout code{font-size:11px}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:9px;margin:8px 0}
+table{width:100%;border-collapse:collapse;font-size:12px;min-width:640px}
+th{background:var(--panel2);color:var(--muted);text-align:left;padding:7px 10px;font-size:10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:7px 10px;border-bottom:1px solid var(--line);color:#a9bccd;vertical-align:top}
+tr:last-child td{border-bottom:none}td.mono,.mono{font-family:var(--mono);font-size:10.5px}
+tbody tr:hover{background:#16202e55}
+.vt{font-family:var(--mono);font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;white-space:nowrap}
+.vt.probe{background:#38bdf820;color:#9fd7ee;border:1px solid #38bdf855}
+.vt.script{background:#a78bfa20;color:#d0c2f5;border:1px solid #a78bfa55}
+.vt.gate{background:#fb718520;color:#ffc4cc;border:1px solid #fb718555}
+.vt.unit{background:#94a3b820;color:#cfd9e4;border:1px solid #94a3b855}
+.vt.integ{background:#f59e0b20;color:#ffcf8a;border:1px solid #f59e0b55}
+.vt.domain{background:#34d39920;color:#8ef0bf;border:1px solid #34d39955}
+.vt.ref{background:#c084fc20;color:#e0c8fa;border:1px solid #c084fc55}
+.vt.op{background:#64748b25;color:#c7d3e0;border:1px solid #64748b66}
+.gatebar{border-radius:9px;padding:10px 14px;margin:10px 0 2px;font-size:12.5px;border:1px solid}
+.pcard.p0 .gatebar{background:#a78bfa10;border-color:#a78bfa44}.pcard.p1 .gatebar{background:#fb718510;border-color:#fb718544}
+.pcard.p2 .gatebar,.pcard.p4 .gatebar,.pcard.p5 .gatebar{background:#34d39910;border-color:#34d39944}
+.pcard.p3 .gatebar,.pcard.p6 .gatebar{background:#22d3ee10;border-color:#22d3ee44}
+.gatebar b{color:var(--ink)}
+.new{font-family:var(--mono);font-size:8.5px;font-weight:700;color:#0a0e15;background:#34d399;border-radius:3px;padding:1px 4px;vertical-align:middle}
+.note{border-radius:10px;padding:11px 14px;margin:12px 0;font-size:12.5px;border:1px solid}
+.note.warn{background:#f59e0b12;border-color:#f59e0b44}.note.warn b{color:#ffcf8a}
+.note.ok{background:#34d39912;border-color:#34d39944}.note.ok b{color:#8ef0bf}
+.note .h{font-weight:750;color:var(--ink);margin-bottom:3px}
+ul{margin:8px 0;padding-left:20px}li{font-size:12.5px;color:#a9bccd;margin:3px 0}li b{color:var(--ink)}
+footer{margin-top:48px;border-top:1px solid var(--line);padding-top:14px;font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1.7}
+@media(max-width:820px){.wrap{padding:28px 14px 56px}}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">DAH 2026 · 방어 AI 에이전트 · 개발 워크플로우 & Phase별 검증</div>
+  <h1>MDG 개발 워크플로우 — P0~P6 × GATE 0/1/2</h1>
+  <p class="sub">공격 <code>agent_v2</code>의 검증된 단계(P0~P6·verify 스크립트·누수-0 게이트) + 우리 <b>GATE0(형식)→GATE1(누수-0)→GATE2(이식·효력)</b> + 검증 매트릭스(75항목의 검증자·게이트배정)를 통합. <b>원칙: 각 Phase는 검증항목 전량 PASS 전 다음 Phase 착수 금지.</b> 검증자 유형별 색: <span class="vt probe">probe</span> <span class="vt script">verify-script</span> <span class="vt gate">build-gate</span> <span class="vt unit">unit</span> <span class="vt integ">integration</span> <span class="vt domain">domain</span> <span class="vt ref">ref-align</span> <span class="vt op">operator</span></p>
+  <div class="toc">
+    <a href="#tl">타임라인</a><a href="#lg">LangGraph·불변식</a><a href="#p0">P0 형식코어</a><a href="#p1">P1 실행/누수0</a><a href="#p2">P2 정찰/이식</a><a href="#p3">P3 분석/LLM</a><a href="#p4">P4 대응/효력</a><a href="#p5">P5 Verifier/replay</a><a href="#p6">P6 E2E/정직</a><a href="#gates">게이트 요약</a>
+  </div>
+</header>
+
+<div class="lead"><b>3대 게이트 = 착수 허가선.</b> <b style="color:var(--g0)">GATE0</b>(형식·계약 확정) 전엔 실행엔진 코딩 금지 · <b style="color:var(--g1)">GATE1</b>(누수-0·ingest 인증) 전엔 <b>라이브 캠페인 금지</b>(공격팀 게이트1 동형 — testbed 오염 방지) · <b style="color:var(--g2)">GATE2</b>(이식·효력) 전엔 배포/데모 금지. 매트릭스 결과 = 결정론 코어 GREEN(57 IMPLEMENTABLE), 선행 BLOCK = 정본개정·ingest 그린필드·verify-suite 3종 신규.</div>
+
+<!-- LangGraph build spine -->
+<h2 id="lg"><span class="n">◈</span> LangGraph 구축순서 × 2대 불변식 교차검증 <span class="new">개정</span></h2>
+<p>프레임워크 전환으로 각 Phase는 <b>그래프의 한 층을 조립</b>한다. 채점을 지키는 <b>2대 불변식은 프레임워크에 안 넘기고 전 Phase에 걸쳐 검증</b>한다 — 교차검증 신규 verify 4종.</p>
+<div class="scroll"><table>
+<tr><th>조립층(Phase)</th><th>LangGraph 산출</th><th>불변식 교차검증 (신규)</th></tr>
+<tr><td class="mono">P0 스캐폴드</td><td>MDGState · 11노드 스텁 · 조건부 엣지 · <code>compile()</code></td><td><b>verify_graph</b>(노드/엣지 완전·컴파일) · <b>verify_routing</b>(엣지 함수가 LLM 출력 미참조=결정론)</td></tr>
+<tr><td class="mono">P1 실행층</td><td>act 노드→safe-exec 위임 · Collector(그래프 밖 데몬)</td><td><b>verify_no_fw_subproc</b>(노드 subprocess 직접실행 0·safe-exec만) · <b>checkpointer≠ledger</b>(actuation 원장=우리 ledger)</td></tr>
+<tr><td class="mono">P3 판단층</td><td>orient/decide 2 LLM 노드 · 나머지 결정론</td><td>verify_routing 재검(band/risk 수치 분기 · Green=orient skip · LLM 경계상향만)</td></tr>
+<tr><td class="mono">P5 재현층</td><td>노드 I/O JSONL 녹화 · Verifier 별 그래프</td><td>replay=노드 I/O(checkpointer 아님·바이트동일) · verify_grep0(Verifier↛decider)</td></tr>
+</table></div>
+<div class="note ok"><span class="h">2대 불변식 (프레임워크 금지 구역)</span> ①<b>결정론 제어흐름</b> — 조건부 엣지는 <code>impact.band·spec.risk</code> 수치로만 라우팅, LLM은 orient/decide 2노드·temp0·조언전용(엣지 미참여). ②<b>누수-0 실행</b> — 도구 부작용은 손수 safe-exec(timeout+setsid+라벨 reap), LangGraph/subprocess 직접실행 0 · grep0 Verifier 별 프로세스. <b>LangGraph는 "무엇을"이 아니라 "어떻게 조립하나"만 담당.</b></div>
+
+<!-- timeline -->
+<h2 id="tl"><span class="n">◷</span> Phase 타임라인</h2>
+<div class="timeline">
+  <div class="tphase p0"><div class="tp">P0</div><div class="tn">형식·LangGraph 스캐폴드</div><div class="tg g0b">→ GATE 0</div></div>
+  <div class="tphase p1"><div class="tp">P1</div><div class="tn">실행/관측·누수0</div><div class="tg g1b">→ GATE 1</div></div>
+  <div class="tphase p2"><div class="tp">P2</div><div class="tn">정찰·타깃해석</div><div class="tg g2b">→ GATE 2 (이식)</div></div>
+  <div class="tphase p3"><div class="tp">P3</div><div class="tn">분석·phase-LLM</div><div class="tg domb">domain</div></div>
+  <div class="tphase p4"><div class="tp">P4</div><div class="tn">대응·집행·안전</div><div class="tg g2b">GATE 2 (효력)</div></div>
+  <div class="tphase p5"><div class="tp">P5</div><div class="tn">Verifier·replay</div><div class="tg g2b">GATE 2 (재현)</div></div>
+  <div class="tphase p6"><div class="tp">P6</div><div class="tn">E2E·정직·보고서</div><div class="tg domb">통합</div></div>
+</div>
+
+<!-- P0 -->
+<div class="pcard p0" id="p0"><div class="ph"><span class="pid">P0</span><span class="pt">형식 코어 & LangGraph 스캐폴드</span><span class="pmeta">GATE0 · 의존: 스택(langgraph/pydantic/grpcio) · 매트릭스 G0 5항목 + 수식 unit</span></div>
+<div class="pbody">
+  <div class="plabel">산출물</div>
+  <div class="pout"><code>LangGraph MDGState + 노드 스텁(sense/correlate/trust/impact/orient/decide/act/verify) + 결정론 조건부 엣지</code> · <code>DefResult[T]=ToolSuccess[T]|ToolError</code> · <code>def_tool_wrap(pre/post)</code> · <code>DefToolSpec</code> 레지스트리(27, pydantic) · <code>WorldState/KB</code> 스키마 · <code>Legality</code> · <code>CampaignResult</code>(ToolVerifyClass) · 정본 config(mission_profile/thresholds/keys/channel_quality/recovery_priors) · <code>Dockerfile+requirements-lock</code>(python:3.12-slim). <b>정본 HTML 개정 반영 확인</b>(E1 14556·X1 전체봉투 MAC).</div>
+  <div class="plabel">검증항목</div>
+  <div class="scroll"><table>
+    <tr><th>항목</th><th>검증자</th><th>판정 기준</th></tr>
+    <tr><td class="mono">verify_tools <span class="new">신규</span></td><td><span class="vt script">verify-script</span></td><td>27 DefToolSpec 완전(requires/consumes/produces/effect/exec)·유령tool 0·params 스키마 유효</td></tr>
+    <tr><td class="mono">verify_graph <span class="new">신규·LG</span></td><td><span class="vt script">verify-script</span></td><td>StateGraph <b>compile() 성공</b>·11노드 완전·전 엣지 도달가능·orphan/dangling 노드 0</td></tr>
+    <tr><td class="mono">verify_routing <span class="new">신규·불변식①</span></td><td><span class="vt script">verify-script</span></td><td>조건부 엣지 함수가 <b>LLM 출력(orient_note/decide) 미참조</b>(AST)·<code>impact.band·spec.risk</code> 수치로만 분기 = 결정론 라우팅</td></tr>
+    <tr><td class="mono">verify_p0</td><td><span class="vt ref">ref-align</span></td><td>DefResult/tool_wrap 계약·타입·CampaignResult optional-list 금지(ToolVerifyClass) PASS</td></tr>
+    <tr><td class="mono">H-A 예외규율</td><td><span class="vt script">verify-script</span></td><td>전 tool 본체가 <b>CRSError로만 raise</b>(AST/grep) — bare Exception 누출 0</td></tr>
+    <tr><td class="mono">verify_keys <span class="new">신규</span></td><td><span class="vt script">verify-script</span></td><td>ingest≠audit≠sign 3키 분리·비밀 argv/env 리터럴 0</td></tr>
+    <tr><td class="mono">verify_grep0</td><td><span class="vt script">verify-script</span></td><td>Verifier↛decider 정적 import/read 차단(빌드 실패로 강제)</td></tr>
+    <tr><td class="mono">수식 결정성 E5·E6·E7·E8·E19</td><td><span class="vt unit">unit</span></td><td>trust idle=100·weight Σ≤1 포화·band→(sev,dev)·conf 1회·corr=w×mean(sev)×(n≥2) 단언</td></tr>
+    <tr><td class="mono">E20 proto/enum</td><td><span class="vt script">verify-script</span></td><td>col_net·identity_access 통일·MessageEnvelope enum 일치</td></tr>
+    <tr><td class="mono">정본 개정 확인</td><td><span class="vt gate">build-gate</span></td><td>설계 HTML에 E1 14556·X1 전체봉투 MAC 반영(낡은정본 코딩 금지)</td></tr>
+    <tr><td class="mono">형식 게이트 H-B/C/D/G/H/N/P</td><td><span class="vt ref">ref-align</span></td><td>LangGraph StateGraph·litellm·LLM 2노드(orient/decide)·닫힌 Literal·InputSpec 하드코딩0·프롬프트 StrictUndefined</td></tr>
+  </table></div>
+  <div class="gatebar">🚪 <b>GATE 0 통과기준:</b> 위 verify 전량 PASS(<b>verify_graph·verify_routing 포함</b>) + 정본 개정 확인 + 형식 게이트 통과 → <b>P1 실행엔진 착수 허가</b>. ★<b>주의:</b> verify_tools/graph/routing/keys/leak0는 서버 부재 → 신규 작성. tool_wrap except=CRSError-only 라이브 확인.</div>
+</div></div>
+
+<!-- P1 -->
+<div class="pcard p1" id="p1"><div class="ph"><span class="pid">P1</span><span class="pt">실행/관측 엔진 & 누수-0</span><span class="pmeta">GATE1 · 의존: P0 · 매트릭스 G1 4항목</span></div>
+<div class="pbody">
+  <div class="plabel">산출물</div>
+  <div class="pout"><code>Backend(mock/local)</code>·<code>safeexec teardown</code>(R1~R6) · <code>SidecarManager</code> · Collector 6(async push·PrioritySemaphore·5762 ss-only) · <b>ingest gRPC :50051</b>(mTLS+전체봉투 HMAC — <b>그린필드</b>)+<code>ingest_verify</code> · <code>record_intent/recover_on_boot</code> ledger · Watchdog.</div>
+  <div class="plabel">검증항목</div>
+  <div class="scroll"><table>
+    <tr><th>항목</th><th>검증자</th><th>판정 기준</th></tr>
+    <tr><td class="mono">verify_leak0 <span class="new">신규·핵심</span></td><td><span class="vt gate">build-gate</span></td><td>기동→N회→종료 시 <b>docker ps diff=0·잔존 프로세스·소켓 0·5762 free</b>(공격팀 게이트1 동형)</td></tr>
+    <tr><td class="mono">teardown R1~R6</td><td><span class="vt integ">integration</span></td><td>컨테이너-스코프 reap(TERM→grace→KILL·우리 라벨만)·secret stdin·argv 누수0</td></tr>
+    <tr><td class="mono">verify_no_fw_subproc <span class="new">신규·불변식②</span></td><td><span class="vt script">verify-script</span></td><td>LangGraph 노드가 subprocess/os.exec <b>직접실행 0</b>(AST)·전 부작용은 <code>safe-exec Backend</code> 경유(집중집행점)</td></tr>
+    <tr><td class="mono">checkpointer ≠ ledger <span class="new">신규</span></td><td><span class="vt integ">integration</span></td><td>LangGraph checkpointer=상태영속만·<b>actuation 원장=record_intent ledger</b>(revert_cmd 정본)·중복 진실원 0</td></tr>
+    <tr><td class="mono">Collector 그래프 밖</td><td><span class="vt script">verify-script</span></td><td>Collector=장수 데몬(그래프 노드 아님)·sense가 큐 non-blocking 드레인(느린 collector가 그래프 미차단, G4)</td></tr>
+    <tr><td class="mono">관측 non-load-bearing</td><td><span class="vt integ">integration</span></td><td>느린/무응답 백엔드→하드타임아웃 확실종료 · hung tap→캠페인 완주 · 보수판정(모니터 미배선→허위탐지 0)</td></tr>
+    <tr><td class="mono">ingest 위조 drop</td><td><span class="vt integ">integration</span></td><td>잘못된 HMAC·재사용 seq·미인증 envelope <b>drop</b>(음성테스트) — Evidence 포이즈닝 차단</td></tr>
+    <tr><td class="mono">5762 pool=1</td><td><span class="vt probe">probe</span></td><td>PrioritySemaphore(1)·<b>어떤 tool도 5762 connect 0</b>(ss만)·백로그5·활성1</td></tr>
+    <tr><td class="mono">record_intent/recover_on_boot</td><td><span class="vt integ">integration</span></td><td>crash 주입 후 재기동 → 적용된 iptables/pause/mode ledger로 정리·복구</td></tr>
+    <tr><td class="mono">mock≠safe · verify_hygiene</td><td><span class="vt gate">build-gate</span></td><td>배포판정은 <b>실백엔드(local) 누수-0으로만</b>(mock 통과≠안전)</td></tr>
+  </table></div>
+  <div class="gatebar">🚪 <b>GATE 1 통과기준:</b> 누수-0 ALL PASS + ingest 위조 drop PASS → <b>라이브 캠페인 허가</b>. <b>통과 전 라이브 실측 금지</b>(testbed 오염 방지). + <code>DEPLOY_VERIFY_RUNBOOK</code>(실행 중 ps/docker ps/ss 5762 감시).</div>
+</div></div>
+
+<!-- P2 -->
+<div class="pcard p2" id="p2"><div class="ph"><span class="pid">P2</span><span class="pt">정찰·타깃해석 & WorldState 시드</span><span class="pmeta">GATE2(이식) · 의존: P1 · 매트릭스 G2 일부</span></div>
+<div class="pbody">
+  <div class="plabel">산출물</div>
+  <div class="pout"><code>resolve_targets</code>(role→container→IP, 2단계 verify) · <code>recon</code>(부팅 baseline: signing·NAS·포트·IP맵) · WorldState 초기화 · 이식형 <code>DefInputSpec</code>(하드코딩 0).</div>
+  <div class="plabel">검증항목</div>
+  <div class="scroll"><table>
+    <tr><th>항목</th><th>검증자</th><th>판정 기준</th></tr>
+    <tr><td class="mono">resolve+verify (E18/X13/H-I)</td><td><span class="vt probe">probe</span></td><td>role→IP 6/6 · UAV=5762 HEARTBEAT <b>sysid=1∧quad</b> · 드론측 lo:14550 평문 재확인</td></tr>
+    <tr><td class="mono">verify_bindings</td><td><span class="vt ref">ref-align</span></td><td>exec binding 경로 매핑(유령 exec 0)</td></tr>
+    <tr><td class="mono">verify_parsers</td><td><span class="vt script">verify-script</span></td><td>19 파서 regex vs fixture(라이브 문자열 앵커·ANSI strip·null-safe)</td></tr>
+    <tr><td class="mono">InputSpec 하드코딩0 (H-H)</td><td><span class="vt script">verify-script</span></td><td>core에 IPv4/포트/컨테이너명 <b>리터럴 0</b>(라이브 IP≠문서 사례 대응)</td></tr>
+    <tr><td class="mono">recon-only 폐루프</td><td><span class="vt integ">integration</span></td><td>부팅 baseline→WorldState 시드, <b>누수 자유</b>(GATE1 재확인)</td></tr>
+    <tr><td class="mono">이식성</td><td><span class="vt gate">build-gate</span></td><td>다른 IP/컨테이너명 config로 role 해석 재현</td></tr>
+  </table></div>
+  <div class="gatebar">🚪 <b>GATE 2(이식) 통과기준:</b> 정찰 폐루프 + 하드코딩0 + 다른 인스턴스 role 해석 → 이식성 확보(심사원 재현 전제).</div>
+</div></div>
+
+<!-- P3 -->
+<div class="pcard p3" id="p3"><div class="ph"><span class="pid">P3</span><span class="pt">분석 파이프라인 & phase-LLM</span><span class="pmeta">domain · 의존: P2 · 매트릭스 도메인·캘리브레이션</span></div>
+<div class="pbody">
+  <div class="plabel">산출물</div>
+  <div class="pout">Evidence Engine(band→sev/dev) · Correlation(시간창·score) · Trust/Impact(패치수식) · <b>Orient LLM</b>(근거) · Policy/Recovery/Decision · <b>Decide LLM</b>(6단계·게이트) · 프롬프트 계층. LLM은 Yellow/Red만·5s 폴백.</div>
+  <div class="plabel">검증항목</div>
+  <div class="scroll"><table>
+    <tr><th>항목</th><th>검증자</th><th>판정 기준</th></tr>
+    <tr><td class="mono">오프라인 폐루프(그래프 실행)</td><td><span class="vt integ">integration</span></td><td>recon→evidence→trust→impact→policy→decision <b>결정론 재현</b>(동일 config→동일 chain·동일 노드경로)</td></tr>
+    <tr><td class="mono">★결정론 라우팅 재검 (불변식①)</td><td><span class="vt integ">integration</span></td><td>Green band→<b>orient 노드 skip</b>(LLM 미호출)·Yellow/Red→orient·엣지 분기 수치로만·LLM 노드 <b>경계 상향만</b>(더 관대 자동 불가, E12)</td></tr>
+    <tr><td class="mono">verify_models</td><td><span class="vt ref">ref-align</span></td><td>role→model 라우팅(Orient=Sonnet·Decide=Opus)·폴백리스트</td></tr>
+    <tr><td class="mono">★ 캘리브레이션 sign-off (E5~E8·E22·E23)</td><td><span class="vt domain">domain</span></td><td><b>thresholds.yaml 값의 정확성</b>을 uav-protocol-analyst·network-vuln-detector 승인(unit-test는 산술만 — ground truth 부재로 정확성 미검증)</td></tr>
+    <tr><td class="mono">프롬프트 인젝션·null-byte (E10/X11)</td><td><span class="vt integ">integration</span></td><td>StrictUndefined·빈프롬프트 가드·조작 STATUSTEXT/헤더 <b>무해화</b>(음성테스트)</td></tr>
+    <tr><td class="mono">LLM 폴백 (E13/G6)</td><td><span class="vt unit">unit</span></td><td>render-fail/5s 초과 → 결정론 폴백표·LLM 수식 오버라이드 불가</td></tr>
+  </table></div>
+  <div class="gatebar">🚪 <b>완료기준:</b> 오프라인 폐루프 결정론 재현 + <b>도메인 sign-off</b>(캘리브레이션) + 프롬프트 방어. ★cannot_verify: 임계값 정확성은 도메인 패널 승인이 유일 게이트.</div>
+</div></div>
+
+<!-- P4 -->
+<div class="pcard p4" id="p4"><div class="ph"><span class="pid">P4</span><span class="pt">대응/집행 & 안전 (효력 실측)</span><span class="pmeta">GATE2(효력) · 의존: P3 · 매트릭스 G2 효력·domain</span></div>
+<div class="pbody">
+  <div class="plabel">산출물</div>
+  <div class="pout">Response Controller · <code>act_host</code>(nsenter host-root DROP·docker pause) · <code>gcs_c2 signer-shim</code>(operator-gate·timestamp 연속) · 2-tier gate(비행=operator) · 원자번들·멱등·디바운스·de-escalation.</div>
+  <div class="plabel">검증항목</div>
+  <div class="scroll"><table>
+    <tr><th>항목</th><th>검증자</th><th>판정 기준</th></tr>
+    <tr><td class="mono">★ E4 효력 실측 (가역)</td><td><span class="vt gate">build-gate</span></td><td><b>inter-container nsenter DROP→도달차단 확인→revert</b>(1건). read-only 미확정 → GATE2 승인 후 유일 확정경로</td></tr>
+    <tr><td class="mono">서명 timestamp 락아웃 (X3)</td><td><span class="vt integ">integration</span></td><td>시계협조·초기 floor 협상 → <b>정상 link0(gcs_c2) 명령 미락아웃</b>(방어 벽시계 앞서도)</td></tr>
+    <tr><td class="mono">effect-confirm per response (H-M)</td><td><span class="vt probe">probe</span></td><td>서명 mode=14560 HEARTBEAT · 5762 ESTAB 종료(ss) · pause 상태(가역). inter-container는 위 실측 후 확정</td></tr>
+    <tr><td class="mono">비행 operator-gate at keyholder (D-2)</td><td><span class="vt integ">integration</span></td><td><b>MDG 단독 서명 LAND 불가</b>(shim이 operator 토큰 없으면 거부) 음성테스트</td></tr>
+    <tr><td class="mono">원자번들·멱등·디바운스</td><td><span class="vt unit">unit</span></td><td>복구+공격차단 1트랜잭션·부분실패 rollback·applied() skip·물리행동 N틱</td></tr>
+    <tr><td class="mono">act 노드 계약 (불변식②)</td><td><span class="vt integ">integration</span></td><td>act 노드 = <code>pre[legality]→record_intent(guard밖)→safe-exec→post[world_update]</code>·노드가 nsenter/docker 직접 안 부름(백엔드 위임)</td></tr>
+    <tr><td class="mono">D11 collector 비공존</td><td><span class="vt script">verify-script</span></td><td>collector netns ⟂ pause/disconnect 대상 disjoint·DROP이 :50051 egress 미매치</td></tr>
+    <tr><td class="mono">능동 검증(unsigned-block)</td><td><span class="vt op">operator</span></td><td>상태변경 주입 → <b>build-gate 승인 후에만</b>(가역·드론 복원 전제)</td></tr>
+  </table></div>
+  <div class="gatebar">🚪 <b>GATE 2(효력) 통과기준:</b> 실증 공격 재생→대응→<b>effect-confirm→revert 가역</b> + 비행 operator-gate 강제 + 드론 복원·누수0·5762 clean.</div>
+</div></div>
+
+<!-- P5 -->
+<div class="pcard p5" id="p5"><div class="ph"><span class="pid">P5</span><span class="pt">Verifier & Viewer & replay</span><span class="pmeta">GATE2(재현) · 의존: P4</span></div>
+<div class="pbody">
+  <div class="plabel">산출물</div>
+  <div class="pout"><b>grep0 Verifier</b>(결정론·교차루트 14560∧lo:14550·비게이팅·gcs_proxy 생존·텔레침묵 판별) · Viewer 3패널(agent≠truth 배너·신뢰루트) · <b>replay</b> 녹화/재생(바이트동일·시계 시드).</div>
+  <div class="plabel">검증항목</div>
+  <div class="scroll"><table>
+    <tr><th>항목</th><th>검증자</th><th>판정 기준</th></tr>
+    <tr><td class="mono">Verifier 교차루트 (D-1/D-3)</td><td><span class="vt probe">probe</span></td><td>14560∧lo:14550 일치=verified·불일치=MitM·단일=consistent. gcs_proxy 생존+14555 암호문으로 텔레침묵 판별</td></tr>
+    <tr><td class="mono">Verifier 비게이팅 (D-3)</td><td><span class="vt script">verify-script</span></td><td>가역 AUTO는 verifier 생존 무관·verify_grep0 재검·verifier=결정론(LLM 아님)</td></tr>
+    <tr><td class="mono">replay 결정성 (H-J)</td><td><span class="vt integ">integration</span></td><td>replay=<b>노드 I/O JSONL 녹화</b>(LangGraph checkpointer 아님)·동일 입력→<b>바이트동일 산출</b>(시계/dict 시드)·testbed 없이 재현</td></tr>
+    <tr><td class="mono">Viewer redact</td><td><span class="vt script">verify-script</span></td><td>3패널·비밀 마스킹·신뢰루트 표기·read-only</td></tr>
+  </table></div>
+  <div class="gatebar">🚪 <b>GATE 2(재현) 통과기준:</b> replay 재현(심사원이 testbed 없이) + Verifier 독립성 → 이식성·재현성 점수.</div>
+</div></div>
+
+<!-- P6 -->
+<div class="pcard p6" id="p6"><div class="ph"><span class="pid">P6</span><span class="pt">E2E 캠페인 & 정직성 & 보고서</span><span class="pmeta">통합 · 의존: P0~P5</span></div>
+<div class="pbody">
+  <div class="plabel">산출물</div>
+  <div class="pout">실증 공격 6종 E2E(탐지→대응→검증) · honest_note/배너 · 산출물(timeline·decisions·verifier_truth·CampaignResult) → <b>예선 보고서 6장(AI 25점)</b> 근거.</div>
+  <div class="plabel">검증항목</div>
+  <div class="scroll"><table>
+    <tr><th>항목</th><th>검증자</th><th>판정 기준</th></tr>
+    <tr><td class="mono">E2E 공방추적</td><td><span class="vt integ">integration</span></td><td>PFCP delete·replay·TM1 oracle·5762·rogue-UE·V4 재생→탐지→대응→검증 매트릭스 전항목</td></tr>
+    <tr><td class="mono">정직 공개</td><td><span class="vt op">operator</span></td><td>V4 탐지불가·5762 명령내용 blind·Mission-weighted·미검증 4공격(GPS/env/GTP/미션)·MDG blast radius</td></tr>
+    <tr><td class="mono">안전·위생</td><td><span class="vt gate">build-gate</span></td><td>drone 복원·누수0·5762 clean·전 규칙 revert</td></tr>
+    <tr><td class="mono">보고서 산출</td><td><span class="vt op">operator</span></td><td>timeline·decisions·verifier_truth·honest_note → 6장 매핑</td></tr>
+  </table></div>
+  <div class="gatebar">🚪 <b>완료기준:</b> E2E + 정직 배너 + 산출물 = 예선 제출(마감 2026-07-10). 정직 재프레임(§B 12건)이 25점 정직성 득점.</div>
+</div></div>
+
+<!-- gates -->
+<h2 id="gates"><span class="n">🚪</span> 게이트 요약 & 검증항목 분포</h2>
+<div class="scroll"><table>
+<tr><th>게이트</th><th>Phase</th><th>통과기준(핵심)</th><th>매트릭스 항목</th><th>착수 허가</th></tr>
+<tr><td class="mono" style="color:var(--g0)">GATE 0</td><td>P0</td><td>형식·계약 확정(verify_tools/<b>graph/routing</b>/p0/keys/grep0 + 수식 unit + 정본개정 + H-A 예외규율)</td><td>G0 5 + <b>LG 2(graph/routing)</b> + 수식 unit + 형식 H-B~P</td><td>→ 실행엔진 코딩</td></tr>
+<tr><td class="mono" style="color:var(--g1)">GATE 1</td><td>P1</td><td>누수-0(docker ps diff=0·5762 free) + <b>no_fw_subproc</b> + ingest 위조 drop</td><td>G1 4 + <b>불변식②</b> (E9/X1/G4/D11)</td><td>→ <b>라이브 캠페인</b></td></tr>
+<tr><td class="mono" style="color:var(--g2)">GATE 2</td><td>P2·P4·P5</td><td>이식(하드코딩0·resolve) + 효력(E4 가역 실측) + 재현(replay)</td><td>G2 (E4/E18/H-H/H-I/H-J)</td><td>→ 배포/데모</td></tr>
+<tr><td class="mono domb" style="border:none;background:none">domain</td><td>P3·P4</td><td>캘리브레이션 sign-off·서명 시맨틱·precond 그래프</td><td>E5~E8/E17/E22/X3/H-F/H-O</td><td>패널 승인</td></tr>
+</table></div>
+<div class="note ok"><span class="h">지금 착수 가능 (GATE0 병렬)</span> 결정론 코어 57 IMPLEMENTABLE — P0 형식 스캐폴드(DefResult/tool_wrap/registry/WorldState/Legality)·수식 코어·config 정본화는 라이브 무관하게 착수 가능. <b>선행 3:</b> ①정본 HTML 개정 확인 ②verify_tools/keys/leak0 신규 작성 ③H-A 예외규율(전 tool CRSError-only).</div>
+<div class="note warn"><span class="h">cannot_verify 6 — 기계검증 불가 항목</span> E5~E8·E22 캘리브레이션 정확성(→P3 도메인 sign-off) · E4·H-M 봉쇄 효력(→P4 GATE2 가역 실측) · X3 시계협조(→P4 integration) · E16 다중호스트(→단일호스트 preflight 전제). 이들은 unit/probe로 못 닫으므로 <b>지정된 게이트·패널로만</b> 확정.</div>
+
+<footer>
+DAH 2026 · MDG 방어 에이전트 개발 워크플로우 · P0~P6 × GATE0/1/2 · 테스트베드 한정·가역·인가 샌드박스.<br>
+근거: agent_v2 구축과정(P0~P6·verify 스크립트·게이트1 누수0) · DEFENSE_AGENT_V3_DESIGN(GATE 로드맵) · DEFENSE_VERIFICATION_MATRIX_20260707(75항목 검증자·게이트배정) · 프레임워크=LangGraph 오케스트레이션 × litellm × Robo Duck safe-exec(FRAMEWORK_STACK.md).<br>
+원칙: 각 Phase 검증항목 전량 PASS 전 다음 Phase 금지 · GATE1 전 라이브 금지(오염방지) · 정본 개정 선행.
+</footer>
+</div>

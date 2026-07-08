@@ -1,0 +1,16 @@
+# MDG defense agent — pinned deps (FRAMEWORK_STACK §4 · PS-4).
+# Production install uses --require-hashes against requirements.lock (pip-compile
+# --generate-hashes). This file pins versions; the lockfile pins the full hash tree.
+langgraph==0.2.60
+litellm==1.55.0
+pydantic==2.10.4
+pyyaml==6.0.2
+grpcio==1.68.1
+grpcio-tools==1.68.1
+protobuf==5.29.2
+httpx==0.27.2  # litellm 1.55.0 requires httpx<0.28 (resolved conflict, verified on server)
+pymavlink==2.4.49
+scapy==2.6.1
+fastapi==0.115.6
+uvicorn==0.34.0
+pytest==8.3.4

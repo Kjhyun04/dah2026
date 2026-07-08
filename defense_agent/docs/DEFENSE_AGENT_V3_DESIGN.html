@@ -1,0 +1,310 @@
+<!doctype html>
+<title>MDG 방어 에이전트 v3 — 구축 형식 & 운영 하부구조 (DAH 2026)</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{
+  --bg:#0a0e15;--panel:#111826;--panel2:#0d1420;--panel3:#0b1019;--line:#1f2c3e;--line2:#2b3b52;
+  --ink:#d7e2ed;--muted:#8299b0;--dim:#5a7088;--accent:#22d3ee;
+  --obs:#38bdf8;--ort:#a78bfa;--dec:#f59e0b;--act:#fb7185;--vfy:#34d399;--ctl:#94a3b8;
+  --breach:#fb5c6b;--hold:#34d399;--warn:#f59e0b;--fixed:#c084fc;
+  --mono:ui-monospace,"Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.7;-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(1100px 480px at 78% -8%,#12233010,transparent 70%)}
+.wrap{max-width:1160px;margin:0 auto;padding:42px 24px 90px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.19em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+h1{font-size:clamp(24px,3.4vw,36px);font-weight:820;letter-spacing:-.02em;margin:0 0 10px;text-wrap:balance}
+.sub{color:var(--muted);font-size:15px;margin:0 0 16px;max-width:82ch}
+.metabar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.badge{font-family:var(--mono);font-size:11px;color:var(--dim);border:1px solid var(--line);border-radius:6px;padding:4px 9px;background:var(--panel2)}
+.badge b{color:var(--ink)}.badge.v3{border-color:#34d39955;color:var(--hold)}
+h2{font-size:20px;font-weight:770;margin:50px 0 6px;padding-bottom:9px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:11px;scroll-margin-top:14px}
+h2 .n{font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:700}
+h3{font-size:15px;font-weight:720;margin:24px 0 8px}
+p{font-size:14px;color:#a9bccd;margin:9px 0}strong{color:var(--ink)}
+code{font-family:var(--mono);font-size:12px;background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:#9fe7f2}
+.new{font-family:var(--mono);font-size:9.5px;font-weight:700;color:#0a0e15;background:var(--hold);border-radius:4px;padding:1px 5px;vertical-align:middle}
+.keep{font-family:var(--mono);font-size:9.5px;font-weight:700;color:#0a0e15;background:var(--ctl);border-radius:4px;padding:1px 5px;vertical-align:middle}
+.lead{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:11px;padding:16px 20px;margin:16px 0;font-size:14.5px}
+.lead b{color:var(--ink)}
+.toc{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 4px}
+.toc a{font-family:var(--mono);font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:7px;padding:6px 11px;background:var(--panel2)}
+.toc a:hover{border-color:var(--accent);color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin:14px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px 15px}
+.card.f{border-left:3px solid var(--ort)}.card.o{border-left:3px solid var(--act)}.card.p{border-left:3px solid var(--obs)}.card.h{border-left:3px solid var(--vfy)}
+.card .cn{font-size:14px;font-weight:720;margin:0 0 6px}.card .cr{font-size:12.5px;color:#a9bccd;line-height:1.5}
+.card .kv{font-size:11.5px;color:var(--muted);margin-top:7px;line-height:1.5}.card .kv b{color:var(--ink)}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:11px;margin:14px 0}
+table{width:100%;border-collapse:collapse;font-size:12.3px;min-width:720px}
+th{background:var(--panel2);color:var(--muted);text-align:left;padding:9px 11px;font-size:10.5px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;top:0}
+td{padding:9px 11px;border-bottom:1px solid var(--line);color:#a9bccd;vertical-align:top}
+tr:last-child td{border-bottom:none}td.mono,.mono{font-family:var(--mono);font-size:11px}
+tbody tr:hover{background:#16202e55}
+details{border:1px solid var(--line);border-radius:9px;margin:9px 0;background:var(--panel2);overflow:hidden}
+details>summary{cursor:pointer;padding:10px 14px;font-family:var(--mono);font-size:12px;color:var(--ink);list-style:none;display:flex;justify-content:space-between;gap:10px}
+details>summary::-webkit-details-marker{display:none}details>summary::after{content:"▸";color:var(--dim)}
+details[open]>summary::after{transform:rotate(90deg)}details>summary:hover{background:#16202e}
+pre{margin:0;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:11px;color:#9fd7e6;line-height:1.62;white-space:pre;border-top:1px solid var(--line);background:var(--panel3)}
+.ascii{background:var(--panel3);border:1px solid var(--line);border-radius:10px;padding:14px;overflow-x:auto;font-family:var(--mono);font-size:11px;color:#8fb8c9;line-height:1.5;white-space:pre;margin:12px 0}
+.note{border-radius:10px;padding:12px 15px;margin:11px 0;font-size:13px;border:1px solid}
+.note.crit{background:#fb5c6b12;border-color:#fb5c6b55}.note.crit b{color:#ff8f9b}
+.note.ok{background:#34d39912;border-color:#34d39944}.note.warn{background:#f59e0b12;border-color:#f59e0b44}
+.note .h{font-weight:750;color:var(--ink);margin-bottom:3px}
+ul{margin:9px 0;padding-left:20px}li{font-size:13px;color:#a9bccd;margin:4px 0}li b{color:var(--ink)}
+.gate{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+.gstep{flex:1 1 220px;border:1px solid var(--line2);border-radius:10px;padding:12px 14px;background:var(--panel)}
+.gstep .gt{font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:700}
+.gstep .gn{font-size:13.5px;font-weight:720;margin:3px 0 5px}
+.gstep .gd{font-size:12px;color:#a9bccd;line-height:1.5}
+footer{margin-top:52px;border-top:1px solid var(--line);padding-top:16px;font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1.75}
+@media(max-width:820px){.wrap{padding:30px 15px 60px}}
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">DAH 2026 · 방어 AI 에이전트 · v3 — 구축 형식 & 운영 하부구조</div>
+  <h1>MDG 방어 에이전트 v3 <span class="badge v3">구축 형식 반영</span></h1>
+  <p class="sub"><b>v2(도메인 로직: 탐지·신뢰·영향·대응)를 유지</b>하고, 공격 <code>agent_v2</code> 구축과정(01~22 + aixcc Robo Duck 참조)에서 확인한 <b>에이전트 구축 형식(H-A~P)과 운영 하부구조(G1~G11)</b>를 그 위에 얹는다. 목표: "코드로 옮길 수 있고, 심사원이 재현 가능하며, 자율 에이전트로 인정되고, 테스트베드를 오염시키지 않는" 산출물. <span class="new">NEW</span>=v3 신규 형식, <span class="keep">KEEP</span>=v2 유지.</p>
+  <div class="metabar">
+    <span class="badge">도메인 로직: <b>DEFENSE_AGENT_PROTOTYPE_DESIGN.html (v2)</b></span>
+    <span class="badge">검증: <b>DESIGN_VERIFICATION Part A~H</b></span>
+    <span class="badge">참조: <b>agent_v2_구축과정 + aixcc Robo Duck</b></span>
+    <span class="badge v3">작성 <b>2026-07-07</b></span>
+  </div>
+  <div class="toc">
+    <a href="#s0">0 · 원칙/게이트</a><a href="#s1">1 · 프레임워크</a><a href="#s2">2 · Tool 계약</a><a href="#s3">3 · WorldState/Legality</a>
+    <a href="#s4">4 · 에이전트 루프</a><a href="#s5">5 · 이식형 InputSpec</a><a href="#s6">6 · 실행/누수-0</a>
+    <a href="#s7">7 · 상태변경 안전</a><a href="#s8">8 · replay/verify</a><a href="#s9">9 · 정직/provenance</a><a href="#s10">10 · 매핑</a>
+  </div>
+</header>
+
+<!-- 0 -->
+<h2 id="s0"><span class="n">00</span> 원칙 · 게이트 로드맵</h2>
+<div class="lead">
+<b>v3 = "무엇을 하는가(v2)" 위에 "어떻게 만들고 안전하게 도는가(v3)".</b> 공격팀의 재설계 심장을 방어에 이식: <b>코드 전에 형식·게이트를 확정</b>하고, <b>누수-0을 첫 통과 기준</b>으로 삼는다. 도메인 수식·토폴로지·대응(v2)은 그대로 두고, tool/agent 계약·WorldState·이식성·실행안전을 하부구조로 깐다.
+</div>
+<div class="gate">
+  <div class="gstep"><div class="gt">GATE 0 — 코드 전 확정</div><div class="gn">형식 & 실행계약</div><div class="gd">프레임워크·참조(§1) · Tool 계약 DefResult/tool_wrap(§2) · Backend/teardown 계약(§6). "코드로 옮길 수 있는가"의 전제.</div></div>
+  <div class="gstep"><div class="gt">GATE 1 — 실측 전 필수</div><div class="gn">누수-0 통합테스트</div><div class="gd">6 Collector·nsenter·pcap 기동→N회→종료 시 잔존 프로세스·컨테이너·소켓 <b>0</b>(docker ps diff=0·5762 free). 통과 전 라이브 캠페인 금지.</div></div>
+  <div class="gstep"><div class="gt">GATE 2 — 자율성·이식성</div><div class="gn">WorldState + 이식형</div><div class="gd">WorldState/Legality(§3) · 이식형 InputSpec+런타임해석(§5) · replay(§8) · H-K 자기한계 ADV(§9). "자율 에이전트·재현 가능"의 근거.</div></div>
+</div>
+<div class="grid">
+  <div class="card h"><div class="cn">v2에서 유지 <span class="keep">KEEP</span></div><div class="cr">5 Trust 도메인·수식 패치(E5~E8)·6단계 결정·2단 게이트·grep0 Verifier·정본 config(M1~M8)·명령=14556/텔레=14560(E1/E2)·nsenter 집행(E3/E4)·키 3분리(E9/X1)·비행=operator(X2)·원자번들(X4/X6). <b>도메인 정확성은 v2가 정본.</b></div></div>
+  <div class="card f"><div class="cn">v3 신규: 형식 <span class="new">NEW</span></div><div class="cr">DefResult[T]/tool_wrap(H-A)·DefRequiredAgent+ReAct+결정론종료(H-B)·프레임워크 <b>LangGraph 오케스트레이션</b>+litellm+Robo Duck safe-exec 참조(H-C)·LLM 2 phase로 축소(H-D)·WorldState/Legality(H-E~G)·닫힌 레지스트리.</div></div>
+  <div class="card p"><div class="cn">v3 신규: 이식성 <span class="new">NEW</span></div><div class="cr">DefInputSpec 하드코딩0(H-H)·런타임 role→IP 해석+검증(H-I)·replay 녹화/재생(H-J).</div></div>
+  <div class="card o"><div class="cn">v3 신규: 운영안전 <span class="new">NEW</span></div><div class="cr">Backend/teardown·누수-0 게이트(G1/G2)·관측 async·5762 pool=1(G4)·record_intent+recover_on_boot(G3)·watchdog(G7)·verify-suite(G5)·provenance/effect-confirm(H-L/M).</div></div>
+</div>
+
+<!-- 1 -->
+<div class="note ok"><span class="h">검증 매트릭스 반영 (2026-07-07, 9-에이전트) — 조건부 GO</span> 75항목: <b>ALREADY-CONFIRMED 9 · IMPLEMENTABLE 57 · NEEDS-FIX 9 · BLOCKED 0</b>. 결정론 코어+형식 스캐폴드 착수 가능. <b>라이브 정정:</b> ① nsenter DROP 근거=<b>호스트 root capability</b>(컨테이너 CAP 아님)→caps=[]인 epc_mongo netns도 집행 가능 ② 드론측 <code>uav_ue lo:14550</code> 평문 UNSIGNED MAVLink v2 <b>실재 확정</b>(D-1) ③ 실증자산 <code>tm1_signing_defense.py</code>는 5762 connect(G4/E2)+attacker_ue netns/키확산(E11) <b>결함 재현</b>→lo:14550 read+gcs_c2 shim로 교체 ④ <code>tool_wrap</code> except=CRSError-only(H-A). <b>게이트 블로커:</b> G0=정본개정(E1/X1 반영)+verify-suite 3종 신규+E20 통일 · G1=ingest gRPC :50051 그린필드+누수0통합 · G2=E4 효력 1건 실측+InputSpec+replay. 상세=<code>DEFENSE_VERIFICATION_MATRIX_20260707.md</code>.</div>
+<h2 id="s1"><span class="n">01</span> 프레임워크 & 참조 <span class="new">NEW · H-C</span></h2>
+<p><b>확정(2026-07-07 개정 · 상세 <code>FRAMEWORK_STACK.md</code>):</b> <b>오케스트레이션 = <code>LangGraph</code> StateGraph</b>(결정론 라우팅 — 분기는 파이프라인 수치로, LLM 자유선택 금지) + <b>LLM 접근 = <code>litellm</code></b>(models.yaml 폴백) + 관심사별 OSS 스택(pydantic·grpcio·FastAPI·pytest). <b>2대 불변식 손수 소유:</b> ①결정론 제어흐름(LLM 2노드·temp0·조언전용) ②누수-0 실행/teardown(safe-exec — 프레임워크 subprocess 미사용)·grep0 Verifier 분리. <b>참조구현 = aixcc-afc-archive "Robo Duck" CRS</b>(읽기전용) 실코드 확인: <code>ToolResult[T]=ToolSuccess[T]|ToolError</code>(core.py)·<code>tool_wrap</code>(utils.py, 예외→ToolError 승격=누출0·pre/post_hook)·<code>ToolRequiredAgent</code>(동적 terminate 합성·ToolVerifyClass optional-list 금지)·<code>AgentGeneric._iter/_run/_compress_context</code>·<code>PrioritySemaphore(value=1)</code>(=5762 pool=1 프리미티브)·models.toml(role→모델 폴백리스트). <b>라이브 확인(2026-07-07):</b> 서버 <b>Python 3.12.3</b> → PEP695(<code>type X[T]</code>) 이식 가능. ★정정: <code>verify_tools/verify_keys/verify_leak0</code>는 서버에 <b>부재 → 신규 작성</b>(기존 verify_p0/parsers/grep0/hygiene/bindings/models/p2 재사용 아님).</p>
+<details><summary>▎ Robo Duck 실코드 → 방어 매핑 (확정)</summary><pre>core.py         ToolResult[T]=ToolSuccess[T]|ToolError · AgentAction{stop,append,rewind} · CRSError
+utils.py:125    tool_wrap(fn, pre_hooks, post_hooks): Ok→Success / Err|CRSError→Error (try/except = 예외 누출 0)
+                PrioritySemaphore(1).scoped(prio)  ← 5762 ss·단일연결 자원 pool=1 (G4)
+tool_required_agent.py  ToolRequiredAgent[R]: _terminate_func(return_type 필드로 시그니처 동적합성) ·
+                        _tools(서브클래스) · tools=_tools+terminate · tool_choice(o3/o4=required else auto) ·
+                        ToolVerifyClass(optional list 금지 → CampaignResult 리스트는 필수+기본[])
+agent.py        AgentGeneric[T]._iter(tool_call 처리) · _run(max_iters) · _compress_context(앞1/3절단)
+models.toml     역할→모델 폴백리스트 (model_idx+=1 폴백)
+
+방어 이식(확정):
+  DefResult[T]=ToolSuccess[T]|ToolError                      # core.py verbatim 재사용
+  def_tool_wrap = tool_wrap(pre=[legality(spec,world)], post=[world_update])   # utils.py 재사용
+  MDGGraph = StateGraph(MDGState)                           # LangGraph 오케스트레이션(ToolRequiredAgent 대체)·조건부엣지=수치라우팅·terminate=goal_reached
+  OrientAgent / DecideAgent = phase-LLM 2곳 (models.yaml: Orient=Sonnet, Decide=Opus)
+  응답 tool = 턴당 1개 (asyncio.gather 병렬 비활성 — WorldState 레이스 방지, 공격팀 C1/D23)
+  PrioritySemaphore(1) = 5762 ss·nsenter 대상 자원 단일화 (누수/포화 방지)
+  CampaignResult(@ToolVerifyClass): {goal_reached, timeline:[], decisions:[], verifier_truth:[], honest_note}</pre></details>
+<div class="ascii">aixcc §4.5 LLM 배치 원칙 (방어 이식):
+  ① 조율 = 결정론      → Orchestrator FSM(WorkDB-lite job 큐)  [LLM 없음]
+  ② LLM = phase당 1개  → phase-A "Orient/Triage" 1곳 · phase-B "Decide/Plan" 1곳  (v2의 6 LLM → 2 phase)
+  ③ 도구 = 전부 결정론 → Collector·compute_trust/impact·nsenter·signer-shim  [tool 안 LLM 0]</div>
+<div class="note ok"><span class="h">LLM 축소 (H-D)</span> v2는 ort 3 + dec 3 = 6 LLM. v3는 <b>2 phase-agent</b>로 통합: <b>Orient LLM</b>(correlate+trust+impact의 결정론 계산 위에 근거·신규성·모호성 판단 1회) · <b>Decide LLM</b>(policy+recovery+decision 통합 판단 1회). 수식은 전부 결정론 도구, LLM은 phase당 1회 narration/adaptation. 재현성·감사가능성↑.</div>
+
+<!-- 2 -->
+<h2 id="s2"><span class="n">02</span> Tool 계약 (닫힌 레지스트리) <span class="new">NEW · H-A/G</span></h2>
+<p>v2의 27 tool을 <b>형식적 계약</b>으로 승격. 공격자-가시 폐포 대신 <b>방어자-집행 폐포</b>: 모든 tool은 통일 봉투로 반환, exec-binding만이 실행 경로. <b>예외 누출 0 = "전 tool CRSError-only raise" 규율</b>(참조 tool_wrap가 CRSError만 포획 — 라이브 확인, GATE0).</p>
+<details open><summary>▎ DefResult[T] · tool_wrap · DefToolSpec (Robo Duck 계승)</summary><pre>type DefResult[T] = DefOk[T] | DefErr            # 모든 tool 통일 반환 (예외 누출 0)
+class DefOk[T]:   result: T;   action: AgentAction   # AgentAction{stop,append,rewind}
+class DefErr:     error: str;  extra: dict;  action: AgentAction
+
+def tool_wrap(fn, pre_hooks=[], post_hooks=[]) -> Tool:   # Ok→DefOk / Err|CRSError→DefErr
+    # ★검증정정(H-A): 참조 tool_wrap의 except는 CRSError만 포획 → bare ValueError/TimeoutError는 누출.
+    #   규율: 모든 tool 본체는 CRSError로만 raise(값역·타임아웃도 CRSError 래핑). 아니면 except 확장.
+    #  pre_hooks  = [legality(spec, world)]      # precond/consumes 검사(§3)
+    #  post_hooks = [world_update(spec, world)]  # produces/effect 반영(§3)
+    #  예외는 tool_wrap이 DefErr로 승격 — 파이프라인 크래시 금지 (H-A)
+
+DefToolSpec {                                    # 레지스트리 1행 (27 tool)
+  id        : DefToolId          # Literal 화이트리스트 (LLM은 고를 수만, 만들 수 없음)
+  cat       : sensor|analysis|response|control
+  requires  : [Predicate]        # WorldState 전제 (Legality)
+  consumes  : [Artifact]         # 필요 아티팩트 (ip_map, sign_key_loc, baseline …)
+  produces  : [Artifact]         # 산출 아티팩트
+  effect    : Effect | null      # 상태 전이(대응 tool)
+  params    : ParamSpec          # 타입된 파라미터(값역검증)
+  risk      : LOW|MED|HIGH       # HIGH(비행행동)=operator-confirm
+  reversible: bool
+  exec      : ExecBinding{ backend, argv_template, secret_params }  # safe-exec 참조(§6)
+  T         : SensorEv|Incident|TrustObj|Decision|EnforcedAction   # payload 타입(v2 객체)
+}</pre></details>
+<div class="grid">
+  <div class="card f"><div class="cn">닫힘 3중 강제 (H-G)</div><div class="cr">① Decide/Plan 출력 `DefToolId` pydantic 화이트리스트(밖=거부) ② Legality 게이트(precond 미충족=비legal) ③ exec-binding만 실행(자유형 명령 경로 0). "등록된 대응만 집행".</div></div>
+  <div class="card f"><div class="cn">레지스트리 불변식</div><div class="cr">모든 tool은 requires/consumes/produces/effect/exec **완전 등록**(유령 tool 금지 → E20 dangling 해소). risk=HIGH(send_signed_mode)=operator. exec=safe-exec 계약만. secret=stdin(argv 금지, R6).</div></div>
+</div>
+
+<!-- 3 -->
+<h2 id="s3"><span class="n">03</span> WorldState/KB + Legality (방어 추론엔진) <span class="new">NEW · H-E/F</span></h2>
+<p>v2의 고정 파이프라인을 <b>상태 기반 추론</b>으로 승격 = "자율 에이전트" 서사의 핵심(25점). 방어 WorldState는 <b>테스트베드 posture · 위협상태 · 활성대응 · 획득 아티팩트</b>를 닫힌 어휘로 유지하고, 대응 tool은 precond/consumes로 게이팅된다.</p>
+<details open><summary>▎ 방어 WorldState 어휘 (닫힌 enum) + Legality</summary><pre>Predicate (posture·recon으로 확보, 런타임 갱신):
+  reach(X)       X∈{gcs14556, web8080, uav5762, mongo27017, pfcp8805, net_core, net_sgi}
+  signing∈{on,off,unknown}   nas_cipher∈{eea0_first,ok}   ue_isolation∈{none,enforced}
+  role_verified(X)           # §5 런타임 해석·검증 완료 (provenance=verified)
+  threat(domain,level)       # Trust/Impact 산출 (command:Red …)
+  applied(rule)              # 이미 적용된 대응 (멱등·recover 대상)  in_flight
+Artifact (produces→consumes 연결점):
+  ip_map        # role→container→IP 해석 결과 (resolve_targets produces)
+  sign_key_loc  # gcs_c2 signer-shim 위치 (mdg는 키 미보유)
+  baseline(rtt,loss)         pid(container)   # nsenter 대상 PID
+Effect: SetResponse(rule) · Contain(container) · Escalate(operator)
+
+Legality(spec, world) ⇔ (spec.requires ⊆ world.facts) ∧ (spec.consumes ⊆ world.artifacts)
+# 예: nsenter_input_drop.consumes=[pid(target)] → resolve_targets가 pid 산출 전엔 비legal
+#     send_signed_mode.requires=[reach(gcs14556), role_verified(gcs)]  consumes=[sign_key_loc]
+#     → 서명경로 미검증·shim 미확인 시 자동 차단 (허위 대응 방지)</pre></details>
+<div class="note ok"><span class="h">방어 조합 창발 (레시피 없이)</span> Decide LLM은 목표(위협 완화) + WorldState + legal 대응의 pre/effect만 받는다. 예: "command 도메인 Red + 5762 ESTAB" → WorldState가 <code>pid(uav_ue)</code> 보유 시 <code>nsenter_input_drop</code>이 legal → 선택. 우리가 "탐지 다음 차단"이라 하드코딩하지 않음. produces/consumes가 recon→resolve→respond 체인을 <b>자동 성립</b>시킴(E23 동시공격 = 다중 legal 대응 집계).</div>
+
+<!-- 4 -->
+<h2 id="s4"><span class="n">04</span> 에이전트 루프 (LangGraph StateGraph · 결정론 종료) <span class="new">NEW · H-B/D</span></h2>
+<div class="ascii">LangGraph StateGraph (노드=SENSE/CORRELATE/TRUST/IMPACT/ORIENT/POLICY/RECOVERY/DECIDE/ACT/VERIFY · 조건부 엣지=수치 라우팅):
+  틱(그래프 1회 실행):
+    SENSE   : (백그라운드 Collector가 async push) 턴 경계에서 WorldState merge  ← 관측 non-blocking(G4)
+    REASON  : phase-LLM이 legal tool 중 선택 (Orient 또는 Decide phase)
+    ACT     : tool_wrap 실행 = pre_hook[legality] → 본체(safe-exec) → post_hook[world_update]
+    OBSERVE : DefResult(payload) 누적 → 다음 판단
+    TERMINATE(결정론): world_update 후 goal_reached(위협해소 or 대응완료)면 AgentAction(stop) —
+              LLM-terminate 아님(중첩스키마 실패 회피). 드라이버가 CampaignResult 조립.
+  드라이버(루프 밖): stop OR max_pivots/k_dry/max_iters → 종료.  안전행동(operator LAND)은 예산면제(G10)</div>
+<div class="grid">
+  <div class="card f"><div class="cn">phase 2곳만 LLM (H-D)</div><div class="cr"><b>Orient phase</b>: correlate_window·compute_trust·compute_impact(결정론) 실행 후 LLM이 근거·신규성 1회 서술. <b>Decide phase</b>: select_policy·rank_recovery(결정론) 후 LLM이 6단계+게이트 1회 판단. 나머지 결정론.</cr></div></div>
+  <div class="card f"><div class="cn">LLM 권한경계 (E12) 형식화</div><div class="cr">수식/임계값이 수치·게이팅 권위. LLM은 (a)근거 (b)주의 <b>상향만</b> (c)신규성 플래그. 더 관대한 행동 자동유발 불가. temp=0·structured output·StrictUndefined·빈프롬프트 가드(H-P). 렌더실패/오류→결정론 폴백표(G6).</cr></div></div>
+</div>
+
+<!-- 5 -->
+<h2 id="s5"><span class="n">05</span> 이식형 InputSpec + 런타임 해석 <span class="new">NEW · H-H/I/J</span></h2>
+<p><b>하드코딩 0.</b> 심사원이 config만 채우면 어느 인스턴스에서도 실행. v2의 하드코딩 IP/컨테이너명/포트/netns를 전부 외부화하고, 런타임에 role→컨테이너→IP를 해석·검증한다.</p>
+<details><summary>▎ DefInputSpec (pydantic, 하드코딩 0)</summary><pre>DefInputSpec {
+  environment { host, docker_sock }                          # exec.mode=local(docker.sock)
+  topology {                                                 # 역할→컨테이너 이름 (IP 아님!)
+    roles: { gcs_proxy, web_backend, uav_ue, uav_proxy, epc_smf, epc_mongo, ... }
+    networks: { net_sgi, net_cellular, net_core }            # CIDR도 런타임 inspect로 확인
+  }
+  keys { ingest_key_env, audit_key_env, operator_cert, sign_key_holder: "gcs_c2" }  # 3분리, env 이름 참조(R6)
+  mission { profile_path }  thresholds { path }              # v2 정본 config
+  run { max_iters=200, max_pivots=8, tick_ms=1000, hitl_flight=on, leak0_gate=required }
+  out { evidence_repo, viewer_port, record: on }             # replay 녹화
+}
+# resolve_targets(role, vantage):   role→container→IP 2단계 (H-I)
+#   name = topology.roles[role]
+#   ip   = docker inspect name .NetworkSettings  (bridge)  또는  docker exec name ip addr (UE풀 tun)
+#   verify: role_verified(role) ← 측정(예: gcs=14556 도달·서명라인 / uav=14560 HEARTBEAT sysid=1)
+#   provenance = config|inspect|verified  →  verified만 완전신뢰(H-L), 실패시 그 대응 봉쇄</pre></details>
+<div class="grid">
+  <div class="card p"><div class="cn">replay 모드 (H-J)</div><div class="cr">라이브 실행 시 <b>Evidence·결정·Verifier truth를 JSONL 녹화</b> → 테스트베드 없는 심사원이 <code>--replay run.jsonl</code>로 Viewer 재생. 이식성·재현성 점수의 기둥. (공격팀 G53처럼 후순위 가능하나 데모엔 필수.)</cr></div></div>
+  <div class="card p"><div class="cn">동적 IP 흡수 (H-I)</div><div class="cr">테스트베드 재배포로 IP 바뀜(실제 발생: 166.44→151.120, UE풀 .3↔.4)을 <b>런타임 inspect+exec로 흡수</b>. v2의 172.30.0.10 등 정적 IP 전부 role 참조로 대체.</cr></div></div>
+</div>
+
+<!-- 6 -->
+<h2 id="s6"><span class="n">06</span> 실행/종료 계약 + 누수-0 <span class="new">NEW · G1/G2/G4</span></h2>
+<div class="note crit"><span class="h">v1 파손 교훈 = 방어에도 그대로</span> 공격팀 재설계의 근원: 관측이 <code>docker run --rm</code> 단명 컨테이너를 띄워 누수→5762 포화→테스트베드 오염→AMI 복원. <b>방어는 더 많은 프로세스를 띄우므로 이 계약이 필수.</b></div>
+<details open><summary>▎ Backend/teardown 계약 (safe-exec, Robo Duck backends 계승)</summary><pre>Backend.run(ExecRequest) -> DefResult          # timeout + 확실한 강제종료 + 자원회수
+Backend.teardown()                             # 라벨/uuid 스코프 reap (넓은 pkill 금지)
+계약(R1~R6):
+  R1  컨테이너 내부 timeout -k + setsid 새 PGID + JOB 마커(cmdline 상주). per-job reap =
+      컨테이너-스코프 kill-all-but-pid1(TERM→grace→KILL, 우리 uuid만). busybox timeout 탈출해도 SIGKILL 회수.
+  R2  라벨(dah_def) teardown/부팅 reap — 우리 라벨만.   R3  preflight 게이트(1회 캐시).
+  R6  비밀 = vault→stdin(argv/평문env 금지).  ★ 안티패턴 금지: docker run --rm per-action /
+      subprocess PIPE capture(손자 데드락) / 동기 인라인 관측(루프 hang).
+관측(G4): 6 Collector = 장수 프로세스, async push. 에이전트는 절대 호출·대기 안 함(fail-open,
+  stale→confidence 감쇠). 5762 = ss-only(TCP connect 0) · pool=1(다중연결 금지).</pre></details>
+<div class="note ok"><span class="h">GATE 1 — 누수-0 통합테스트 (라이브 전 필수, G2)</span> ① Collector·nsenter·pcap 기동→N회→종료 시 잔존 프로세스·컨테이너·소켓 <b>0</b>(docker ps diff=0·5762 free) ② 타임아웃 실효(무응답 백엔드→확실 종료) ③ 관측 non-load-bearing(hung tap→캠페인 완주) ④ verifier 격리 ⑤ 보수판정(모니터 미배선→허위탐지 0). + <code>DEPLOY_VERIFY_RUNBOOK</code>(실행 중 ps/docker ps/ss 5762 감시, 잔여 증가 시 즉시 중단).</div>
+
+<!-- 7 -->
+<h2 id="s7"><span class="n">07</span> 상태변경 안전 (record_intent · recover_on_boot) <span class="new">NEW · G3/G7</span></h2>
+<p>방어는 iptables DROP·docker pause·DO_SET_MODE로 <b>상태를 변경</b>한다. MDG 크래시 후 이 변경들이 방치되면 위험(드론이 RTL로 남거나 컨테이너 paused). 공격팀 §8 패턴을 방어에 필수 적용.</p>
+<div class="ascii">record_intent(ledger)  ← guard 밖, 실행 직전 항상 기록 {rule, revert_cmd, ts, decision_id, verified?}
+recover_on_boot(all_prior_runs):
+  각 prior ledger 스캔 →  · applied iptables 규칙 존재? → 위협 해소 확인 후 revert (없으면 유지+경보)
+                          · paused 컨테이너? → 운영자에 확인 요청 (자동 unpause 금지)
+                          · 미검증 비행명령? → 운영자 에스컬레이트 (자동 revert 금지)
+Watchdog(독립 데몬 스레드): 자기 hang 감지 · 안전 불변식(비행상태) 감시 · ledger flush 보장 · finally stop
+멱등(E24): applied(rule) ∈ WorldState → 재발화 시 skip.  원자번들(X6): 복구+공격차단 1 트랜잭션·부분실패→rollback.</div>
+
+<!-- 8 -->
+<h2 id="s8"><span class="n">08</span> replay + verify-suite + 프롬프트 <span class="new">NEW · H-J/N/P · G5</span></h2>
+<div class="grid">
+  <div class="card o"><div class="cn">verify-suite (코드 전 게이트, G5/H-N)</div><div class="cr"><b>verify_tools</b>(27 tool 계약 완전·유령 0·params 스키마=E20 해소) · <b>verify_grep0</b>(Verifier↛decider 정적 강제) · <b>verify_keys</b>(3키 분리·argv 누수 0) · <b>verify_parsers</b>(regex vs fixture) · <b>verify_leak0</b>(GATE 1 통합). 전부 PASS 전 실행 금지.</cr></div></div>
+  <div class="card o"><div class="cn">프롬프트 설계 계층 (H-P)</div><div class="cr">Jinja <b>StrictUndefined</b>(누락 변수=실패) · 레시피/worked-example 금지(조합 창발) · legal tool 계층필터 · <b>빈프롬프트 가드</b> · 신뢰불가 필드(MAVLink STATUSTEXT·로그·IMSI)는 지시가 아닌 <b>구조화 데이터로만</b>·이스케이프·길이상한·null-strip(E10/X11).</cr></div></div>
+  <div class="card p"><div class="cn">replay 산출 (H-J)</div><div class="cr">CampaignResult{timeline, evidence_chain, decisions, verifier_truth, honest_note}. Viewer 3패널(동작=decision JSONL / 통신=14560 텔레 / 검증=Verifier 대조). agent≠truth 배너 최상단(H-K).</cr></div></div>
+  <div class="card o"><div class="cn">도메인 전문가 패널 (H-O)</div><div class="cr">코드 전 검증에 하네스 <b>uav-protocol-analyst·network-vuln-detector·benchmark-analyst</b> 병렬 투입(공격팀 4인검증 대응) → codex/agy 범용검증 보완.</cr></div></div>
+</div>
+
+<!-- 9 -->
+<h2 id="s9"><span class="n">09</span> 정직성 · provenance · 자기한계 <span class="new">NEW · H-K/L/M</span></h2>
+<div class="note warn"><span class="h">provenance 게이팅 (H-L)</span> 모든 fact/타깃에 provenance{config·inspect·verified}. <b>verified만 완전신뢰</b>; 미검증 타깃엔 대응 금지(허위 대응 방지). 측정 실패→그 계층 봉쇄(정직).</div>
+<div class="note warn"><span class="h">effect-confirm per response (H-M)</span> 대응별 효력 확인 정직: 서명 mode=14560 HEARTBEAT로 <b>확인</b> · 5762 봉쇄=ss ESTAB 종료로 <b>확인</b> · docker pause=컨테이너 상태로 <b>확인</b> · inter-container nsenter DROP=<b>런타임 실검증 선행</b>(미확인이면 "미확인" 표기). V4 봉쇄=탐지불가라 effect 판정 불가(정직).</div>
+<h3>H-K 자기한계 ADV 패스 결과 (독립 적대분석, 2026-07-07)</h3>
+<p>공격팀 ADV-F1("자기 원칙이 데모를 깬다")의 방어 대응을 독립 <code>ai-adversarial-analyst</code>로 점검 → 12건(D-1~D-12). <b>공통 뿌리(ADV-F1 미러):</b> 방어는 <b>자기가 통제하지 못하는 신뢰 지점에서만 평문을 보고</b>, <b>지키려는 권한을 한 노드에 집중</b>했다.</p>
+<div class="scroll"><table>
+<tr><th>ID</th><th>자기모순 메커니즘</th><th>판정</th><th>정직 재프레임 / 수정</th></tr>
+<tr><td class="mono">D-1</td><td>"독립 Verifier"가 14560(gcs_proxy 복호)을 decider와 <b>공유</b> → gcs_proxy 장악/사망 시 둘 다 실명</td><td>🔴 주장붕괴</td><td>독립=decider 독립이지 <b>복호루트 독립 아님</b> 명시 + 드론측 <code>uav_ue lo:14550</code> 교차루트 추가. 단일루트면 "verified"→"consistent"</td></tr>
+<tr><td class="mono">D-2</td><td>MDG가 서명LAND+host-root+3망을 한 노드에 집중 → 장악 시 <b>유효서명 LAND</b>(V4-탐지불가가 공격자 편)·root·3망 pivot</td><td>🔴 주장붕괴</td><td>비행 operator-gate를 <b>키홀더(gcs_c2 shim)에서 강제</b>(MDG가 "승인됨" 자칭 불가) + act_host 분리 + blast radius 정직 공개</td></tr>
+<tr><td class="mono">D-3</td><td>Verifier "결정권0/non-load-bearing"인데 X10(verifier-down→AUTO보류)로 <b>load-bearing화</b> + Sonnet LLM이라 지연 유도 DoS. grep0 정적게이트와 <b>모순</b></td><td>🔴 빌드모순</td><td>Verifier=<b>결정론</b>(LLM 아님·ss/pcap/metric) + <b>가역 AUTO는 verifier 생존 무관</b>. fail-closed는 비가역(이미 operator)만 → grep0∧X10 모순 해소</td></tr>
+<tr><td class="mono">D-4</td><td>5762 백도어 명령 <b>내용</b>은 두 신뢰탭 미경유 → 포트 메타만, effect는 하행텔레(=gcs_proxy 의존)로만 추정</td><td>🟠 공개</td><td>ADV-F1 미러 그대로: "우리 두 탭 우회 채널의 명령 내용은 못 봄. 5762가 그것"</td></tr>
+<tr><td class="mono">D-5</td><td>5762 DROP은 리스너 제거 못 함(arducopter LISTEN 유지)·loopback/타소스 우회·ESTAB드레인은 모호</td><td>🟠 공개</td><td>"소스한정 인바운드 필터, 백도어 제거 아님·ss-ESTAB은 보강신호". (candidate-2 ss실명은 반증됨)</td></tr>
+<tr><td class="mono">D-6</td><td>서명복구가 gcs_c2(공격 주표적) 운명 공유 → C2 공격 시 액추에이터 상실</td><td>🟠 공개</td><td>비서명 폴백: <b>docker_pause/nsenter 격리 → 자동조종 자체 failsafe</b>(rtl_on_link_loss). 서명단일 아님</td></tr>
+<tr><td class="mono">D-7</td><td>텔레 침묵 = 공격? 자기 실명? 공유루트라 Verifier도 판별 못 함</td><td>🟠 공개</td><td>gcs_proxy 생존 직접확인 + 14555 암호문 흐름(P-ARIA-01) + 드론측 14550 교차: 암호문有·평문無=내 실명(미집행)</td></tr>
+<tr><td class="mono">D-8</td><td>"Mission-<b>Aware</b>"인데 mission 상태를 고정config로만 봄·미션조작 탐지불가(E22)</td><td>🟠 공개</td><td>"Mission-<b>weighted</b>"로 재명명. impact는 config=현실 가정 하 조건부, 미션조작=범위밖</td></tr>
+<tr><td class="mono">D-9</td><td>정직배너(agent≠truth)의 "truth"가 agent와 같은 루트 → 위조 14560이면 "거짓 일치"를 verified로</td><td>🟠 공개</td><td>배너에 신뢰루트 표기. 14560 단독=" 공유텔레와 일치(독립루트 아님)", 절대 "verified" 아님</td></tr>
+<tr><td class="mono">D-10</td><td>provenance=verified 게이트를 공격자가 <b>거부권</b>으로: 텔레 훼손→타깃 미검증→방어 정지</td><td>🟠 공개</td><td>"never resolved"(정당차단) vs "established 후 lost"(=위협신호→에스컬레이트) 구별</td></tr>
+<tr><td class="mono">D-11</td><td>대응이 자기 센싱 절단: col 사이드카가 대상 netns 내부 → pause/disconnect/과넓은 DROP이 자기 collector 차단</td><td>🟡 minor</td><td>collector와 pause/disconnect 대상 <b>비공존</b> 단언 + DROP이 collector dst:50051 egress 미매치 검증</td></tr>
+<tr><td class="mono">D-12</td><td>최고가중 comm(30)이 단일 ping 하나에 의존 → 그 경로만 훼손해도 오판. "파생신호만" 순수성도 위반</td><td>🟡 minor</td><td>pos_rate 연속성으로 보강, comm=단일프로브 플래그</td></tr>
+</table></div>
+
+<div class="note crit"><span class="h">★ 적용한 3대 필수 수정 (v3 반영)</span>
+<ul>
+<li><b>D-3 (빌드모순 해소):</b> Verifier = <b>결정론</b>(LLM 아님 — effect 확인은 ss/pcap/metric). <b>가역 AUTO 대응(nsenter DROP·mongo ACL)은 verifier 생존과 무관</b>하게 집행. fail-closed는 <b>비가역 행동에만</b>(그건 이미 operator-confirm) → grep0 정적게이트(Verifier↛decider)와 X10이 더 이상 충돌 안 함. gate_evaluate의 "verifier-up" precondition 삭제.</li>
+<li><b>D-2 (blast radius 축소):</b> 비행 operator-gate를 <b>gcs_c2 signer-shim(키홀더)에서 독립 강제</b> — shim이 operator mTLS 토큰을 자체 요구·비행모드는 토큰 없이 거부. 장악된 mdg_core가 "operator 승인됨"을 자칭해도 shim이 서명 거부 → MDG 단독 LAND 불가. act_host를 <b>iptables-agent ⟂ signed-command 경로 분리</b>. MDG=최고가치 표적임을 정직 공개.</li>
+<li><b>D-1 (교차루트 진실):</b> Verifier가 14560(GCS측)뿐 아니라 <b>드론측 <code>uav_ue lo:14550</code>(ARIA 미경유)도 독립 tap</b> → 양측 비행모드 일치=진짜 교차검증, 불일치=셀룰러 구간 MitM/spoof. 14560 단독 가용 시 "verified"→"<b>consistent(단일루트)</b>" 강등. 배너에 신뢰루트 표기. 텔레 침묵 시 gcs_proxy 생존 직접확인으로 "공격 vs 자기실명" 판별.</li>
+</ul></div>
+<div class="note ok"><span class="h">정직 공개 (보고서 반영, ADV-F1 규율)</span> D-4(5762 명령내용 blind)·D-5(리스너 유지)·D-6(비서명 폴백=격리+autopilot failsafe)·D-8("Mission-weighted" 재명명)·D-10(verify 상실=위협신호). <b>핵심 가치 존속:</b> 12건 중 파이프라인을 깨는 것은 없음 — 3개 재명명("독립 Verifier"→decision독립·텔레루트공유·드론측 교차 / "최소 공격표면"→집중권한+공개된 blast radius+키홀더 게이트 / "Mission-aware"→"weighted")이 <b>그 자체로 25점 정직성 득점</b>. 공격팀이 ADV-F1 후 가치가 살아남은 것과 동일.</div>
+
+<!-- 10 -->
+<h2 id="s10"><span class="n">10</span> 매핑: H-A~P · G1~G11 → v3 반영</h2>
+<div class="scroll"><table>
+<tr><th>검증항목</th><th>v3 반영 위치</th><th>게이트</th></tr>
+<tr><td class="mono">H-A DefResult/tool_wrap</td><td>§2 Tool 계약</td><td>0</td></tr>
+<tr><td class="mono">H-B DefRequiredAgent+결정론종료</td><td>§4 에이전트 루프</td><td>0</td></tr>
+<tr><td class="mono">H-C 프레임워크+참조</td><td>§1 (§C에서 실코드 확정)</td><td>0</td></tr>
+<tr><td class="mono">H-D LLM 2 phase</td><td>§1 §4</td><td>0</td></tr>
+<tr><td class="mono">H-E~G WorldState/Legality/닫힘</td><td>§3</td><td>2</td></tr>
+<tr><td class="mono">H-H~J InputSpec/해석/replay</td><td>§5 §8</td><td>2</td></tr>
+<tr><td class="mono">H-K 자기한계 ADV</td><td>§9 (§B 수행)</td><td>2</td></tr>
+<tr><td class="mono">H-L/M provenance/effect-confirm</td><td>§9</td><td>2</td></tr>
+<tr><td class="mono">H-N/O/P gaps게이트/전문가/프롬프트</td><td>§8</td><td>0/2</td></tr>
+<tr><td class="mono">G1/G2/G4 teardown/누수0/관측async</td><td>§6</td><td>0/1</td></tr>
+<tr><td class="mono">G3/G7 record_intent/watchdog</td><td>§7</td><td>1</td></tr>
+<tr><td class="mono">G5 verify-suite</td><td>§8</td><td>0/1</td></tr>
+<tr><td class="mono">v2 도메인(E1~X13)</td><td>DEFENSE_AGENT_PROTOTYPE_DESIGN.html</td><td>유지</td></tr>
+</table></div>
+
+<footer>
+DAH 2026 · MDG 방어 에이전트 <b>v3</b> — 구축 형식 & 운영 하부구조 · 테스트베드 한정·가역·인가 샌드박스.<br>
+v2 도메인 로직 위에 공격 agent_v2 구축과정(01~22)+aixcc Robo Duck 형식을 이식. 착수 순서: GATE0(§1·§2·§6)→GATE1(누수-0)→GATE2(§3·§5·§8·§9).<br>
+다음: §B H-K 자기한계 ADV 패스 → §C aixcc 실코드 정독·프레임워크 최종 확정.
+</footer>
+</div>

@@ -1,0 +1,32 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+.cache_verify
+.claude
+.claude_hidden
+
+# mdg 실행 산출물 (autorun / live / campaign) — 절대 커밋 금지
+live_out/
+*_out/
+run.jsonl
+run*.jsonl
+autorun.log
+report.json
+
+*.log
+
+runs/
+*.bak
+*.tgz
+*.egg-info/
+.pytest_cache/
+.DS_Store
+
+# 비밀·배포 의존값 — .env 는 gitignore, .env.example(플레이스홀더)만 커밋
+.env
+.env.*
+*.pem
+!.env.example

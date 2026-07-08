@@ -1,0 +1,921 @@
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mission‑Centric Defense Architecture Core Model</title>
+  <!--
+    This document defines the core data and evaluation models used across all
+    chapters of the Mission‑Centric Defense Architecture.  It uses the same
+    style as the blueprint and skeleton documents.  Each model is defined
+    concretely: the purpose, necessity, inputs, internal fields, relationships,
+    processing logic, outputs, design considerations, and an example structure
+    are described.  The models draw only on data that can be collected from
+    the testbed and validated attack scenarios.
+  -->
+  <style>
+    :root{
+      --bg:#0d1117; --panel:#161b22; --panel2:#1c2430; --line:#30363d;
+      --ink:#e6edf3; --sub:#9da7b3; --muted:#6e7681;
+      --cell:#3b82f6; --core:#a855f7; --sgi:#22c55e; --ran:#f59e0b; --air:#ef4444; --atk:#f43f5e;
+      --accent:#58a6ff; --ok:#3fb950; --warn:#d29922; --bad:#f85149; --plain:#f59e0b; --ct:#22c55e;
+      --code:#0b0f14;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);
+      font-family:"Segoe UI","Malgun Gothic",-apple-system,system-ui,sans-serif;line-height:1.65;font-size:15px}
+    .wrap{max-width:1080px;margin:0 auto;padding:32px 22px 90px}
+    header.doc{border:1px solid var(--line);border-radius:14px;overflow:hidden;
+      background:linear-gradient(135deg,#12203a 0%,#161b22 55%,#101a2c 100%);
+      padding:26px 28px;margin-bottom:24px}
+    header.doc h1{margin:14px 0 6px;font-size:25px;line-height:1.3}
+    header.doc .sub{color:var(--sub);font-size:14px}
+    header.doc .meta{display:flex;flex-wrap:wrap;gap:8px 10px;margin-top:16px}
+    .pill{display:inline-block;font-size:12.5px;font-weight:700;padding:6px 11px;border-radius:8px;background:var(--panel2);
+      border:1px solid var(--line);color:var(--sub)}
+    .pill b{color:var(--ink);font-weight:600}
+    h2{margin:46px 0 14px;font-size:20px;border-bottom:1px solid var(--line);padding-bottom:8px;scroll-margin-top:16px}
+    h2 .num{color:var(--accent);font-variant-numeric:tabular-nums;margin-right:10px}
+    h3{margin:32px 0 14px;font-size:17px;color:#dbe6f2}
+    h4{margin:18px 0 8px;font-size:15px;color:#9fd0ff;font-weight:600}
+    p{margin:10px 0}
+    .lede{color:var(--sub);font-size:15px}
+    ul{margin:8px 0 12px 20px}
+    ul li{margin:5px 0}
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:16px 0}
+    table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+    th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+    th{background:var(--panel2);color:#cbd5e1;font-weight:600;font-size:12.5px}
+    tr:nth-child(even) td{background:rgba(255,255,255,.015)}
+    pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:12px 14px;overflow-x:auto;
+      font-size:12.5px;color:#cdd9e5;margin:10px 0}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header class="doc">
+    <h1>Mission‑Centric Defense Architecture Core Model</h1>
+    <div class="sub">LTE/5G 기반 UAV C2 환경을 위한 임무 중심 방어 아키텍처 Core Model 설계 (2026‑07‑05)</div>
+    <div class="meta">
+      <span class="pill">프로젝트 <b>Mission‑Centric Defense Architecture</b></span>
+      <span class="pill">환경 <b>4G/5G UAV C2 Testbed</b></span>
+      <span class="pill">버전 <b>Core Model Stage</b></span>
+      <span class="pill">철학 <b>Capability‑Driven, Mission‑Aware</b></span>
+    </div>
+  </header>
+
+  <h2 id="overview"><span class="num">1.</span> Core Model Overview</h2>
+  <p class="lede">Core Architecture Model은 Mission‑Centric Defense Architecture의 모든 장에서 공통으로 사용하는 데이터 구조와 판단 모델을 정의한다. 본 모델은 테스트베드에서 수집 가능한 데이터와 실증된 공격 시나리오를 기반으로 설계되며, 추상적인 설명 없이 명확한 입력·출력·관계를 규정한다. 이후 각 Chapter는 본 모델을 그대로 참조하여 설계될 수 있다.</p>
+
+  <!-- Evidence Object -->
+  <h2 id="evidence-object"><span class="num">2.</span> Evidence&nbsp;Object</h2>
+  <div class="panel">
+    <h4>Purpose</h4>
+    <p>Evidence&nbsp;Object는 Capability가 관찰한 사건을 표준화된 레코드로 표현하기 위한 데이터 모델이다. 이 객체는 평가 모델과 신뢰 계산에서 사용하기 위해 사건에 대한 상세 정보를 구조화한다.</p>
+
+    <h4>Why this model is required</h4>
+    <p>각 Capability에서 발생하는 이벤트는 포맷과 메트릭이 다르다. Evidence&nbsp;Object는 이러한 이질적 데이터를 통합된 구조로 저장하여 Trust Architecture, Mission Impact 등이 일관된 방식으로 처리할 수 있도록 한다.</p>
+
+    <h4>Inputs</h4>
+    <ul>
+      <li><strong>Raw Event Data:</strong> Capability Monitor가 생성한 원시 이벤트(예: PFCP 세션 삭제, web API 호출, MongoDB 접근 등)【208159606947672†L279-L293】【488147192654095†L60-L99】.</li>
+      <li><strong>Expected Value &amp; Threshold:</strong> 각 메트릭에 대해 정상 범위와 경계 값. 예를 들어 NAS 암호 우선순위 설정이 <code>EEA0</code>이면 threshold =N/A【208159606947672†L279-L293】.</li>
+      <li><strong>Metric Metadata:</strong> 메트릭의 중요도(Weight), 심각도 구간(Severity) 정의.</li>
+    </ul>
+
+    <h4>Internal Fields</h4>
+    <p>Evidence Object는 다음 필드를 포함한다. 각 필드는 추후 데이터베이스 스키마에 반영된다.</p>
+    <table>
+      <thead><tr><th>Field</th><th>Type</th><th>Description &amp; Use</th></tr></thead>
+      <tbody>
+        <tr><td><code>evidence_id</code></td><td>string</td><td>각 Evidence의 고유 식별자(ID). 이벤트 수집 시 생성되며, 상관 분석과 감사 기록에서 사용.</td></tr>
+        <tr><td><code>capability</code></td><td>enum</td><td>이 이벤트를 생성한 Capability 도메인 (communication, identity_access, session_network, command, mission).</td></tr>
+        <tr><td><code>source</code></td><td>string</td><td>이벤트가 발생한 장치나 프로세스 (예: <span class="mono">uav_proxy</span>, <span class="mono">epc_mongo</span>, <span class="mono">web_backend</span>).</td></tr>
+        <tr><td><code>entity</code></td><td>string</td><td>관련 엔티티 ID (예: UE IMSI, container name, IP 주소).</td></tr>
+        <tr><td><code>metric</code></td><td>string</td><td>수집된 메트릭 이름 (예: PFCP_Delete_Attempt, DB_Access, Command_Source).</td></tr>
+        <tr><td><code>observed_value</code></td><td>any</td><td>실제 관측 값 (예: 접속 시도 횟수, 암호 설정 값, 명령 ID).</td></tr>
+        <tr><td><code>expected_value</code></td><td>any</td><td>정상으로 기대되는 값 (예: 암호 우선순위 <code>EEA2</code>, DB 인증 성공). 오류 이벤트의 경우 <code>null</code>.</td></tr>
+        <tr><td><code>threshold</code></td><td>any</td><td>위험 상태로 판단하는 기준값. 예: PFCP 삭제 시도 허용 횟수.</td></tr>
+        <tr><td><code>severity</code></td><td>enum</td><td>이벤트의 심각도 (<em>info</em>, <em>low</em>, <em>medium</em>, <em>high</em>, <em>critical</em>). 정의는 공격 영향도와 연결.</td></tr>
+        <tr><td><code>weight</code></td><td>float</td><td>해당 메트릭이 Capability 신뢰 평가에서 차지하는 중요도 (0–1 범위).</td></tr>
+        <tr><td><code>confidence</code></td><td>float</td><td>이 Evidence의 신뢰도 (0–1). 수집 채널 신뢰성, 데이터 완전성 등을 반영한다.</td></tr>
+        <tr><td><code>timestamp</code></td><td>datetime</td><td>이벤트 발생 시각. 신뢰 평가와 TTL 계산에 사용.</td></tr>
+        <tr><td><code>ttl</code></td><td>integer</td><td>Time‑to‑Live. Evidence가 유효한 기간(초). 재평가 시 만료된 Evidence는 무시한다.</td></tr>
+        <tr><td><code>correlation_id</code></td><td>string</td><td>다수 Evidence를 한 사건으로 연관지을 때 공유하는 ID.</td></tr>
+        <tr><td><code>description</code></td><td>string</td><td>이벤트에 대한 설명과 추가 메타정보. 분석가 또는 자동 시스템이 기록.</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Relationships</h4>
+    <ul>
+      <li>Evidence는 <strong>Capability</strong>의 출력이며, <strong>Evidence Architecture</strong>에 저장된다.</li>
+      <li>여러 Evidence는 동일한 <code>correlation_id</code>를 통해 한 사건으로 연결될 수 있으며, 연관 분석에 사용된다.</li>
+      <li>Evidence는 <strong>Trust Architecture</strong>의 입력으로 사용되어 각 도메인의 신뢰 점수를 계산한다.</li>
+    </ul>
+
+    <h4>Processing&nbsp;Logic</h4>
+    <p>Evidence 레코드는 다음과 같은 처리 과정을 거친다:</p>
+    <ul>
+      <li>Capability가 Raw Event를 생성하면 Evidence Collector가 이를 받아 <code>evidence_id</code>를 생성한다.</li>
+      <li>Event의 메트릭과 관측 값을 기반으로 <code>expected_value</code>와 <code>threshold</code>를 조회한다.</li>
+      <li>관측 값과 기준을 비교하여 <code>severity</code>를 결정하고, 해당 메트릭의 중요도를 <code>weight</code>로 설정한다.</li>
+      <li>데이터 신뢰성, 채널 무결성, 일관성 등을 평가하여 <code>confidence</code>를 계산한다.</li>
+      <li>TTL을 설정하여 Evidence의 유효 기간을 정의하고, <code>timestamp</code>와 함께 저장한다.</li>
+    </ul>
+
+    <h4>Outputs</h4>
+    <ul>
+      <li>정규화된 Evidence Object는 Evidence Repository에 저장되고, Trust Architecture가 이를 조회하여 신뢰 계산에 사용한다.</li>
+    </ul>
+
+    <h4>Design&nbsp;Considerations</h4>
+    <ul>
+      <li><code>evidence_id</code>는 전역 고유해야 하며, 타임스탬프와 해시를 조합해 생성할 수 있다.</li>
+      <li><code>weight</code>와 <code>threshold</code> 값은 Capability 설계에서 정의하며, Mission Weight Model과 연계된다.</li>
+      <li><code>confidence</code> 값은 Evidence 품질과 수집 경로에 따라 동적으로 조정한다.</li>
+      <li>TTL은 이벤트의 변동성에 따라 결정하며, 네트워크 이벤트는 수 초, 정책 위반은 수 분 이상 유지될 수 있다.</li>
+    </ul>
+
+    <h4>Example&nbsp;Structure</h4>
+    <pre>{
+  "evidence_id": "EV20260705-0001",
+  "capability": "session_network",
+  "source": "epc_upf",
+  "entity": "10.45.0.3",
+  "metric": "PFCP_Delete_Attempt",
+  "observed_value": 1,
+  "expected_value": 0,
+  "threshold": 0,
+  "severity": "high",
+  "weight": 0.4,
+  "confidence": 0.95,
+  "timestamp": "2026-07-05T15:32:10Z",
+  "ttl": 600,
+  "correlation_id": "SEID-0x3fa2",
+  "description": "Unexpected PFCP session deletion detected on UPF"
+}</pre>
+  </div>
+
+  <!-- Trust Object -->
+  <h2 id="trust-object"><span class="num">3.</span> Trust&nbsp;Object</h2>
+  <div class="panel">
+    <h4>Purpose</h4>
+    <p>Trust Object는 Evidence를 평가한 결과를 정량화하여 각 도메인(communication, identity_access, session_network, command, mission)의 신뢰 수준과 근거를 담는다. 이는 Mission Context와 Impact 계산의 기본 단위이다.</p>
+
+    <h4>Why this model is required</h4>
+    <p>신뢰 수준은 방어 시스템이 상황을 이해하는 핵심 지표이다. 여러 Evidence를 종합하여 단일 점수로 표현함으로써, 정책 및 임무 영향 평가가 간결하고 일관되게 수행될 수 있다.</p>
+
+    <h4>Inputs</h4>
+    <ul>
+      <li><strong>Aggregated Evidence:</strong> 특정 도메인에 속하는 Evidence 레코드 목록.</li>
+      <li><strong>Domain Weight:</strong> Evidence Object의 <code>weight</code> 값 및 Mission Weight Model에서 정의한 가중치.</li>
+      <li><strong>Trust Score Model Parameters:</strong> 신뢰 범주, 계산 방식, confidence 활용 기준.</li>
+    </ul>
+
+    <h4>Internal Fields</h4>
+    <table>
+      <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>domain</code></td><td>enum</td><td>신뢰 평가 대상 도메인 (communication, identity_access, session_network, command, mission).</td></tr>
+        <tr><td><code>trust_score</code></td><td>float</td><td>0~100 범위의 신뢰 점수. 100은 완전 신뢰, 0은 신뢰 없음.</td></tr>
+        <tr><td><code>confidence</code></td><td>float</td><td>0~1 범위의 신뢰도. Evidence 양과 품질에 따라 계산.</td></tr>
+        <tr><td><code>evidence_count</code></td><td>integer</td><td>해당 도메인의 Evidence 개수.</td></tr>
+        <tr><td><code>supporting_evidence</code></td><td>list&lt;string&gt;</td><td>신뢰 증가에 기여한 Evidence ID 목록.</td></tr>
+        <tr><td><code>conflicting_evidence</code></td><td>list&lt;string&gt;</td><td>신뢰를 감소시키는 Evidence ID 목록.</td></tr>
+        <tr><td><code>calculation_result</code></td><td>string</td><td>신뢰 점수 산출 과정을 설명하는 메시지. 감사 용도로 사용.</td></tr>
+        <tr><td><code>reason</code></td><td>string</td><td>신뢰 수준의 최종 판단 근거. Domain-specific 요약.</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Relationships</h4>
+    <ul>
+      <li>Trust Object는 <strong>Trust Architecture</strong>의 출력이며, Mission Context 단계의 입력이다.</li>
+      <li>여러 Trust Objects는 신뢰 벡터를 형성하여 Mission Impact 계산에 사용된다.</li>
+      <li>신뢰 점수는 Policy 결정 및 Recovery 후보 평가에도 영향을 준다.</li>
+    </ul>
+
+    <h4>Processing Logic</h4>
+    <p>도메인별 Evidence를 종합하여 신뢰 점수를 산출하는 흐름은 다음과 같다:</p>
+    <ul>
+      <li>Evidence Records를 도메인별로 그룹화하고, <code>weight</code>와 <code>severity</code>를 기반으로 가중 영향을 계산한다.</li>
+      <li><code>trust_score</code> = 100 - Σ( (observed_value deviation / threshold) × weight × severity_factor ). 모든 음수 값은 0으로 제한한다.</li>
+      <li><code>confidence</code>는 Evidence 개수, 품질, 상호 일관성, 최신성 등을 고려하여 계산한다. Evidence가 많고 상호 일치할수록 confidence가 높다.</li>
+      <li>지원 증거 목록과 상충 증거 목록을 기록하고, 계산 과정과 판단 근거를 문자열로 요약한다.</li>
+    </ul>
+
+    <h4>Outputs</h4>
+    <ul>
+      <li>Trust Object는 Mission Context에 전달되어 가중치 계산과 Mission Impact 평가에 사용된다.</li>
+    </ul>
+
+    <h4>Design&nbsp;Considerations</h4>
+    <ul>
+      <li>신뢰 점수는 0~100 범위로 정규화한다. 90 이상은 매우 높은 신뢰, 70–89는 높은, 50–69는 중간, 30–49는 낮음, 0–29는 매우 낮음으로 분류한다.</li>
+      <li>Evidence가 부족하거나 충돌이 많을 경우 <code>confidence</code>를 낮춰 신뢰 평가가 보수적으로 이뤄지도록 한다.</li>
+      <li>도메인별 가중치는 Mission Weight Model과 별도로 신뢰 평가 내부에서도 적용될 수 있다.</li>
+    </ul>
+
+    <h4>Example&nbsp;Structure</h4>
+    <pre>{
+  "domain": "command",
+  "trust_score": 55.0,
+  "confidence": 0.72,
+  "evidence_count": 3,
+  "supporting_evidence": ["EV20260705-0004"],
+  "conflicting_evidence": ["EV20260705-0001", "EV20260705-0002"],
+  "calculation_result": "1 high-severity Oracle injection and 1 unsigned command reduced score; one successful signed command provided partial support.",
+  "reason": "Unauthenticated command injection attempts lowered command trust."
+}</pre>
+  </div>
+
+  <!-- Mission Context Object -->
+  <h2 id="mission-context-object"><span class="num">4.</span> Mission&nbsp;Context&nbsp;Object</h2>
+  <div class="panel">
+    <h4>Purpose</h4>
+    <p>Mission Context Object는 임무 특성(유형·단계·우선순위)과 환경, 중요한 자산, 제약 조건 등을 구조화하여 Mission Impact 계산의 입력으로 사용한다.</p>
+
+    <h4>Why this model is required</h4>
+    <p>동일한 신뢰 결핍이 임무 유형에 따라 다른 영향을 미칠 수 있다. 예를 들어 정찰(Recon) 임무에서는 통신 신뢰가 중요하고, 운송(Transport) 임무에서는 네트워크 안정성과 페이로드 안전이 중요하다. Mission Context는 이러한 차이를 반영하는 가중치를 지정한다.</p>
+
+    <h4>Inputs</h4>
+    <ul>
+      <li><strong>Mission Plan:</strong> 운영 시스템에서 제공하는 임무 계획 문서. UAV 임무 유형, 목표, 일정, 환경 조건 등을 포함한다.</li>
+      <li><strong>Mission Phase:</strong> 임무의 현재 단계 (pre-flight, takeoff, en-route, execution, return, landing). 공격 영향도는 단계에 따라 달라질 수 있다.</li>
+      <li><strong>Mission Weight Model:</strong> 각 임무 유형에 대한 Capability 가중치 설정.</li>
+    </ul>
+
+    <h4>Internal Fields</h4>
+    <table>
+      <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>mission_type</code></td><td>enum</td><td>Recon, Strike, Relay, Transport, Monitoring 등 임무 범주.</td></tr>
+        <tr><td><code>mission_phase</code></td><td>enum</td><td>Pre-flight, Takeoff, En‑route, Execution, Return, Landing.</td></tr>
+        <tr><td><code>mission_priority</code></td><td>enum</td><td>Critical, High, Medium, Low. 조직적 중요도를 표현.</td></tr>
+        <tr><td><code>mission_goal</code></td><td>string</td><td>임무가 달성하려는 구체적 목표 (예: 좌표 지역 정찰, 물자 배송).</td></tr>
+        <tr><td><code>mission_critical_asset</code></td><td>string</td><td>임무에 중요한 자산 (예: UAV 기체, 페이로드, 통신 링크).</td></tr>
+        <tr><td><code>operational_constraints</code></td><td>list&lt;string&gt;</td><td>연료, 시간, 비행 경로 제한, 규제 등.</td></tr>
+        <tr><td><code>environment</code></td><td>string</td><td>날씨, 지형, 전자전 위협 등 환경 조건.</td></tr>
+        <tr><td><code>mission_weight</code></td><td>dict</td><td>Capability별 가중치 (communication, identity, session_network, command, mission, recovery) 합이 100. Mission Weight Model 참조.</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Relationships</h4>
+    <ul>
+      <li>Mission Context Object는 Trust Vector와 함께 Mission Impact 계산의 입력으로 사용된다.</li>
+      <li>Mission Weight Model은 Context 객체에 포함된 <code>mission_weight</code> 필드를 채우는 기준이 된다.</li>
+      <li>Policy 및 Recovery 단계에서 임무 유형과 우선순위는 권장 행동과 복구 옵션에 직접 영향을 준다.</li>
+    </ul>
+
+    <h4>Processing Logic</h4>
+    <p>Mission Context는 다음 단계로 구성된다:</p>
+    <ul>
+      <li>Mission Plan에서 임무 유형, 단계, 우선순위, 목표, 자산, 제약, 환경 정보를 추출한다.</li>
+      <li>Mission Weight Model을 참조하여 해당 임무 유형에 대한 기본 가중치를 설정하고, 중요한 자산과 환경 제약에 따라 조정한다.</li>
+      <li>Mission Context Object를 생성하여 Mission Impact 단계로 전달한다.</li>
+    </ul>
+
+    <h4>Outputs</h4>
+    <ul>
+      <li>Mission Context Object – Mission Impact 및 Policy 단계로 전달된다.</li>
+    </ul>
+
+    <h4>Design Considerations</h4>
+    <ul>
+      <li>임무 유형과 단계의 정의는 조직적 절차를 반영하며, 추가 임무가 등장할 경우 확장 가능해야 한다.</li>
+      <li>Mission Weight는 100을 기준으로 하며, 임무 특성에 따라 가중치 비율이 달라진다.</li>
+      <li>환경 및 제약 조건은 신뢰 및 Impact 계산에 영향을 줄 수 있으므로 정확한 입력이 필요하다.</li>
+    </ul>
+
+    <h4>Example Structure</h4>
+    <pre>{
+  "mission_type": "Recon",
+  "mission_phase": "En‑route",
+  "mission_priority": "High",
+  "mission_goal": "Area surveillance of sector B3",
+  "mission_critical_asset": "UAV and camera payload",
+  "operational_constraints": ["Stay below 120m", "Return within 30min"],
+  "environment": "Clear weather, urban terrain",
+  "mission_weight": {"communication": 30, "identity": 10, "session_network": 20, "command": 20, "mission": 20, "recovery": 0}
+}</pre>
+  </div>
+
+  <!-- Mission Weight Model -->
+  <h2 id="mission-weight-model"><span class="num">5.</span> Mission&nbsp;Weight&nbsp;Model</h2>
+  <div class="panel">
+    <h4>Purpose</h4>
+    <p>Mission Weight Model은 임무 유형에 따라 각 Capability 영역의 상대적 중요도를 정의한다. 가중치는 신뢰 평가를 Mission Impact로 변환할 때 사용된다.</p>
+
+    <h4>Why this model is required</h4>
+    <p>임무마다 요구되는 보안 성능과 민감도가 다르므로, 각 도메인의 신뢰 점수를 임무에 맞게 가중하여 영향도를 계산해야 한다. 이는 일괄적인 평가가 아닌 임무 맞춤형 평가를 가능하게 한다.</p>
+
+    <h4>Inputs</h4>
+    <ul>
+      <li><strong>Mission Type:</strong> Recon, Strike, Relay, Transport, Monitoring 등의 임무 범주.</li>
+      <li><strong>Organizational Priorities:</strong> 조직이 설정한 도메인 중요도 기준.</li>
+    </ul>
+
+    <h4>Internal Fields</h4>
+    <p>Mission Weight Model은 임무 유형별로 다음과 같은 가중치 세트를 정의한다. 각 세트의 합은 100이다.</p>
+    <table>
+      <thead><tr><th>Mission&nbsp;Type</th><th>Communication</th><th>Identity</th><th>Session&nbsp;&amp;&nbsp;Network</th><th>Command</th><th>Mission</th><th>Recovery</th></tr></thead>
+      <tbody>
+        <tr><td>Recon</td><td>30</td><td>10</td><td>20</td><td>20</td><td>20</td><td>0</td></tr>
+        <tr><td>Strike</td><td>25</td><td>15</td><td>25</td><td>25</td><td>10</td><td>0</td></tr>
+        <tr><td>Relay</td><td>35</td><td>10</td><td>25</td><td>15</td><td>15</td><td>0</td></tr>
+        <tr><td>Transport</td><td>20</td><td>10</td><td>30</td><td>20</td><td>20</td><td>0</td></tr>
+        <tr><td>Monitoring</td><td>25</td><td>15</td><td>20</td><td>15</td><td>20</td><td>5</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Relationships</h4>
+    <ul>
+      <li>Mission Weight Model은 Mission Context 객체의 <code>mission_weight</code> 필드로 전달되어 Mission Impact 계산에 사용된다.</li>
+      <li>가중치는 Trust Score Model에서 도메인별 신뢰 점수를 임무 영향 점수로 전환할 때 사용된다.</li>
+    </ul>
+
+    <h4>Processing Logic</h4>
+    <ul>
+      <li>Mission 유형을 입력받으면 해당 표의 가중치 세트를 선택한다.</li>
+      <li>특정 임무 조건(중요 자산, 환경 제약)에 따라 가중치를 조정할 수 있다. 가중치 합은 100을 유지한다.</li>
+      <li>도메인별 가중치는 신뢰 점수와 곱해져 임무 영향도를 계산한다.</li>
+    </ul>
+
+    <h4>Outputs</h4>
+    <ul>
+      <li>가중치 세트(예: {communication:30, identity:10,…}) → Mission Context 객체.</li>
+    </ul>
+
+    <h4>Design Considerations</h4>
+    <ul>
+      <li>가중치 값은 조직의 우선순위와 임무 특성에 따라 조정 가능하다. Core Model에서는 기본값만 제시한다.</li>
+      <li>Recovery 도메인 가중치는 평시에 0으로 두었지만, 임무 진행 중 Trust Architecture가 낮은 영역이 발견되면 가중치를 재분배하여 Recovery의 중요도를 반영할 수 있다.</li>
+    </ul>
+
+    <h4>Example Structure</h4>
+    <pre>{
+  "mission_type": "Transport",
+  "weights": {"communication": 20, "identity": 10, "session_network": 30, "command": 20, "mission": 20, "recovery": 0}
+}</pre>
+  </div>
+
+  <!-- Trust Score Model -->
+  <h2 id="trust-score-model"><span class="num">6.</span> Trust&nbsp;Score&nbsp;Model</h2>
+  <div class="panel">
+    <h4>Purpose</h4>
+    <p>Trust Score Model은 Evidence에서 신뢰 점수를 계산하는 수식과 구간 정의를 제공한다. 이 모델은 신뢰 점수의 의미와 구간을 명확히 하고, Mission Impact 계산에서 사용되는 입력을 표준화한다.</p>
+
+    <h4>Why this model is required</h4>
+    <p>정량적 신뢰 평가가 이루어지기 위해서는 점수의 범위와 구간 의미가 명확해야 한다. 또한 weight와 confidence를 어떻게 반영할지 정의해야 일관된 비교가 가능하다.</p>
+
+    <h4>Inputs</h4>
+    <ul>
+      <li><strong>Evidence Records:</strong> 도메인별 Evidence의 심각도(severity), weight, observed/expected 비교 결과.</li>
+      <li><strong>Weight Model:</strong> 각 메트릭의 중요도와 Mission Weight.</li>
+      <li><strong>Confidence Model:</strong> Evidence 신뢰도.</li>
+    </ul>
+
+    <h4>Internal Fields</h4>
+    <p>Trust Score Model은 다음과 같은 범주와 수식을 정의한다:</p>
+    <table>
+      <thead><tr><th>Score Range</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td>100–90</td><td>Very High Trust – 거의 모든 Evidence가 기대 값에 부합하고, 심각한 이벤트가 없다.</td></tr>
+        <tr><td>89–70</td><td>High Trust – 일부 경미한 편차가 있으나 전반적으로 안정적.</td></tr>
+        <tr><td>69–50</td><td>Moderate Trust – 여러 경미/중간 수준의 이벤트가 발생. 주의를 요함.</td></tr>
+        <tr><td>49–30</td><td>Low Trust – 심각한 이벤트가 복수 발생하여 도메인 신뢰가 낮음.</td></tr>
+        <tr><td>29–0</td><td>Very Low Trust – 중대한 결함 또는 다수의 심각한 이벤트. 즉각적인 조치 필요.</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Relationships</h4>
+    <ul>
+      <li>Trust Score Model은 Trust Object를 생성하는 평가 단계에서 사용된다.</li>
+      <li>Score Range는 Mission Impact와 Policy 단계에서 위험 등급 할당의 기준이 된다.</li>
+    </ul>
+
+    <h4>Processing Logic</h4>
+    <p>Trust Score 계산의 핵심 단계는 다음과 같다:</p>
+    <ul>
+      <li>각 Evidence에 대해 (<em>observed_value</em> vs <em>expected_value</em>)를 비교하여 편차를 구하고, 메트릭의 <code>weight</code>와 <code>severity</code> 값을 곱한다.</li>
+      <li>도메인별 총 편차 합을 1에서 빼고 100을 곱하여 기본 신뢰 점수를 얻는다: <code>trust_score_base = 100 × (1 - Σ(weight × severity_factor × deviation_ratio))</code>.</li>
+      <li>Confidence 값이 1보다 낮으면 신뢰 점수에 가중 감쇠를 적용한다: <code>trust_score = trust_score_base × confidence</code>.</li>
+      <li>Score Range 표에 따라 신뢰 등급을 결정하고, <code>reason</code> 필드를 작성한다.</li>
+    </ul>
+
+    <h4>Outputs</h4>
+    <ul>
+      <li>Domain별 <code>trust_score</code>와 신뢰 등급.</li>
+    </ul>
+
+    <h4>Design Considerations</h4>
+    <ul>
+      <li>Severity Factor는 단순 수치(예: info=0.0, low=0.1, medium=0.3, high=0.6, critical=1.0)로 정의한다.</li>
+      <li>Deviation Ratio는 (observed_value - expected_value) / max(expected_value, threshold)를 사용하여 0~1 범위로 정규화한다.</li>
+      <li>Confidence가 낮을수록 신뢰 점수는 더 낮아지므로, evidence 수집 품질이 평가에 큰 영향을 준다.</li>
+    </ul>
+
+    <h4>Example Structure</h4>
+    <pre>{
+  "domain": "communication",
+  "evidence_inputs": [
+    {"severity_factor": 0.6, "weight": 0.3, "deviation_ratio": 1.0},
+    {"severity_factor": 0.1, "weight": 0.2, "deviation_ratio": 0.3}
+  ],
+  "confidence": 0.9,
+  "trust_score_base": 58.0,
+  "trust_score": 52.2,
+  "trust_level": "Low",
+  "reason": "PFCP deletion and NAS null encryption lowered communication trust."
+}</pre>
+  </div>
+
+  <!-- Confidence Model -->
+  <h2 id="confidence-model"><span class="num">7.</span> Confidence&nbsp;Model</h2>
+  <div class="panel">
+    <h4>Purpose</h4>
+    <p>Confidence Model은 Evidence와 Trust 평가가 얼마나 신뢰할 수 있는지(불확실성)를 정량화한다. 높은 confidence는 판단이 확실함을 의미한다.</p>
+
+    <h4>Why this model is required</h4>
+    <p>방어 시스템은 불완전한 정보와 노이즈를 처리해야 한다. Confidence를 통해 판단의 확실성을 표현함으로써, Mission Impact와 Policy 단계에서 보수적 또는 적극적인 결정을 할 수 있다.</p>
+
+    <h4>Inputs</h4>
+    <ul>
+      <li><strong>Evidence Count:</strong> 도메인별 Evidence 수. 많은 Evidence는 confidence를 높인다.</li>
+      <li><strong>Evidence Quality:</strong> 각 Evidence의 <code>confidence</code> 값. 데이터 채널 무결성, 수집 신뢰도, 정확도를 반영한다.</li>
+      <li><strong>Correlation Degree:</strong> 여러 Evidence 간 일관성. 상충되는 Evidence가 많을수록 confidence를 낮춘다.</li>
+      <li><strong>Time Factor:</strong> Evidence의 최신성. 오래된 Evidence는 confidence를 감소시킨다.</li>
+      <li><strong>Conflict Indicator:</strong> supporting vs conflicting evidence 비율.</li>
+    </ul>
+
+    <h4>Internal Fields</h4>
+    <table>
+      <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>evidence_count</code></td><td>integer</td><td>해당 평가에 사용된 Evidence 개수.</td></tr>
+        <tr><td><code>average_quality</code></td><td>float</td><td>Evidence 개별 <code>confidence</code> 값의 평균.</td></tr>
+        <tr><td><code>correlation</code></td><td>float</td><td>0~1 범위의 일관성 지수. 1에 가까울수록 supporting evidence가 일치한다.</td></tr>
+        <tr><td><code>time_decay</code></td><td>float</td><td>최신성을 반영한 감쇠 계수 (1 = 최신, 0 = 오래됨).</td></tr>
+        <tr><td><code>conflict_ratio</code></td><td>float</td><td>conflicting_evidence / evidence_count. 값이 높을수록 confidence가 낮아진다.</td></tr>
+        <tr><td><code>confidence</code></td><td>float</td><td>최종 계산된 신뢰도 (0~1).</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Relationships</h4>
+    <ul>
+      <li>Confidence Model은 Trust Score 계산에 적용되어 최종 신뢰 점수를 조정한다.</li>
+      <li>Mission Impact와 Policy 단계는 낮은 confidence를 갖는 도메인의 위험을 과대평가하여 보수적 결정을 유도한다.</li>
+    </ul>
+
+    <h4>Processing Logic</h4>
+    <ul>
+      <li><code>average_quality</code> = mean(Evidence.<code>confidence</code>)</li>
+      <li><code>correlation</code> = supporting_evidence_count / evidence_count</li>
+      <li><code>time_decay</code> = max(0, 1 - (current_time - latest_evidence_timestamp) / decay_window)</li>
+      <li><code>conflict_ratio</code> = conflicting_evidence_count / evidence_count</li>
+      <li><code>confidence</code> = average_quality × correlation × time_decay × (1 - conflict_ratio)</li>
+    </ul>
+
+    <h4>Outputs</h4>
+    <ul>
+      <li>Calculated confidence value for Trust Object.</li>
+    </ul>
+
+    <h4>Design Considerations</h4>
+    <ul>
+      <li>decay_window는 임무 특성에 따라 60 s 또는 5 min 등으로 설정할 수 있다. 최신 Evidence가 없는 경우 confidence가 급격히 감소한다.</li>
+      <li>Evidence Quality는 수집 채널, 인증 여부, 암호화 상태 등에 따라 기본값을 설정하고, 실제 경험을 통해 조정할 수 있다.</li>
+      <li>상충 Evidence 비율이 높으면 confidence를 크게 감소시켜 경고를 발생시킨다.</li>
+    </ul>
+
+    <h4>Example Structure</h4>
+    <pre>{
+  "evidence_count": 5,
+  "average_quality": 0.92,
+  "correlation": 0.8,
+  "time_decay": 0.95,
+  "conflict_ratio": 0.2,
+  "confidence": 0.92 × 0.8 × 0.95 × 0.8 ≈ 0.56
+}</pre>
+  </div>
+
+  <!-- Mission Impact Object -->
+  <h2 id="mission-impact-object"><span class="num">8.</span> Mission&nbsp;Impact&nbsp;Object</h2>
+  <div class="panel">
+    <h4>Purpose</h4>
+    <p>Mission Impact Object는 신뢰 부족이 임무의 여러 측면에 미치는 영향을 정량적으로 표현한다. 각 영역별로 영향 점수와 위험 수준을 포함하여 임무 평가와 정책 결정의 기준이 된다.</p>
+
+    <h4>Why this model is required</h4>
+    <p>Trust Score가 낮은 도메인이 임무 목표에 어떤 영향을 미치는지 수치화하지 않으면, 정책 단계에서 적절한 조치를 선택하기 어렵다. Mission Impact는 이러한 영향도를 구조화한다.</p>
+
+    <h4>Inputs</h4>
+    <ul>
+      <li><strong>Trust Vector:</strong> 도메인별 신뢰 점수와 등급.</li>
+      <li><strong>Mission Context Object:</strong> 임무 가중치와 환경 정보.</li>
+      <li><strong>Confidence:</strong> 신뢰 평가의 확실성.</li>
+    </ul>
+
+    <h4>Internal Fields</h4>
+    <table>
+      <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>availability</code></td><td>float</td><td>임무 가용성 영향을 0~100으로 표현. 통신·세션 신뢰 저하에 기반.</td></tr>
+        <tr><td><code>integrity</code></td><td>float</td><td>임무 데이터 및 명령 무결성 영향. 명령·신원 신뢰에 기반.</td></tr>
+        <tr><td><code>safety</code></td><td>float</td><td>임무 수행 중 안전(충돌, 추락) 영향을 나타내며, command 및 mission 도메인 신뢰와 연관된다.</td></tr>
+        <tr><td><code>continuity</code></td><td>float</td><td>임무 지속 가능성(중단 가능성) 영향을 나타내며, recovery 도메인 신뢰와 관련.</td></tr>
+        <tr><td><code>recoverability</code></td><td>float</td><td>복구 가능성. Recovery 객체가 제공하는 예상 회복 효과에 따라 설정된다.</td></tr>
+        <tr><td><code>overall_impact</code></td><td>float</td><td>위 영역들을 가중합하여 임무 전체 영향도를 0~100 점수로 표현.</td></tr>
+        <tr><td><code>mission_risk</code></td><td>enum</td><td>Green, Yellow, Red. Overall Impact에 기반한 위험 구분.</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Relationships</h4>
+    <ul>
+      <li>Mission Impact Object는 Policy 단계의 입력으로 사용되며, 행동 옵션을 결정할 때 기준이 된다.</li>
+      <li>Impact 평가에서 recoverability가 낮으면, Recovery 단계에서 더 적극적인 옵션이 필요하다.</li>
+    </ul>
+
+    <h4>Processing Logic</h4>
+    <p>임무 영향 계산은 다음과 같이 진행된다:</p>
+    <ul>
+      <li><code>availability</code> = Mission Weight (communication + session_network) × (1 - trust_score/100)</li>
+      <li><code>integrity</code> = Mission Weight (command + identity_access) × (1 - trust_score/100)</li>
+      <li><code>safety</code> = Mission Weight (mission + command) × (1 - trust_score/100)</li>
+      <li><code>continuity</code> = (1 - trust_score/100) × (1 - recoverability/100)</li>
+      <li><code>recoverability</code>는 Recovery 객체의 예상 회복 효과 평균으로 설정한다.</li>
+      <li><code>overall_impact</code> = weighted sum of availability, integrity, safety, continuity.</li>
+      <li><code>mission_risk</code>는 overall_impact에 따라 Green (0–30), Yellow (31–70), Red (71–100)로 분류된다.</li>
+    </ul>
+
+    <h4>Outputs</h4>
+    <ul>
+      <li>Mission Impact Object – Policy 단계의 입력.</li>
+    </ul>
+
+    <h4>Design Considerations</h4>
+    <ul>
+      <li>각 영역의 영향 점수는 Mission Weight에 따라 조정되며, 모든 영향도의 합은 100을 초과하지 않도록 정규화한다.</li>
+      <li>Recoverability는 복구 옵션을 고려하여 동적으로 변경되므로, Impact 평가에서 최신 값을 사용해야 한다.</li>
+    </ul>
+
+    <h4>Example Structure</h4>
+    <pre>{
+  "availability": 40.0,
+  "integrity": 25.0,
+  "safety": 20.0,
+  "continuity": 15.0,
+  "recoverability": 60.0,
+  "overall_impact": 36.0,
+  "mission_risk": "Yellow"
+}</pre>
+  </div>
+
+  <!-- Mission Impact Model -->
+  <h2 id="mission-impact-model"><span class="num">9.</span> Mission&nbsp;Impact&nbsp;Model</h2>
+  <div class="panel">
+    <h4>Purpose</h4>
+    <p>Mission Impact Model은 Trust Vector, Mission Context, Confidence를 결합하여 Mission Impact Object를 계산하는 절차를 정의한다.</p>
+
+    <h4>Why this model is required</h4>
+    <p>각 도메인 신뢰 점수와 임무 가중치를 체계적으로 통합해야 임무 영향도와 위험을 일관된 방식으로 산출할 수 있다. 이 모델은 그 계산 구조를 표준화한다.</p>
+
+    <h4>Inputs</h4>
+    <ul>
+      <li><strong>Trust Vector:</strong> 도메인별 신뢰 점수와 confidence.</li>
+      <li><strong>Mission Context Object:</strong> 임무 유형, 가중치, 환경, 제약.</li>
+      <li><strong>Confidence:</strong> 각 도메인의 신뢰 평가 확실성.</li>
+    </ul>
+
+    <h4>Internal Fields</h4>
+    <p>Mission Impact Model의 핵심 구성 요소는 아래와 같다:</p>
+    <ul>
+      <li><strong>Impact Matrix:</strong> 도메인 × 영향 영역 매핑 표. 예: Communication 신뢰는 Availability와 Continuity에 60/40 비율로 반영.</li>
+      <li><strong>Weight Vector:</strong> Mission Weight Model에서 가져온 도메인 가중치.</li>
+      <li><strong>Confidence Modifier:</strong> 각 도메인의 confidence를 통해 Impact를 조정하는 계수.</li>
+    </ul>
+
+    <h4>Relationships</h4>
+    <ul>
+      <li>Mission Impact Model은 Mission Impact Object를 생성하는 절차이며, Policy 단계에서 위험 등급을 결정하는 기준이 된다.</li>
+    </ul>
+
+    <h4>Processing Logic</h4>
+    <ol>
+      <li><b>Map Trust to Impact:</b> Trust Vector의 각 도메인에 대해 Impact Matrix를 조회하여 availability, integrity, safety, continuity 부분 점수를 계산한다.</li>
+      <li><b>Apply Weights:</b> Mission Context에서 가져온 가중치를 적용하여 도메인별 영향 점수를 조합한다.</li>
+      <li><b>Adjust by Confidence:</b> Confidence가 낮은 영역은 영향 점수를 더 크게 반영하여 위험을 과대평가한다.</li>
+      <li><b>Aggregate Scores:</b> 네 개의 영향 영역 점수를 합산하여 Mission Impact Object를 생성하고, 미리 정의된 위험 구간에 따라 mission_risk를 할당한다.</li>
+    </ol>
+
+    <h4>Outputs</h4>
+    <ul>
+      <li>Mission Impact Object – Mission Risk 등급과 함께 Policy 단계에 전달된다.</li>
+    </ul>
+
+    <h4>Design Considerations</h4>
+    <ul>
+      <li>Impact Matrix는 조직의 위험 관리 방침에 따라 커스터마이즈할 수 있다. 예를 들어 Command 신뢰가 낮으면 Safety 영향에 더 큰 비중을 둘 수 있다.</li>
+      <li>Confidence Modifier는 1 + (1 - confidence)와 같은 단순식으로 정의하여 confidence가 낮을 때 영향 점수를 증가시킨다.</li>
+    </ul>
+
+    <h4>Example Structure</h4>
+    <pre>{
+  "impact_matrix": {
+    "communication": {"availability": 0.6, "continuity": 0.4},
+    "identity": {"integrity": 0.8, "safety": 0.2},
+    "session_network": {"availability": 0.7, "continuity": 0.3},
+    "command": {"integrity": 0.5, "safety": 0.5},
+    "mission": {"safety": 1.0}
+  },
+  "weight_vector": {"communication": 25, "identity": 15, "session_network": 25, "command": 20, "mission": 15, "recovery": 0},
+  "confidence_modifier": {"communication": 1.2, "identity": 1.0, "session_network": 1.1, "command": 1.3, "mission": 1.0}
+}</pre>
+  </div>
+
+  <!-- Policy Rule Object -->
+  <h2 id="policy-rule-object"><span class="num">10.</span> Policy&nbsp;Rule&nbsp;Object</h2>
+  <div class="panel">
+    <h4>Purpose</h4>
+    <p>Policy Rule Object는 임무 위험과 신뢰 상태에 따라 적용할 수 있는 규칙을 정의하며, 각 규칙은 조건을 만족할 때 수행할 행동과 예외를 포함한다.</p>
+
+    <h4>Why this model is required</h4>
+    <p>조직의 방어 정책을 구조화하여, Mission Impact와 Trust 상태에 따라 일관된 행동을 결정할 수 있게 한다. 규칙 기반 접근은 관리자가 정책을 쉽게 검토·수정할 수 있도록 한다.</p>
+
+    <h4>Inputs</h4>
+    <ul>
+      <li><strong>Mission Impact Object:</strong> 임무 위험 등급과 영역별 영향 점수.</li>
+      <li><strong>Mission Context:</strong> 임무 유형, 단계, 우선순위, 중요 자산.</li>
+      <li><strong>Trust Vector:</strong> 도메인별 신뢰 점수.</li>
+    </ul>
+
+    <h4>Internal Fields</h4>
+    <table>
+      <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>rule_id</code></td><td>string</td><td>규칙을 식별하는 ID.</td></tr>
+        <tr><td><code>priority</code></td><td>integer</td><td>규칙 적용 우선순위 (낮은 숫자가 높은 우선순위).</td></tr>
+        <tr><td><code>condition</code></td><td>string</td><td>룰을 적용하는 조건식. 예: <code>mission_risk == 'Red' &amp;&amp; trust_score_command &lt; 40</code>.</td></tr>
+        <tr><td><code>action</code></td><td>string</td><td>충족 시 수행할 행동 (continue, restrict, monitor, abort 등).</td></tr>
+        <tr><td><code>exception</code></td><td>string</td><td>특정 상황에서 규칙을 무시하거나 완화하는 조건.</td></tr>
+        <tr><td><code>reason</code></td><td>string</td><td>규칙의 도입 배경과 목적.</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Relationships</h4>
+    <ul>
+      <li>Policy Rule은 Policy Engine에서 평가되어 적합한 행동을 선택하는 데 사용된다.</li>
+      <li>여러 규칙이 동시에 만족할 경우 priority 순서에 따라 하나가 선택되거나 병합된다.</li>
+    </ul>
+
+    <h4>Processing Logic</h4>
+    <ul>
+      <li>Policy Engine은 Mission Impact, Mission Context, Trust Vector를 입력으로 모든 규칙의 <code>condition</code>을 평가한다.</li>
+      <li>조건을 만족하는 규칙들 중 가장 낮은 <code>priority</code> 값을 가진 규칙을 선택한다.</li>
+      <li>선택된 규칙의 <code>action</code>을 Policy Recommendation으로 설정한다. 예외 조건이 충족되면 그 규칙을 건너뛰고 다음 후보를 평가한다.</li>
+    </ul>
+
+    <h4>Outputs</h4>
+    <ul>
+      <li>Policy Recommendation – 선택된 규칙에 따른 권장 행동.</li>
+    </ul>
+
+    <h4>Design Considerations</h4>
+    <ul>
+      <li>규칙 조건은 단순한 비교식뿐만 아니라 범위 및 조합 조건을 포함할 수 있다.</li>
+      <li>규칙 우선순위는 조직의 정책에 따라 정기적으로 검토·조정해야 한다.</li>
+    </ul>
+
+    <h4>Example Structure</h4>
+    <pre>{
+  "rule_id": "POL-001",
+  "priority": 1,
+  "condition": "mission_risk == 'Red' && trust_score_command < 50",
+  "action": "abort",
+  "exception": "mission_priority == 'Critical'",
+  "reason": "Abort mission if command trust is too low and overall risk is high, except for critical missions"
+}</pre>
+  </div>
+
+  <!-- Recovery Object -->
+  <h2 id="recovery-object"><span class="num">11.</span> Recovery&nbsp;Object</h2>
+  <div class="panel">
+    <h4>Purpose</h4>
+    <p>Recovery Object는 복구 단계에서 제안된 각 후보 절차를 표현한다. 각 복구 옵션은 실행 시간, 자원 소요, 신뢰 회복 효과 등을 포함한다.</p>
+
+    <h4>Why this model is required</h4>
+    <p>복수의 복구 옵션을 체계적으로 비교해야 합리적인 선택을 할 수 있다. Recovery Object는 평가 기준을 명시함으로써 자동화된 복구 선택을 가능하게 한다.</p>
+
+    <h4>Inputs</h4>
+    <ul>
+      <li><strong>Trust Deficits:</strong> 신뢰 점수가 낮은 도메인 목록.</li>
+      <li><strong>Policy Recommendation:</strong> Continue, restrict, monitor, abort 등의 권장 정책.</li>
+      <li><strong>Mission Impact:</strong> 영역별 임무 영향 점수와 위험 등급.</li>
+      <li><strong>Available Resources:</strong> 복구를 위해 사용할 수 있는 시간·인력·시스템 리소스.</li>
+    </ul>
+
+    <h4>Internal Fields</h4>
+    <table>
+      <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>recovery_id</code></td><td>string</td><td>복구 후보 식별자.</td></tr>
+        <tr><td><code>recovery_type</code></td><td>enum</td><td>재인증, 세션 재설정, 키 회전, 대체 링크 전환, 미션 변경 등.</td></tr>
+        <tr><td><code>execution_time</code></td><td>integer</td><td>복구 수행 예상 시간(초 또는 분).</td></tr>
+        <tr><td><code>resource_cost</code></td><td>float</td><td>필요한 자원 비용(정규화된 점수).</td></tr>
+        <tr><td><code>expected_trust_recovery</code></td><td>float</td><td>해당 복구가 신뢰 점수에 가져올 예상 개선(0~100).</td></tr>
+        <tr><td><code>expected_mission_recovery</code></td><td>float</td><td>임무 영향 점수 개선 예상(0~100).</td></tr>
+        <tr><td><code>success_probability</code></td><td>float</td><td>복구가 성공할 확률(0~1). 경험적 데이터에 기반.</td></tr>
+        <tr><td><code>risk</code></td><td>float</td><td>복구 자체가 초래할 수 있는 위험(예: 일시적 통신 중단).</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Relationships</h4>
+    <ul>
+      <li>복구 후보는 Recovery 단계의 입력이며, Feasibility Evaluator가 이 필드를 참고하여 우선순위를 정한다.</li>
+      <li>선택된 복구는 Mission Decision 단계에 전달된다.</li>
+    </ul>
+
+    <h4>Processing Logic</h4>
+    <p>복구 절차 선택은 다음을 따른다:</p>
+    <ul>
+      <li>Recovery Candidate Generator가 신뢰 결핍 영역과 Policy Recommendation을 바탕으로 후보 목록을 생성한다.</li>
+      <li>각 후보에 대해 실행 시간, 비용, 예상 신뢰 회복, 성공 확률, 위험을 평가한다.</li>
+      <li>Feasibility Evaluator가 <code>expected_trust_recovery × success_probability / (resource_cost + risk)</code> 등의 점수를 계산하여 우선순위를 정한다.</li>
+      <li>가장 높은 우선순위 후보를 선택하거나, 여러 후보를 조합하여 Recovery Plan을 생성한다.</li>
+    </ul>
+
+    <h4>Outputs</h4>
+    <ul>
+      <li>Recovery Candidate List – 평가된 후보 목록.</li>
+      <li>Selected Recovery Action – Mission Decision 단계로 전달될 최적 후보.</li>
+    </ul>
+
+    <h4>Design Considerations</h4>
+    <ul>
+      <li>Resource Cost는 단위 자원(시간, 사람, 네트워크 대역폭)별 비용을 합산하여 0~1 범위로 정규화한다.</li>
+      <li>Success Probability는 과거 성공률, 시스템 상태, 실행 환경 등을 기반으로 추정한다.</li>
+      <li>복구가 실패할 경우 Mission Decision 단계에서 임무 중단을 고려해야 한다.</li>
+    </ul>
+
+    <h4>Example Structure</h4>
+    <pre>{
+  "recovery_id": "REC-02",
+  "recovery_type": "SessionReset",
+  "execution_time": 120,
+  "resource_cost": 0.3,
+  "expected_trust_recovery": 30.0,
+  "expected_mission_recovery": 20.0,
+  "success_probability": 0.8,
+  "risk": 0.1
+}</pre>
+  </div>
+
+  <!-- Mission Decision Object -->
+  <h2 id="mission-decision-object"><span class="num">12.</span> Mission&nbsp;Decision&nbsp;Object</h2>
+  <div class="panel">
+    <h4>Purpose</h4>
+    <p>Mission Decision Object는 정책과 복구 정보를 결합하여 임무 수행 여부를 최종 결정하고, 그 근거와 데이터를 기록한다.</p>
+
+    <h4>Why this model is required</h4>
+    <p>모든 단계의 결과를 종합하여 임무를 중단하거나 진행할지 판단하는 마지막 단계이다. 구조화된 결정 객체를 기록함으로써 투명성과 감사 가능성을 제공한다.</p>
+
+    <h4>Inputs</h4>
+    <ul>
+      <li><strong>Policy Recommendation</strong> – 정책 엔진이 선택한 행동.</li>
+      <li><strong>Selected Recovery Action</strong> – Recovery 단계에서 선택된 복구 절차.</li>
+      <li><strong>Mission Impact Object</strong> – 임무 위험과 영향 점수.</li>
+      <li><strong>Trust Summary</strong> – 최종 신뢰 벡터와 평가 요약.</li>
+    </ul>
+
+    <h4>Internal Fields</h4>
+    <table>
+      <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>decision</code></td><td>enum</td><td>Continue, Partial, Abort – 최종 임무 행동.</td></tr>
+        <tr><td><code>decision_reason</code></td><td>string</td><td>선택된 행동의 근거. 임무 위험, 신뢰 상태, 복구 가능성 등을 요약.</td></tr>
+        <tr><td><code>supporting_evidence</code></td><td>list&lt;string&gt;</td><td>결정을 뒷받침한 Evidence ID 목록.</td></tr>
+        <tr><td><code>trust_summary</code></td><td>dict</td><td>도메인별 신뢰 점수, 등급, confidence 요약.</td></tr>
+        <tr><td><code>mission_impact</code></td><td>dict</td><td>Mission Impact Object의 주요 값.</td></tr>
+        <tr><td><code>recovery_plan</code></td><td>string</td><td>선택된 복구 절차에 대한 간결한 설명.</td></tr>
+        <tr><td><code>confidence</code></td><td>float</td><td>최종 결정에 대한 확신도. 여러 단계의 confidence를 종합하여 계산.</td></tr>
+        <tr><td><code>timestamp</code></td><td>datetime</td><td>결정이 내려진 시간.</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Relationships</h4>
+    <ul>
+      <li>Mission Decision Object는 Attack Mapping 단계에서 사용되어 각 공격 시나리오가 임무 결정에 어떤 영향을 미쳤는지 평가한다.</li>
+      <li>결정 객체는 감사 로그와 후속 분석에 저장된다.</li>
+    </ul>
+
+    <h4>Processing Logic</h4>
+    <ul>
+      <li>Policy Recommendation과 Selected Recovery Action을 병합하여 가능한 행동을 검토한다.</li>
+      <li>Mission Impact에서 mission_risk가 Red이거나 recoverability가 낮으면 abort 또는 partial을 고려한다.</li>
+      <li>Trust Summary에서 특정 도메인이 낮은 신뢰를 보여도 Mission Impact가 Green이라면 continue를 선택할 수 있다.</li>
+      <li>결정 근거를 상세히 기록하고, 해당 Evidence ID를 supporting_evidence에 포함한다.</li>
+      <li>Confidence는 inputs의 confidence를 평균하거나 가중 합한 값으로 설정한다.</li>
+    </ul>
+
+    <h4>Outputs</h4>
+    <ul>
+      <li>Mission Decision Object – Attack Mapping과 End‑to‑End Architecture에 전달.</li>
+    </ul>
+
+    <h4>Design Considerations</h4>
+    <ul>
+      <li>결정은 자동 시스템이 내리지만, 인간 운영자가 검증할 수 있도록 명확한 근거를 포함해야 한다.</li>
+      <li>Partial Decision은 임무 일부만 수행하거나 임무를 축소하는 방법을 포함할 수 있으며, 복구 계획과 함께 기록해야 한다.</li>
+    </ul>
+
+    <h4>Example Structure</h4>
+    <pre>{
+  "decision": "Partial",
+  "decision_reason": "High mission risk due to low command and session trust; recoverability allows degraded operation.",
+  "supporting_evidence": ["EV20260705-0001", "EV20260705-0003", "EV20260705-0005"],
+  "trust_summary": {"communication": {"score": 60, "level": "Moderate"}, "command": {"score": 40, "level": "Low"}},
+  "mission_impact": {"overall_impact": 45, "mission_risk": "Yellow"},
+  "recovery_plan": "Re-authenticate GCS and reset PFCP session",
+  "confidence": 0.65,
+  "timestamp": "2026-07-05T15:34:22Z"
+}</pre>
+  </div>
+
+  <!-- Attack Mapping Model -->
+  <h2 id="attack-mapping-model"><span class="num">13.</span> Attack&nbsp;Mapping&nbsp;Model</h2>
+  <div class="panel">
+    <h4>Purpose</h4>
+    <p>Attack Mapping Model은 각 공격 시나리오가 아키텍처 내부에서 어떻게 처리되는지, 어떤 Capability와 Evidence가 관련되는지, 그리고 최종 Mission Decision으로 어떻게 이어지는지를 표현한다.</p>
+
+    <h4>Why this model is required</h4>
+    <p>12개의 공격 시나리오의 처리 경로를 명시함으로써 방어 체계의 커버리지와 취약점을 분석하고, 새로운 공격에 대비하는 기준을 제공한다.</p>
+
+    <h4>Inputs</h4>
+    <ul>
+      <li><strong>Attack Scenario Catalog:</strong> 각 공격의 ID, 목표 포트, 전제 조건, 결과【488147192654095†L50-L57】.</li>
+      <li><strong>Capability Definitions:</strong> 각 Capability가 감시하는 메트릭과 책임.</li>
+      <li><strong>Evidence Records:</strong> 공격 실행 시 생성된 Evidence 리스트.</li>
+      <li><strong>Mission Decisions:</strong> 공격 탐지 후 최종 임무 결정.</li>
+    </ul>
+
+    <h4>Internal Fields</h4>
+    <p>Attack Mapping Model은 다음과 같은 구조로 설계된다:</p>
+    <table>
+      <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>attack_id</code></td><td>string</td><td>공격 시나리오 식별자 (예: TM1, NF-4).</td></tr>
+        <tr><td><code>origin</code></td><td>string</td><td>공격 위치 (rogue UE, net_sgi, net_core).</td></tr>
+        <tr><td><code>target_port</code></td><td>string</td><td>공격이 노린 포트/서비스 (예: 14556, 27017).</td></tr>
+        <tr><td><code>capability_path</code></td><td>list&lt;string&gt;</td><td>공격이 탐지/처리되는 Capability 순서.</td></tr>
+        <tr><td><code>evidence_ids</code></td><td>list&lt;string&gt;</td><td>공격 실행 중 생성된 Evidence ID.</td></tr>
+        <tr><td><code>trust_effect</code></td><td>dict</td><td>도메인별 신뢰 점수 변화. Ex: {"command": -30}.</td></tr>
+        <tr><td><code>mission_impact_effect</code></td><td>dict</td><td>Mission Impact 변화. Ex: {"availability": +20}.</td></tr>
+        <tr><td><code>policy_response</code></td><td>string</td><td>적용된 정책 행동.</td></tr>
+        <tr><td><code>recovery_action</code></td><td>string</td><td>선택된 복구 절차.</td></tr>
+        <tr><td><code>final_decision</code></td><td>string</td><td>최종 Mission Decision.</td></tr>
+      </tbody>
+    </table>
+
+    <h4>Relationships</h4>
+    <ul>
+      <li>각 Attack Mapping 레코드는 Attack Mapping 단계의 출력이며, End‑to‑End Architecture가 전체 방어 흐름을 설명할 때 사용된다.</li>
+      <li>Mapping 정보는 Defense Capability 설계를 개선하는 피드백으로도 활용된다.</li>
+    </ul>
+
+    <h4>Processing Logic</h4>
+    <ol>
+      <li><b>Identify Attack:</b> Attack Catalog에서 공격 ID, 위치, 표적을 로드한다.</li>
+      <li><b>Determine Capability Path:</b> 공격이 어떤 Capability에 의해 탐지되는지 정의한다. 예: NF-4 웹 무인증 → Command Trust Capability → Evidence.</li>
+      <li><b>Record Evidence:</b> 공격 실행 중 수집된 Evidence ID를 기록하고, 해당 Evidence가 Trust Score에 미친 영향을 계산한다.</li>
+      <li><b>Compute Trust Effect:</b> 도메인별 신뢰 점수 변화량을 기록한다.</li>
+      <li><b>Derive Mission Impact Effect:</b> Mission Impact Model을 사용하여 공격으로 인한 임무 영향 변화를 계산한다.</li>
+      <li><b>Note Responses:</b> 적용된 Policy와 Recovery 행동을 기록하고, 최종 Mission Decision을 매핑한다.</li>
+    </ol>
+
+    <h4>Outputs</h4>
+    <ul>
+      <li>Attack Mapping Table – 각 공격에 대한 처리 경로와 결과.</li>
+    </ul>
+
+    <h4>Design Considerations</h4>
+    <ul>
+      <li>공격 ID와 Capability Path 매핑은 Testbed의 실제 로그와 공격 시나리오 문서【488147192654095†L50-L57】에 근거하여 작성한다.</li>
+      <li>Mapping은 지속적으로 업데이트되어야 하며, 새로운 공격이 발견되면 모델을 확장해야 한다.</li>
+    </ul>
+
+    <h4>Example Structure</h4>
+    <pre>{
+  "attack_id": "NF-4",
+  "origin": "net_sgi",
+  "target_port": "8080/tcp",
+  "capability_path": ["command", "identity_access"],
+  "evidence_ids": ["EV20260705-0010", "EV20260705-0011"],
+  "trust_effect": {"command": -40, "identity": -15},
+  "mission_impact_effect": {"integrity": +30},
+  "policy_response": "restrict",
+  "recovery_action": "KeyRotation",
+  "final_decision": "Partial"
+}</pre>
+  </div>
+
+  <footer>
+    본 Core Model 문서는 Mission‑Centric Defense Architecture의 공통 데이터 모델과 평가 구조를 정의한다. 각 모델은 테스트베드에서 수집 가능한 데이터를 기반으로 설계되어 있으며, 추상적인 표현 없이 입력·출력·관계·처리 과정을 명확하게 기술한다. 이 문서를 기준으로 Threat Analysis, Defense Capability, Evidence Architecture, Trust Architecture, Mission Context, Mission Impact, Policy, Recovery, Mission Decision, Attack Mapping 등의 모든 Chapter가 일관된 구조와 데이터 흐름을 유지할 수 있다.
+  </footer>
+</div>
+</body>

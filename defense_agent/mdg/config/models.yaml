@@ -1,0 +1,23 @@
+# models.yaml — LLM 역할별 모델·폴백 (FRAMEWORK_STACK §6#2 · litellm). temp=0 강제(수용 모델만).
+# ANTHROPIC_API_KEY = litellm 생성자 env 주입 (State/JSONL 미경유, PS-3). 프롬프트 렌더러 미접근.
+# P3-Q6 FIX-4: 은퇴/폐기 ID 교체 — Haiku 3.5(은퇴 2026-02-19) → haiku-4-5, opus-4-1(폐기,
+#   retires 2026-08-05) → opus-4-8. opus-4-8/sonnet-5 등 current-gen은 temperature 400이므로
+#   client._emit_temperature 게이트가 해당 패밀리엔 temperature 미방출(drop_params 2차망).
+roles:
+  orient:
+    model: "anthropic/claude-sonnet-4-5"       # Orient = 경량 (근거·신규성·모호성 1회). 활성(temp 수용).
+    fallback: ["anthropic/claude-haiku-4-5"]    # was claude-3-5-haiku-latest (은퇴 → 404). 활성.
+    temperature: 0                              # 문서용; 실제 방출은 client._emit_temperature 게이트가 결정.
+    response_model: "OrientNote"
+    max_tokens: 1024
+  decide:
+    model: "anthropic/claude-opus-4-8"          # Decide = 상위 (6단계 래더 1회). was opus-4-1(폐기). temp 미방출(게이트).
+    fallback: ["anthropic/claude-sonnet-4-5"]   # 활성(temp 수용).
+    temperature: 0
+    response_model: "DecideNote"
+    max_tokens: 1024
+
+# 렌더실패/빈프롬프트/스키마오류/바이트초과 => 결정표 폴백 (G6). 5s 초과 => 결정론 결정 확정 (E13).
+timeout_s: 5
+on_error: "deterministic_fallback"
+egress_allowlist: ["api.anthropic.com:443"]     # PS-4
