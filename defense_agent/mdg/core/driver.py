@@ -58,12 +58,18 @@ def redact(record):
 
 def run_driver(graph, run_id: str, cfg: Optional[dict] = None, state0: Optional[MDGState] = None,
                jsonl_path: str = "", max_iters: Optional[int] = None,
-               max_pivots: Optional[int] = None, k_dry: Optional[int] = None) -> MDGState:
+               max_pivots: Optional[int] = None, k_dry: Optional[int] = None,
+               forever: bool = False, tick_interval_s: float = 0.0) -> MDGState:
     """Drive the compiled graph. Returns the final state. Break conditions (PA-1):
     goal_reached ∨ tick_i>=max_iters ∨ pivots>=max_pivots ∨ dry_streak>=k_dry.
     Safe operator LAND is budget-exempt (G10) — enforced by not counting escalate
     ticks as dry (escalate does not increment dry_streak).
-    """
+
+    forever (24/7 감시 모드): True 면 위 break 조건을 전부 무시하고 KeyboardInterrupt/프로세스
+    종료까지 계속 관측한다 — 평시(quiescence)에 멈추지 않는 상시 탐지 데몬. tick_interval_s>0 이면
+    매 틱 사이에 그만큼 대기(collector interval 에 맞춰 CPU 스핀 방지). 배치/replay(demo·campaign)는
+    forever=False 기본이라 결정론·바이트동일 재생이 무손상(불변식① 무영향). Green 평시 틱은 조기 END 라
+    incident/decision 채널이 누적하지 않아(operator.add([]) = 무증가) 상시런 메모리는 실제 사건 수로 유계."""
     budgets = D.DRIVER_BUDGETS
     max_iters = max_iters if max_iters is not None else budgets["max_iters"]
     max_pivots = max_pivots if max_pivots is not None else budgets["max_pivots"]
@@ -89,10 +95,13 @@ def run_driver(graph, run_id: str, cfg: Optional[dict] = None, state0: Optional[
 
     tick = 1
     while True:
-        if state.get("goal_reached") or int(state.get("tick_i", 0)) >= max_iters \
-                or int(state.get("pivots", 0)) >= max_pivots \
-                or int(state.get("dry_streak", 0)) >= k_dry:
+        if not forever and (state.get("goal_reached") or int(state.get("tick_i", 0)) >= max_iters
+                or int(state.get("pivots", 0)) >= max_pivots
+                or int(state.get("dry_streak", 0)) >= k_dry):
             break
+        if tick_interval_s and tick_interval_s > 0:
+            import time as _t
+            _t.sleep(tick_interval_s)              # 상시 감시: collector interval 에 맞춰 관측(스핀 방지)
         # re-seed with the prior tick's read-back state on a FRESH thread (NOT stream(None),
         # which is a no-op on an END-terminated thread). Carrying the full state forward
         # advances tick_i and accumulates ledger/decisions/incidents exactly once.

@@ -152,10 +152,12 @@ def test_run_happy_path_returns_and_shuts_down():
     be = _FakeBackend()
     seen = {}
 
-    def _driver(graph, run_id, state0=None, jsonl_path="", max_iters=None):
+    def _driver(graph, run_id, state0=None, jsonl_path="", max_iters=None,
+                forever=False, tick_interval_s=0.0):
         seen["graph"] = graph
         seen["run_id"] = run_id
         seen["jsonl"] = jsonl_path
+        seen["forever"] = forever
         return {"final": True}
 
     with tempfile.TemporaryDirectory() as d:

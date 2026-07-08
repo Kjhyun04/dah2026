@@ -39,11 +39,18 @@ case "$cmd" in
     OUT="${1:-campaign_out}"; shift 2>/dev/null || true
     exec $PY -m mdg.campaign.e2e "$OUT" "$@" ;;
 
-  autorun)  # 자율런 (DRY 기본: Backend allow_live=False → 모든 상태변경 DRY)
+  autorun)  # 자율런 1회 (배치: quiescence/max_iters 에서 종료) — DRY 기본
     # 실 actuation 은 MDG_ALLOW_LIVE truthy(operator-go) 일 때만 단일 가역 DROP 창 개방.
     _load_env
     OUT="${OUT:-./live_out}"; RID="${RUN_ID:-live}"
     exec $PY -m mdg.live_autorun --out "$OUT" --run-id "$RID" "$@" ;;
+
+  monitor)  # ★24/7 상시 감시 데몬 (quiescence 무시, Ctrl-C 까지 계속 관측) — 탐지모델 상시가동
+    # 온-호스트 netns 관측(5762 ss / air-tap / PFCP)엔 sudo 필요 → 'sudo -E ./dah.sh monitor' 권장.
+    _load_env
+    OUT="${OUT:-./live_out}"; RID="${RUN_ID:-monitor}"
+    echo "24/7 상시 감시 시작 (Ctrl-C 종료) · 틱 간격 ${INTERVAL:-2}s · MDG_ALLOW_LIVE=${MDG_ALLOW_LIVE:-0}(0=DRY)"
+    exec $PY -m mdg.live_autorun --out "$OUT" --run-id "$RID" --forever --interval "${INTERVAL:-2}" "$@" ;;
 
   live)     # 온-테스트베드 오케스트레이션 검증 (read-only 기본; ALLOW_LIVE=1 시 집행 창)
     _load_env
@@ -79,7 +86,8 @@ defense_agent(MDG) 런처 — ./dah.sh <명령>   (에이전트 본체는 python
   verify     무결성 게이트 단일 러너 (오프라인·무해)                  → verify.py
   test       pytest 회귀 (기준선 ~192 passed / 2 skipped; SKIP=langgraph 부재 예상)
   campaign   오프라인 결정론 6공격 캠페인 → report.json (live_execution_count=0)
-  autorun    자율런 (DRY 기본; 실 DROP 은 MDG_ALLOW_LIVE=1 operator-go)
+  autorun    자율런 1회 (배치; quiescence/max_iters 에서 종료; DRY 기본)
+  monitor    ★24/7 상시 감시 데몬 (평시 quiescence 무시, Ctrl-C 까지 계속) — netns 관측엔 sudo -E
   live       온-테스트베드 오케스트레이션 검증 (read-only; ALLOW_LIVE=1 시 집행)  [.env 필요]
   viewer     read-only 뷰어 (127.0.0.1:8787 · 루프백 바인드 PS-8)
   status     read-only 테스트베드 스냅샷 (docker ps + 탐지 tail)              [.env 필요]

@@ -164,6 +164,7 @@ def _shutdown(collectors, backend, join_timeout: float = 10.0) -> None:
 
 def run(out_dir: str, run_id: str, *, allow_live: bool = False, docker=None,
         backend: Optional[Backend] = None, max_iters: Optional[int] = None,
+        forever: bool = False, tick_interval_s: float = 0.0,
         clock: Optional[Clock] = None, keyring: Optional[Keyring] = None,
         kid: Optional[str] = None, seqwm: Optional[SeqWatermark] = None,
         ledger=None, join_timeout: float = 10.0,
@@ -228,7 +229,7 @@ def run(out_dir: str, run_id: str, *, allow_live: bool = False, docker=None,
         for c in collectors:
             c.start()
         return driver_fn(graph, run_id, state0=state0, jsonl_path=jsonl_path,
-                         max_iters=max_iters)
+                         max_iters=max_iters, forever=forever, tick_interval_s=tick_interval_s)
     finally:
         _shutdown(collectors, backend, join_timeout)
 
@@ -240,6 +241,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--out", default="./live_out", help="output root dir (run dir = <out>/<run-id>)")
     p.add_argument("--run-id", default=None, help="run id (default: run-<UTC timestamp>)")
     p.add_argument("--max-iters", type=int, default=None, help="driver tick budget (default: config)")
+    p.add_argument("--forever", action="store_true",
+                   help="24/7 상시 감시 모드 — quiescence/max_iters 무시하고 KeyboardInterrupt 까지 계속 관측.")
+    p.add_argument("--interval", type=float, default=2.0,
+                   help="상시 감시 모드의 틱 간격(초, --forever 시). collector interval 에 맞춰 CPU 스핀 방지.")
     args = p.parse_args(argv)
 
     run_id = args.run_id or time.strftime("run-%Y%m%d-%H%M%S", time.gmtime())
@@ -247,8 +252,12 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     backend = Backend(allow_live=allow_live, mode="local")
     docker = _SafeExecDocker(backend)                     # boot netns resolution via the single spawn site
-    run(args.out, run_id, allow_live=allow_live, docker=docker, backend=backend,
-        max_iters=args.max_iters)
+    try:
+        run(args.out, run_id, allow_live=allow_live, docker=docker, backend=backend,
+            max_iters=args.max_iters, forever=args.forever,
+            tick_interval_s=(args.interval if args.forever else 0.0))
+    except KeyboardInterrupt:
+        print("\n감시 종료(KeyboardInterrupt) — 관측자 회수.")   # _shutdown 은 run() 의 finally 가 수행
     return 0
 
 
