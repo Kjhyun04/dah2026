@@ -61,6 +61,11 @@ def build_graph(deps: Optional[dict[str, Any]] = None):
         ) from exc
 
     d = deps or {}
+    # Phase 0 wiring: normalize the sandbox OPER auto-confirm flag to a guaranteed bool so the
+    # Phase 1 gate/edge can read it without re-parsing. No routing effect yet — topology.BIND does
+    # not reference 'operator_auto' until Phase 1, so control flow is unchanged (불변식① 무손상,
+    # 회귀 0). Shallow-copy so the caller's deps dict is not mutated.
+    d = {**d, "operator_auto": bool(d.get("operator_auto"))}
 
     def _node(name: str):
         # bind injected deps from the ONE recipe (topology.BIND) — no globals, no drift.

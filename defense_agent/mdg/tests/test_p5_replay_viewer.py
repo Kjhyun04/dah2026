@@ -341,6 +341,106 @@ def test_viewer_standing_panel_and_view_band():
             assert not (set(row["attack_signals"]) & set(viewer.STANDING_SIGNALS))
 
 
+def _tele(metric, value):
+    return {"metric": metric, "value": value, "band": "normal",
+            "domain": "communication", "channel": "plaintext_mavlink_tap"}
+
+
+def _write_lines(path, lines):
+    with open(path, "w", encoding="utf-8") as fh:
+        for seq, (node, patch) in enumerate(lines):
+            fh.write(json.dumps({"seq": seq, "node": node, "patch": patch}) + "\n")
+
+
+def test_recovery_panel_lifecycle_and_flight():
+    """Phase 7: load_panels emits a `recovery` panel — per-incident lifecycle
+    (탐지→대응→집행→확인→회복) from ledger/worldstate.applied/view_band + a rel_alt/flight_mode
+    flight series. S2-shaped run: attack(Red, alt 12) -> operator-auto enforce -> confirm/recover
+    (Green, alt 30)."""
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "run.jsonl")
+        applied_unconf = {"applied": {"signed_guided": {
+            "rule": "signed_guided", "revert_cmd": "mode LAND", "confirmed": False}}}
+        applied_conf = {"applied": {"signed_guided": {
+            "rule": "signed_guided", "revert_cmd": "mode LAND", "confirmed": True}}}
+        intent = {"rule": "signed_guided", "tool_id": "send_signed_mode",
+                  "revert_cmd": "mode LAND", "operator_gate": False,
+                  "operator_auto_confirmed": True, "provenance_relaxed": True}
+        _write_lines(p, [
+            # tick 0 — attack visible (Red), altitude dropped to 12m under LAND injection,
+            # operator-auto OPER tool executes (ledger intent + applied[rule] unconfirmed).
+            # The incident member is the REAL command-hijack signature (Unauthorized_Command),
+            # which is a STANDING_SIGNAL: view_band strips it to Green, so the recovery card MUST
+            # source its band from the engine impact_band / incident presence (not view_band) —
+            # else the flight-hijack scenario renders as 밴드 Green→Green (no attack). Regression
+            # for the Phase 7 headline S2 deliverable.
+            ("sense", {"tick_i": 1, "evidence": [_tele("rel_alt", 12), _tele("flight_mode", "LAND")],
+                       "incidents": [{"members": ["Unauthorized_Command"]}]}),
+            ("decide", {"decisions": [{"decision": "Graceful Degradation", "enforcement": "auto"}]}),
+            ("act", {"ledger": [intent], "worldstate": applied_unconf}),
+            # tick 1 — recovered: no incident (Green), alt back to 30m, effect_confirm sets confirmed
+            ("sense", {"tick_i": 2, "evidence": [_tele("rel_alt", 30), _tele("flight_mode", "GUIDED")]}),
+            ("decide", {"decisions": [{"decision": "Continue", "enforcement": "auto"}]}),
+            ("effect_confirm", {"worldstate": applied_conf}),
+        ])
+        panels = viewer.load_panels(p)
+        assert "recovery" in panels
+        rec = panels["recovery"]
+        # flight series carries rel_alt/flight_mode per tick
+        alts = [f["rel_alt"] for f in rec["flight"] if f["rel_alt"] is not None]
+        assert 12.0 in alts and 30.0 in alts, rec["flight"]
+        assert any(f["flight_mode"] == "GUIDED" for f in rec["flight"])
+        # exactly one recovery event, fully realized lifecycle
+        assert len(rec["events"]) == 1, rec["events"]
+        e = rec["events"][0]
+        assert e["tool"] == "send_signed_mode" and e["rule"] == "signed_guided"
+        assert e["enforced"] is True and e["confirmed"] is True
+        assert e["operator_auto_confirmed"] is True and "OPER" in e["tier"]
+        assert e["revert_cmd"] == "mode LAND"
+        done = {s["label"]: s["done"] for s in e["steps"]}
+        assert all(done[k] for k in ("탐지", "대응", "집행", "확인", "회복")), done
+        # the 집행 step carries the sandbox auto flag; band + altitude recover
+        enf = next(s for s in e["steps"] if s["label"] == "집행")
+        assert enf["auto"] is True
+        # the recovery card MUST show 탐지→회복 as a band transition even though the attack
+        # signature is a STANDING signal that view_band strips to Green (the real defect).
+        assert e["band_before"] == "Red" and e["band_after"] == "Green"
+        assert e["alt_before"] == 12.0 and e["alt_after"] == 30.0
+        # proof the fix is load-bearing: for THIS run the log's view_band is Green on the attack
+        # tick (standing signal filtered) — so the recovery band cannot be sourced from view_band.
+        act0 = panels["panels"]["action"][0]
+        assert "Unauthorized_Command" in act0["signals"]
+        assert act0["view_band"] == "Green"        # view_band hides the standing-metric attack
+        assert act0["attack_signals"] == []        # (whereas the recovery band above shows Red)
+
+
+def test_recovery_band_prefers_engine_impact_over_view_band():
+    """Unit: `_recovery_band` uses the engine's authoritative per-tick impact_band (Green/Yellow/Red)
+    when present, and falls back to incident-presence (`_detect_band`, standing signals INCLUDED)
+    when it is absent — never the standing-filtered view_band."""
+    # engine impact_band present -> used verbatim (even if view_band would disagree)
+    assert viewer._recovery_band({"impact_band": "Red", "signals": []}) == "Red"
+    assert viewer._recovery_band({"impact_band": "Green", "signals": ["Unauthorized_Command"]}) == "Green"
+    # impact_band absent/invalid -> fall back to detection band that INCLUDES standing signals
+    assert viewer._recovery_band({"impact_band": None, "signals": ["Unauthorized_Command"]}) == "Red"
+    assert viewer._recovery_band({"signals": ["Port_5762_State"]}) == "Red"
+    assert viewer._recovery_band({"signals": ["Recon"]}) == "Yellow"
+    assert viewer._recovery_band({"signals": []}) == "Green"
+    # _detect_band (recovery) does NOT strip standing signals the way _classify_view (log) does
+    assert viewer._detect_band(["Unauthorized_Command"]) == "Red"
+    assert viewer._classify_view(["Unauthorized_Command"]) == ([], "Green")
+
+
+def test_recovery_panel_empty_when_no_ledger():
+    """No enforcement in the run -> recovery.events empty (viewer shows a wait card, not a crash)."""
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "run.jsonl")
+        _record_to(p)                       # synthetic run has no ledger / applied / rel_alt
+        rec = viewer.load_panels(p)["recovery"]
+        assert rec["events"] == [] and rec["flight"] == []
+        assert rec["flight_target"] == 30.0
+
+
 def test_viewer_bind_loopback_only():
     """PS-8: serve() refuses 0.0.0.0 / public binds (attacker UE must not reach mgmt plane)."""
     for bad in ("0.0.0.0", "::", "", "8.8.8.8", "203.0.113.5"):

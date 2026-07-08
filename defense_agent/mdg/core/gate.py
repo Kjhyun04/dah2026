@@ -25,7 +25,7 @@ from typing import Literal
 
 from ..tools.registry import REGISTRY
 
-Tier2 = Literal["AUTO", "OPER"]
+Tier2 = Literal["AUTO", "OPER", "AUTO_BY_OPERATOR"]
 FLIGHT_EFFECT = "flight_mode_set"
 
 
@@ -44,39 +44,60 @@ class GateDecision:
         return not self.auto
 
 
-def gate_for(tool_id: str, risk: str, reversible: bool) -> GateDecision:
+def gate_for(tool_id: str, risk: str, reversible: bool,
+             operator_auto: bool = False) -> GateDecision:
     """Classify a chosen response tool into AUTO vs OPER (fail-closed to OPER).
 
     AUTO requires ALL of: registered ∧ registry tier == AUTO ∧ risk in {LOW,MED} ∧ reversible
     ∧ not a flight action. Anything else (unregistered, OPER/RO tier, HIGH risk, irreversible,
     flight) is OPER. An unknown tool is OPER — a ghost id can never actuate.
+
+    ``operator_auto`` (Phase 1, SANDBOX DEMO): when True, a REGISTERED OPER decision is widened to
+    ``auto=True`` (sandbox operator auto-confirm) so the OPER recovery path (docker_pause / flight)
+    executes instead of deferring to a human. The ``flight`` and ``registry_tier`` fields are
+    PRESERVED (still carry the original OPER classification) so routing/ledger stays transparent
+    that this was an operator-gate tool auto-approved — not a native AUTO tool. This is a
+    DETERMINISTIC function of (registry + risk + the env-sourced operator_auto bool): no LLM field,
+    so a hostile advice can never flip it (불변식①). An UNREGISTERED/ghost id is NEVER widened —
+    the closed-registry fail-closed is absolute, operator_auto does not rescue an unknown tool.
     """
     spec = REGISTRY.get(tool_id)
     if spec is None:
+        # ghost/unregistered id NEVER actuates — operator_auto does NOT rescue it (closed registry).
         return GateDecision(tool_id, "OPER", False, False, "",
                             f"unregistered tool_id '{tool_id}' -> operator (fail-closed)")
     flight = spec.effect == FLIGHT_EFFECT
     reg_tier = spec.tier
     if flight:
-        return GateDecision(tool_id, "OPER", False, True, reg_tier,
+        base = GateDecision(tool_id, "OPER", False, True, reg_tier,
                             "flight action -> operator (2-tier: 비행=operator)")
-    if reg_tier != "AUTO":
-        return GateDecision(tool_id, "OPER", False, False, reg_tier,
+    elif reg_tier != "AUTO":
+        base = GateDecision(tool_id, "OPER", False, False, reg_tier,
                             f"registry tier '{reg_tier}' != AUTO -> operator")
-    if risk not in ("LOW", "MED"):
-        return GateDecision(tool_id, "OPER", False, False, reg_tier,
+    elif risk not in ("LOW", "MED"):
+        base = GateDecision(tool_id, "OPER", False, False, reg_tier,
                             f"risk '{risk}' not auto-eligible -> operator")
-    if not reversible:
-        return GateDecision(tool_id, "OPER", False, False, reg_tier,
+    elif not reversible:
+        base = GateDecision(tool_id, "OPER", False, False, reg_tier,
                             "irreversible bundle -> operator")
-    return GateDecision(tool_id, "AUTO", True, False, reg_tier, "AUTO-tier reversible response")
+    else:
+        base = GateDecision(tool_id, "AUTO", True, False, reg_tier,
+                            "AUTO-tier reversible response")
+
+    if operator_auto and base.operator_required:
+        # sandbox operator auto-confirm: OPER -> auto=True. flight/registry_tier PRESERVED for
+        # transparency (ledger/routing still see the original OPER classification).
+        return GateDecision(tool_id, "AUTO_BY_OPERATOR", True, base.flight, base.registry_tier,
+                            "sandbox operator auto-confirm")
+    return base
 
 
-def is_auto(tool_id: str, risk: str, reversible: bool) -> bool:
+def is_auto(tool_id: str, risk: str, reversible: bool, operator_auto: bool = False) -> bool:
     """Convenience predicate: True iff the tool may auto-actuate (tier-2 AUTO)."""
-    return gate_for(tool_id, risk, reversible).auto
+    return gate_for(tool_id, risk, reversible, operator_auto).auto
 
 
-def requires_operator(tool_id: str, risk: str, reversible: bool) -> bool:
+def requires_operator(tool_id: str, risk: str, reversible: bool,
+                      operator_auto: bool = False) -> bool:
     """True iff the tool must be deferred to the operator (tier-2 OPER)."""
-    return gate_for(tool_id, risk, reversible).operator_required
+    return gate_for(tool_id, risk, reversible, operator_auto).operator_required

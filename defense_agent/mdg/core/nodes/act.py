@@ -29,7 +29,8 @@ from ..worldstate import AppliedRule, WorldState
 
 
 def act(state: MDGState, backend: Backend | None = None, ledger=None, clock=None,
-        controller: ResponseController | None = None, smf_table=None) -> dict:
+        controller: ResponseController | None = None, smf_table=None,
+        operator_auto: bool = False, docker=None) -> dict:
     chosen = state.get("chosen_action")
     if chosen is None:
         return {}                                          # nothing to do
@@ -62,7 +63,14 @@ def act(state: MDGState, backend: Backend | None = None, ledger=None, clock=None
     # P4: thread the LIVE SmfSessionTable into the controller so the stale-binding guard's (b)
     # cross-check (imsi_for_ip re-attribution) is active on the production act path — not just the
     # boot-snapshot (a). Absent (deps has no smf_table) -> best-effort (a)-only (fail-safe).
-    ctrl = controller or ResponseController(backend=be, smf_table=smf_table)
+    # Phase 1: thread the sandbox operator_auto flag into the controller so the 2-tier gate widens a
+    # registered OPER decision (docker_pause) to auto — the OPER recovery then EXECUTES here instead
+    # of deferring to a human. DETERMINISTIC (env bool), transparency kept via ledger fields below.
+    # Phase 4: thread the duck-typed docker backend so an operator_auto-widened docker_pause
+    # ACTUATES (act_host.pause) instead of recording an inert decision — the S1 회복 completion
+    # then becomes observable via inspect_paused. Absent (docker=None) -> operator-go DRY (fail-safe).
+    ctrl = controller or ResponseController(
+        backend=be, docker=docker, smf_table=smf_table, operator_auto=bool(operator_auto))
 
     # 2) plan: bundle idempotency/debounce + 2-tier gate (pure — no side effect yet)
     plan = ctrl.plan(chosen, world, tick_i, risk=risk, reversible=reversible)
@@ -94,8 +102,16 @@ def act(state: MDGState, backend: Backend | None = None, ledger=None, clock=None
         op_update["dry_streak"] = 0
         return op_update
 
-    # 3) record_intent OUTSIDE guard, BEFORE exec (G3)
-    intent = chosen.model_copy(update={"ts": ts, "revert_cmd": plan.revert_cmd or chosen.revert_cmd})
+    # 3) record_intent OUTSIDE guard, BEFORE exec (G3). Phase 1: when this AUTO plan is an OPER tool
+    # widened by operator_auto, stamp the ledger Intent so an auditor can distinguish a sandbox
+    # operator-auto-confirmed enforcement from a native AUTO one (transparency; registry_tier stays
+    # OPER upstream). authority names WHO authorized it — the sandbox, not a human operator.
+    op_auto_confirmed = bool(getattr(plan, "operator_auto_confirmed", False))
+    intent = chosen.model_copy(update={
+        "ts": ts, "revert_cmd": plan.revert_cmd or chosen.revert_cmd,
+        "operator_auto_confirmed": op_auto_confirmed,
+        "authority": "sandbox-auto" if op_auto_confirmed else "",
+    })
     ledger_update = ledger.record_intent(intent) if ledger is not None else {"ledger": [intent]}
 
     # 4) tool_wrap = safe-exec body (Backend.run) + post world_update (only these two wrapped)
@@ -115,6 +131,8 @@ def act(state: MDGState, backend: Backend | None = None, ledger=None, clock=None
 
     out: dict = {"dry_streak": 0}
     out.update(ledger_update)
+    if op_auto_confirmed:
+        out["operator_auto_confirmed"] = True              # state marking (edge can't mutate state)
     if getattr(result, "ok", False):
         out["worldstate"] = result.value                   # merged world with applied rule
     return out

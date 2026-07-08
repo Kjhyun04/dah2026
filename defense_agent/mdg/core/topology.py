@@ -79,7 +79,8 @@ BIND: dict[str, dict[str, str]] = {
     "select_policy": {},
     "rank_recovery": {},
     "decide": {"llm": "llm_decide", "clock": "clock"},
-    "act": {"backend": "backend", "ledger": "ledger", "clock": "clock", "smf_table": "smf_table"},
+    "act": {"backend": "backend", "ledger": "ledger", "clock": "clock", "smf_table": "smf_table",
+            "operator_auto": "operator_auto", "docker": "docker"},
     "effect_confirm": {"observe": "observe"},
     "escalate": {"ledger": "ledger", "clock": "clock", "gate": "gate"},
 }

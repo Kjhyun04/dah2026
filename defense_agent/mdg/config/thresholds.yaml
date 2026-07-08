@@ -26,6 +26,18 @@ low_confidence_threshold: 0.5           # E8: below this, mission_risk band +1 (
 debounce: {physical_action_min_ticks: 3}                                    # X5
 deescalation: {revert_reversible_after_quiet_s: 120, flight_action_auto_revert: false}  # E15
 
+# Phase 2 (RECOVERY_DEMO_PLAN §Phase2, B3/PS-7) — provenance/debounce gate relaxation that
+# applies ONLY under operator_auto (sandbox/SITL demo). PRODUCTION (operator_auto off) NEVER
+# consults this block and keeps the strict PS-7 posture: provenance_relaxed=false and the full
+# debounce.physical_action_min_ticks hold. Self-DoS surface widens under relaxation → demo-only.
+demo_mode:
+  provenance_relaxed: true    # under operator_auto: record-then-pass an injected high-severity
+                              # recovery candidate (rank_recovery stamps chosen_action.provenance_relaxed
+                              # =true into the ledger/trace) instead of the strict trusted-source hold.
+  debounce_ticks: 1           # demo physical-action debounce hold (shrunk from
+                              # physical_action_min_ticks=3) so a re-selected recovery re-binds within
+                              # the next tick during a live demo. Applied only when operator_auto is on.
+
 correlation_rules:
   CR01: {metrics: [PFCP_Delete_Attempt, Unauthorized_Command], max_time_diff_s: 5, join: time_only, weight: 1.0, min_members: 2}
 

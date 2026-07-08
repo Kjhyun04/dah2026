@@ -75,6 +75,22 @@ def thresholds() -> dict:
 
 
 @lru_cache(maxsize=1)
+def demo_mode() -> dict:
+    """Phase 2 (PS-7/B3) demo-mode relaxation knobs. thresholds.yaml ``demo_mode`` block ->
+    defaults fallback. The returned values apply ONLY under operator_auto (sandbox demo);
+    production (operator_auto off) NEVER consults them, so the strict posture is unaffected."""
+    thr = thresholds()
+    dm = thr.get("demo_mode") if isinstance(thr, dict) else None
+    if isinstance(dm, dict):
+        return {
+            "provenance_relaxed": bool(dm.get("provenance_relaxed", D.DEMO_PROVENANCE_RELAXED)),
+            "debounce_ticks": int(dm.get("debounce_ticks", D.DEMO_DEBOUNCE_TICKS)),
+        }
+    return {"provenance_relaxed": D.DEMO_PROVENANCE_RELAXED,
+            "debounce_ticks": D.DEMO_DEBOUNCE_TICKS}
+
+
+@lru_cache(maxsize=1)
 def mission_profile() -> dict:
     return _try_yaml("mission_profile.yaml") or D.MISSION_PROFILE
 

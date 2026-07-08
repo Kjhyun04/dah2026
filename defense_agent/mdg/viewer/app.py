@@ -108,6 +108,32 @@ def _classify_view(signals: list[str]) -> tuple[list[str], str]:
     return attack, "Red"
 
 
+def _detect_band(signals: list[str]) -> str:
+    """복구(recovery) lifecycle 전용 '탐지 밴드'. `_classify_view`(로그용)와 달리 상시(구조적)
+    시그니처를 제외하지 **않는다**.
+
+    이유: command-hijack / 5762-LAND 의 실제 공격 서명은 config 지표(Unauthorized_Command,
+    Port_5762_State)이며 이는 STANDING_SIGNALS 에 속한다. view_band 는 이들을 걷어내 Green 으로
+    보이므로, 그 값으로 복구 카드를 그리면 실제 비행 하이재킹 틱이 '밴드 Green→Green'(공격 없음)
+    으로 렌더된다. 복구 서사(탐지→…→회복)는 상시 시그니처를 포함한 밴드로 판정해야 한다.
+    상시/일반 구분 없이: 시그니처 없음→평시, 저심각(WARN)만→주의, 그 외→위험."""
+    if not signals:
+        return "Green"
+    if all(s in WARN_SIGNALS for s in signals):
+        return "Yellow"
+    return "Red"
+
+
+def _recovery_band(row: dict) -> str:
+    """복구 lifecycle 밴드: 엔진의 권위있는 per-tick `impact_band`(Green/Yellow/Red)를 우선 사용하고,
+    미기록/비정상 값이면 상시 시그니처를 포함한 `_detect_band`(사건 존재 기반)로 폴백한다.
+    view_band(상시 제외, 로그 전용)는 여기서 쓰지 않는다."""
+    ib = row.get("impact_band")
+    if ib in ("Red", "Yellow", "Green"):
+        return ib
+    return _detect_band(row.get("signals") or [])
+
+
 # --------------------------------------------------------------------------- #
 # Pure panel builders (no web deps) — testable directly
 # --------------------------------------------------------------------------- #
@@ -124,6 +150,164 @@ def _telemetry_rows(tick: play.TickView) -> list[dict]:
                 "verified": ev.get("verified"), "tamper": ev.get("tamper"),
             })
     return rows
+
+
+# --------------------------------------------------------------------------- #
+# Phase 7 — 복구 타임라인 + 비행상태 (recovery lifecycle / flight state) builders
+# --------------------------------------------------------------------------- #
+# PRESENTATION ONLY: derived purely from the already-recorded ledger(Intent)/worldstate.applied/
+# view_band transitions + 14560 rel_alt/flight_mode telemetry rows. No re-execution, no testbed,
+# deterministic — reuses the same run.jsonl the 3-panel view consumes (H-J portability pillar).
+_FLIGHT_TARGET_ALT = 30.0                       # S2 복귀 목표 고도(m) — 스파크라인 기준선
+_RECOVERY_STEPS = (("detect", "탐지"), ("respond", "대응"),
+                   ("enforce", "집행"), ("confirm", "확인"), ("recover", "회복"))
+
+
+def _flight_series(comm_panel: list[dict]) -> list[dict]:
+    """Per-tick flight state (rel_alt/flight_mode) from the 14560 telemetry rows already
+    folded into the communication panel. Ticks with neither metric are omitted."""
+    series: list[dict] = []
+    for c in comm_panel:
+        alt = None
+        mode = None
+        for row in (c.get("telemetry") or []):
+            m = row.get("metric")
+            if m == "rel_alt":
+                v = row.get("value")
+                try:
+                    alt = float(v)
+                except (TypeError, ValueError):
+                    alt = v
+            elif m == "flight_mode":
+                mode = row.get("value")
+        if alt is not None or mode is not None:
+            series.append({"tick": c.get("tick"), "rel_alt": alt, "flight_mode": mode})
+    return series
+
+
+def _recovery_events(ticks: list, band_by_tick: dict, flight: list[dict]) -> list[dict]:
+    """Group ledger(Intent) + worldstate.applied[rule].confirmed + detection-band transitions into
+    per-incident recovery lifecycles: 탐지→대응→집행→확인→회복. One event per recovery ``rule``.
+
+    ``band_by_tick`` here is the recovery detection band (engine impact_band / incident presence,
+    built by ``_recovery_band``), NOT the standing-filtered view_band — so a command-hijack /
+    5762-LAND whose incident members are STANDING config metrics still shows an attack band.
+
+    detect = first non-Green tick (attack visible); respond = first ledger Intent for the rule;
+    enforce = first EXECUTED Intent (operator_gate falsy — an operator_auto-widened OPER tool
+    executes here); confirm = first tick worldstate.applied[rule].confirmed; recover = first Green
+    tick after enforcement (band returned to 평시). Pure/deterministic."""
+    alt_by_tick = {f["tick"]: f["rel_alt"] for f in flight if f.get("rel_alt") is not None}
+    detect_global = None
+    for t in ticks:
+        if band_by_tick.get(t.index, "Green") != "Green":
+            detect_global = t.index
+            break
+
+    events: dict[str, dict] = {}
+    order: list[str] = []
+
+    def _ev(rule: str) -> dict:
+        ev = events.get(rule)
+        if ev is None:
+            ev = {"rule": rule, "tool": rule, "revert_cmd": "", "first_tick": None,
+                  "enforce_tick": None, "confirm_tick": None,
+                  "operator_auto_confirmed": False, "deferred": False,
+                  "provenance_relaxed": False}
+            events[rule] = ev
+            order.append(rule)
+        return ev
+
+    for t in ticks:
+        for intent in (t.ledger or []):
+            if not isinstance(intent, dict):
+                continue
+            rule = intent.get("rule") or intent.get("recovery_type") or intent.get("tool_id")
+            if not rule:
+                continue
+            ev = _ev(rule)
+            if ev["first_tick"] is None:
+                ev["first_tick"] = t.index
+            if intent.get("tool_id"):
+                ev["tool"] = intent.get("tool_id")
+            if intent.get("revert_cmd"):
+                ev["revert_cmd"] = intent.get("revert_cmd")
+            if intent.get("operator_auto_confirmed"):
+                ev["operator_auto_confirmed"] = True
+            if intent.get("provenance_relaxed"):
+                ev["provenance_relaxed"] = True
+            if not bool(intent.get("operator_gate")):
+                if ev["enforce_tick"] is None:
+                    ev["enforce_tick"] = t.index
+            else:
+                ev["deferred"] = True
+        ws = t.worldstate if isinstance(t.worldstate, dict) else {}
+        for rule, ap in (ws.get("applied") or {}).items():
+            if not isinstance(ap, dict):
+                continue
+            ev = _ev(rule)
+            if not ev["revert_cmd"] and ap.get("revert_cmd"):
+                ev["revert_cmd"] = ap.get("revert_cmd")
+            if ap.get("confirmed") and ev["confirm_tick"] is None:
+                ev["confirm_tick"] = t.index
+
+    last_tick = ticks[-1].index if ticks else None
+    out: list[dict] = []
+    for rule in order:
+        ev = events[rule]
+        first_tick = ev["first_tick"]
+        enforce_tick = ev["enforce_tick"]
+        confirm_tick = ev["confirm_tick"]
+        enforced = enforce_tick is not None
+        confirmed = confirm_tick is not None
+        # detection = earliest visible attack tick, but never after this event first appeared
+        detect_tick = detect_global
+        if detect_tick is None or (first_tick is not None and detect_tick > first_tick):
+            detect_tick = first_tick
+        # recovery = first Green tick after enforcement (band returned to 평시)
+        recover_tick = None
+        base = enforce_tick if enforce_tick is not None else first_tick
+        if base is not None:
+            for t in ticks:
+                if t.index > base and band_by_tick.get(t.index, "Green") == "Green":
+                    recover_tick = t.index
+                    break
+        b_ref = detect_tick if detect_tick is not None else first_tick
+        band_before = band_by_tick.get(b_ref, "Green")
+        band_after = band_by_tick.get(
+            recover_tick if recover_tick is not None else last_tick, band_before)
+        alt_before = alt_by_tick.get(b_ref)
+        alt_after = (alt_by_tick.get(recover_tick) if recover_tick is not None
+                     else alt_by_tick.get(last_tick))
+        if ev["operator_auto_confirmed"]:
+            tier = "OPER→AUTO(sandbox)"
+        elif enforced:
+            tier = "AUTO"
+        else:
+            tier = "OPER(대기)"
+        done = {"detect": detect_tick is not None, "respond": first_tick is not None,
+                "enforce": enforced, "confirm": confirmed,
+                "recover": (recover_tick is not None) or confirmed}
+        tickmap = {"detect": detect_tick, "respond": first_tick, "enforce": enforce_tick,
+                   "confirm": confirm_tick, "recover": recover_tick}
+        steps = [
+            {"key": k, "label": lbl, "done": done[k], "tick": tickmap[k],
+             **({"auto": ev["operator_auto_confirmed"]} if k == "enforce" else {})}
+            for k, lbl in _RECOVERY_STEPS
+        ]
+        out.append({
+            "rule": rule, "tool": ev["tool"], "tier": tier,
+            "revert_cmd": ev["revert_cmd"],
+            "operator_auto_confirmed": ev["operator_auto_confirmed"],
+            "provenance_relaxed": ev["provenance_relaxed"],
+            "enforced": enforced, "confirmed": confirmed,
+            "detect_tick": detect_tick, "enforce_tick": enforce_tick,
+            "confirm_tick": confirm_tick, "recover_tick": recover_tick,
+            "band_before": band_before, "band_after": band_after,
+            "alt_before": alt_before, "alt_after": alt_after,
+            "steps": steps,
+        })
+    return out
 
 
 def load_panels(run_path: str) -> dict:
@@ -205,6 +389,19 @@ def load_panels(run_path: str) -> dict:
         for n in nodes.values()
     ]
 
+    # Phase 7 — 복구 lifecycle + 비행상태(고도/모드) 시계열. 순수 파생(재실행 없음): 좌측 '복구 진행'
+    # 카드 + 고도 스파크라인의 뷰모델. 기존 상시패널/view_band 와 공존(표현계층 추가일 뿐).
+    flight = _flight_series(comm_panel)
+    # 복구 lifecycle 밴드는 view_band(상시조건 제외, 로그 전용)가 아니라 엔진 impact_band(권위)
+    # /사건 기반 탐지밴드를 쓴다 — 실제 공격 서명이 상시 시그니처(Unauthorized_Command/
+    # Port_5762_State)인 command-hijack/5762-LAND 틱도 '탐지→회복' 서사가 성립하도록.
+    band_by_tick = {row["tick"]: _recovery_band(row) for row in action_panel}
+    recovery = {
+        "events": _recovery_events(ticks, band_by_tick, flight),
+        "flight": flight,
+        "flight_target": _FLIGHT_TARGET_ALT,
+    }
+
     return {
         # 헤더 메타(경고 문구 없음). 신뢰근원·불일치 수만 콤팩트 칩으로 노출.
         "banner": {
@@ -213,6 +410,7 @@ def load_panels(run_path: str) -> dict:
         },
         "summary": summary,
         "standing": standing,              # 우측 취약 노드 상태(상시조건 — 로그 아님)
+        "recovery": recovery,              # 좌측 복구 진행 카드 + 고도 스파크라인(Phase 7)
         "panels": {"action": action_panel, "communication": comm_panel, "verification": verify_panel},
         "record_time_redact": True,        # display-time redaction is intentionally OFF (PS-3)
         "read_only": True,
@@ -270,6 +468,22 @@ _HTML = """<!doctype html><html><head><meta charset="utf-8"><title>MDG 방어 �
  .tdetail{padding:8px 12px;font-size:11px;color:#9fb0c4;border-top:1px solid #17222f;line-height:1.8}
  .tdetail b{color:#7fb4d0}
  .tamper{color:#ff8ea3;font-weight:bold}
+ /* Phase 7 — 복구 진행 카드 + 비행 고도 스파크라인 */
+ .recovery{margin-bottom:14px}
+ .rgrid{display:flex;gap:12px;flex-wrap:wrap;align-items:stretch}
+ .rcard{flex:1;min-width:260px;border:1px solid #23324a;border-radius:10px;background:#0e1420;padding:11px 13px}
+ .rcard.flight{flex:0 0 300px}
+ .rtitle{font-size:13px;color:#9fe7f2;margin-bottom:9px;font-weight:bold;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+ .rtier{font-size:10px;color:#8fb0c8;border:1px solid #2b3a52;border-radius:5px;padding:1px 6px}
+ .rsteps{display:flex;flex-wrap:wrap;align-items:center;gap:3px;font-size:12px}
+ .rstep{padding:2px 9px;border-radius:6px;white-space:nowrap}
+ .rstep.done{background:#10241b;border:1px solid #2e7d5b;color:#8fe6bf}
+ .rstep.pending{background:#141c2b;border:1px solid #26364c;color:#6f8296}
+ .rsep{color:#3f5168}
+ .rtk{color:#7f8ea3;font-size:10px}
+ .rauto{background:#1a2740;border:1px solid #3a5a8a;color:#9fc4f0;font-size:10px;padding:0 5px;border-radius:4px}
+ .rmeta{font-size:11px;color:#9fb0c4;margin-top:9px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+ .spark{display:block;width:100%;height:66px;background:#0b111c;border-radius:6px;margin-bottom:5px}
  /* 2단 레이아웃: 좌=공격 로그 · 우=상시 취약 노드 상태 */
  .wrap{display:flex;gap:14px;align-items:flex-start}
  .main{flex:1;min-width:0}
@@ -293,6 +507,7 @@ _HTML = """<!doctype html><html><head><meta charset="utf-8"><title>MDG 방어 �
  <span><span class="sw" style="background:#ff8ea3"></span>에이전트≠진실 불일치</span>
  <span class="muted">· 좌=공격 트래픽 로그(상시조건 제외) · 우=상시 취약 노드 상태 · 묶음/행 클릭 시 펼침 · 3초 자동갱신</span>
 </div>
+<div id="recovery" class="recovery"></div>
 <div class="wrap"><div id="body" class="main"></div><aside id="aside" class="aside"></aside></div>
 <script>
 const TOKEN=new URLSearchParams(location.search).get('token')||'';
@@ -359,6 +574,55 @@ function renderStanding(standing){
  h+='<div class="muted" style="margin-top:6px">테스트베드 환경 자체의 상시 취약점 — 환경을 고쳐야 해소되며 좌측 공격 로그의 위험/주의/평시 산정에서는 제외됩니다.</div>';
  el.innerHTML=h;
 }
+function altSpark(flight,target){
+ const pts=(flight||[]).filter(f=>f.rel_alt!=null);
+ if(!pts.length)return '<div class="muted">비행 고도 데이터 없음(rel_alt 미관측)</div>';
+ const w=280,h=66,pad=7;
+ const xs=pts.map(p=>p.tick),ys=pts.map(p=>+p.rel_alt);
+ const minT=Math.min.apply(null,xs),maxT=Math.max.apply(null,xs);
+ let maxY=Math.max(target,Math.max.apply(null,ys)),minY=Math.min(0,Math.min.apply(null,ys));
+ if(maxY<=minY)maxY=minY+1;
+ const sx=t=>pad+(maxT===minT?0:(t-minT)/(maxT-minT))*(w-2*pad);
+ const sy=y=>h-pad-(y-minY)/(maxY-minY)*(h-2*pad);
+ const poly=pts.map(p=>sx(p.tick).toFixed(1)+','+sy(+p.rel_alt).toFixed(1)).join(' ');
+ const ty=sy(target).toFixed(1);
+ const last=pts[pts.length-1];
+ return '<svg class="spark" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none">'
+   +'<line x1="'+pad+'" y1="'+ty+'" x2="'+(w-pad)+'" y2="'+ty+'" stroke="#3ecf8e" stroke-dasharray="3,3" stroke-width="1"/>'
+   +'<polyline fill="none" stroke="#9fe7f2" stroke-width="1.7" points="'+poly+'"/>'
+   +'<circle cx="'+sx(last.tick).toFixed(1)+'" cy="'+sy(+last.rel_alt).toFixed(1)+'" r="2.7" fill="#9fe7f2"/></svg>'
+   +'<div class="muted">목표 '+target+'m · 최근 <b>'+(+last.rel_alt).toFixed(1)+'m</b>'
+   +(last.flight_mode!=null?(' · 모드 '+esc(last.flight_mode)):'')+'</div>';
+}
+function renderRecovery(rec){
+ const el=document.getElementById('recovery');
+ if(!el)return;
+ const evs=(rec&&rec.events)||[],flight=(rec&&rec.flight)||[];
+ if(!evs.length&&!flight.length){el.innerHTML='';return;}
+ let cards='';
+ if(!evs.length){
+  cards='<div class="rcard"><div class="rtitle">복구 진행</div>'
+    +'<div class="muted">집행된 복구 없음 — 공격 집행(ledger) 대기 중</div></div>';
+ }else{
+  for(const e of evs){
+   const steps=(e.steps||[]).map(s=>{
+     const tk=(s.tick!=null)?(' <span class="rtk">#'+s.tick+'</span>'):'';
+     const au=(s.key==='enforce'&&s.auto)?' <span class="rauto">auto</span>':'';
+     return '<span class="rstep '+(s.done?'done':'pending')+'">'+(s.done?'✓':'○')+' '+esc(s.label)+au+tk+'</span>';
+   }).join('<span class="rsep">→</span>');
+   const band='<span class="badge b-'+(e.band_after||'Green')+'">'+(BANDLBL[e.band_after]||'⚪ ?')+'</span>';
+   cards+='<div class="rcard"><div class="rtitle">복구 진행 · '+esc(e.tool)
+     +' <span class="rtier">'+esc(e.tier)+'</span></div>'
+     +'<div class="rsteps">'+steps+'</div>'
+     +'<div class="rmeta">'+(e.band_before?('밴드 '+esc(e.band_before)+' → '):'')+band
+     +(e.revert_cmd?(' · <span class="muted">revert: '+esc(e.revert_cmd)+'</span>'):'')
+     +(e.provenance_relaxed?' · <span class="rauto">provenance_relaxed</span>':'')+'</div></div>';
+  }
+ }
+ const alt='<div class="rcard flight"><div class="rtitle">비행 고도(30m 복귀)</div>'
+   +altSpark(flight,(rec&&rec.flight_target)||30)+'</div>';
+ el.innerHTML='<div class="rgrid">'+cards+alt+'</div>';
+}
 function render(d){
  const A=d.panels.action||[], C=d.panels.communication||[], Vv=d.panels.verification||[];
  const cmap={},vmap={}; C.forEach(c=>cmap[c.tick]=c); Vv.forEach(x=>vmap[x.tick]=x);
@@ -391,6 +655,7 @@ function render(d){
   +'<span class="muted">갱신 '+new Date().toLocaleTimeString('ko-KR')+' · 읽기전용 · 신뢰근원 '+esc((d.banner&&d.banner.trust_root)||'mdg.verifier')+'</span>'
   +(causes.length?('<div class="causes"><span class="lbl">공격 원인</span>'+causes.map(c=>'<span class="sig">'+esc(c[0])+' <b>'+c[1]+'틱</b></span>').join('')+'</div>'):'<div class="causes"><span class="sig calm">공격 시그니처 없음 · 상시조건만(우측 상태 참조)</span></div>');
  document.getElementById('body').innerHTML= ids.length? ids.map(id=>batchBlock(id,byBatch.get(id))).join('') : '<div class="muted">로그 없음 — 감시(monitor) 실행을 확인하세요.</div>';
+ renderRecovery(d.recovery);
  renderStanding(d.standing);
  document.querySelectorAll('details.batch').forEach(el=>el.addEventListener('toggle',()=>{const id=+el.dataset.batch; el.open?openBatches.add(id):openBatches.delete(id);}));
  document.querySelectorAll('details.trow').forEach(el=>el.addEventListener('toggle',()=>{const tk=+el.dataset.tick; el.open?openTicks.add(tk):openTicks.delete(tk);}));

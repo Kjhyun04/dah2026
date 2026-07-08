@@ -60,6 +60,7 @@ class AppliedRule(BaseModel):
     confirmed: bool = False           # effect_confirm sets this (PA-2). Not an exec gate.
     reverted: bool = False            # de-escalation revert marker (bundle, X5/E15)
     provenance: Provenance = "config"
+    confirm_note: str = ""            # effect_confirm delta note on confirm (Phase 4; audit/viewer only)
 
 
 class RoleBinding(BaseModel):

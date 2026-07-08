@@ -140,6 +140,11 @@ DEBOUNCE_PHYSICAL_MIN_TICKS: int = 3
 DEESCALATION_REVERT_QUIET_S: int = 120
 FLIGHT_ACTION_AUTO_REVERT: bool = False
 
+# --- Phase 2 (PS-7/B3) demo-mode relaxation — fallback for the pyyaml-absent path (loader.demo_mode).
+# These values apply ONLY under operator_auto (sandbox demo); production ignores them entirely.
+DEMO_PROVENANCE_RELAXED: bool = True   # record-then-pass injected high-severity under operator_auto
+DEMO_DEBOUNCE_TICKS: int = 1           # demo debounce hold (< DEBOUNCE_PHYSICAL_MIN_TICKS)
+
 # --- Anti-replay (PS-6) ---
 SEQ_WINDOW: int = 1024
 # Q-D-4 DOCUMENTATION-ONLY: SEQ_SKEW_S is UNUSED (no reader — grep confirmed). Anti-replay is

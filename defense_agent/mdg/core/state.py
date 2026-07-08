@@ -102,6 +102,17 @@ class Intent(BaseModel):
     config_version: str = ""
     tool_id: str = ""
     operator_gate: bool = False            # escalate records these (side-effect 0)
+    # Phase 1 (sandbox demo) audit fields: an OPER tool executed via operator_auto records
+    # operator_auto_confirmed=True + authority="sandbox-auto" so an auditor can distinguish an
+    # auto-confirmed OPER enforcement from a native AUTO one. Defaults keep every other path intact.
+    operator_auto_confirmed: bool = False
+    authority: str = ""                    # "" | "sandbox-auto" (who authorized the enforcement)
+    # Phase 2 (PS-7/B3, sandbox demo): when the injected-high-severity provenance/debounce gate is
+    # RELAXED under operator_auto (record-then-pass), rank_recovery stamps provenance_relaxed=True so
+    # the ledger/trace transparently records that the strict trusted-source hold was waived for the
+    # demo. Production (operator_auto off) keeps False — the strict posture is unrecorded because it
+    # was not relaxed. Defaulted, so every non-demo Intent construction is unaffected.
+    provenance_relaxed: bool = False       # demo record-then-pass marker (audit/trace)
     # P4-Q1 — pivot target as an OPAQUE VALIDATED SELECTOR (NOT a live IP). Pure data-carrying:
     # ``target`` is an UNTRUSTED value (from telemetry/correlation) and MUST NEVER be used as a
     # raw ``iptables -s`` argument. It is only a KEY resolved against the verified WorldState
@@ -192,6 +203,11 @@ class MDGState(TypedDict, total=False):
     pivots: int
     dry_streak: int
     goal_reached: bool
+    # Phase 1 (sandbox demo) routing input: env-sourced bool. When True the decide-edge routes an
+    # otherwise-escalated OPER response to act (deterministic — a bool, never an LLM field, 불변식①)
+    # and act records the enforcement as operator-auto-confirmed. Absent/False -> unchanged posture.
+    operator_auto: bool
+    operator_auto_confirmed: bool
 
 
 def initial_state(config_version: str) -> MDGState:

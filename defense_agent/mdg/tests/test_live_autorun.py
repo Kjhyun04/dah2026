@@ -87,6 +87,74 @@ def test_parse_allow_live_truthy():
 
 
 # --------------------------------------------------------------------------- #
+# (a') parse_operator_auto (Phase 0 — sandbox OPER auto-confirm gate)
+# --------------------------------------------------------------------------- #
+def test_parse_operator_auto_default_false():
+    # safe default: absent/blank/0/false/garbage -> False (OPER stays escalate).
+    assert live_autorun.parse_operator_auto({}) is False
+    assert live_autorun.parse_operator_auto({"MDG_OPERATOR_AUTO": ""}) is False
+    assert live_autorun.parse_operator_auto({"MDG_OPERATOR_AUTO": "0"}) is False
+    assert live_autorun.parse_operator_auto({"MDG_OPERATOR_AUTO": "false"}) is False
+    assert live_autorun.parse_operator_auto({"MDG_OPERATOR_AUTO": "nope"}) is False
+
+
+def test_parse_operator_auto_truthy():
+    for v in ("1", "true", "TRUE", "Yes", "on"):
+        assert live_autorun.parse_operator_auto({"MDG_OPERATOR_AUTO": v}) is True
+
+
+def test_run_threads_operator_auto_into_deps():
+    # Phase 0 wiring: run() must pass operator_auto through to the graph builder's deps.
+    cols = [_FakeCollector("a")]
+    be = _FakeBackend()
+    seen = {}
+
+    def _graph_builder(deps):
+        seen["operator_auto"] = deps.get("operator_auto")
+        return ("GRAPH", deps)
+
+    kwargs = _run_kwargs(cols, be)
+    kwargs["graph_builder"] = _graph_builder
+    with tempfile.TemporaryDirectory() as d:
+        live_autorun.run(d, "runz", operator_auto=True,
+                         driver_fn=lambda *a, **k: {}, **kwargs)
+    assert seen["operator_auto"] is True
+
+
+def test_run_seeds_operator_auto_into_state_channel():
+    # Phase 1 env->STATE wire (regression for the dead route_after_decide branch): deps carrying
+    # operator_auto is NOT enough — the conditional edge reads the STATE channel, so run() MUST
+    # seed state0["operator_auto"]. Capture the state0 the launcher hands the driver and assert it.
+    cols = [_FakeCollector("a")]
+    be = _FakeBackend()
+    seen = {}
+
+    def _driver(graph, run_id, state0=None, **k):
+        seen["operator_auto"] = (state0 or {}).get("operator_auto")
+        return {}
+
+    with tempfile.TemporaryDirectory() as d:
+        live_autorun.run(d, "runw", operator_auto=True, driver_fn=_driver, **_run_kwargs(cols, be))
+    # env->state wire live: route_after_decide can now actually see operator_auto every tick.
+    assert seen["operator_auto"] is True
+
+
+def test_run_operator_auto_default_off_absent_from_state():
+    # Safe default (operator_auto=0): state channel is False -> legacy escalate posture (회귀 0).
+    cols = [_FakeCollector("a")]
+    be = _FakeBackend()
+    seen = {}
+
+    def _driver(graph, run_id, state0=None, **k):
+        seen["operator_auto"] = (state0 or {}).get("operator_auto")
+        return {}
+
+    with tempfile.TemporaryDirectory() as d:
+        live_autorun.run(d, "runv", driver_fn=_driver, **_run_kwargs(cols, be))
+    assert seen["operator_auto"] is False
+
+
+# --------------------------------------------------------------------------- #
 # (b) _shutdown
 # --------------------------------------------------------------------------- #
 def test_shutdown_stops_joins_and_teardown():

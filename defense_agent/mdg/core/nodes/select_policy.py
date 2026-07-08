@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 
+from ...config import defaults as D
 from ...config import loader
 from ..legality import legal_actions
 from ..state import Action, MDGState
@@ -16,7 +17,17 @@ from ..worldstate import WorldState
 # incident kind -> candidate recovery types (closed mapping)
 _INCIDENT_RECOVERY = {
     "CR01": ["pfcp_firewall", "command_override"],
-    "single-signal": ["backdoor_pause"],
+    # Phase 3 (B2, S2) — single-signal now offers BOTH the container-isolation recovery
+    # (backdoor_pause, docker_pause) AND the flight-recovery candidate (signed_guided,
+    # send_signed_mode). This is CANDIDATE WIRING ONLY — the legality gate (send_signed_mode
+    # requires "signing" == CONFIRMED_ON ∧ role_verified.gcs) DOUBLE-GATES signed_guided out
+    # whenever signing is UNKNOWN (the live/production posture), so S1 and replay stay
+    # byte-identical: only backdoor_pause survives select_policy under UNKNOWN signing. When
+    # signing is CONFIRMED (Phase 6, testbed side), signed_guided enters legal_actions as an
+    # OPER/HIGH candidate; ranking is left to recovery_priors (no core _sort_key boost) — under
+    # equal candidates backdoor_pause (succ 0.95, MED) still out-ranks signed_guided (0.90, HIGH),
+    # so admitting signed_guided never perturbs the S1 selection. See recovery_priors.yaml.
+    "single-signal": ["backdoor_pause", "signed_guided"],
     # row D (step 5) — dedicated 5762 backdoor kind (correlate emits it ONLY for
     # Port_5762_State). KEY isolates the 5762 signal so no other tripped metric can route
     # to the nsenter DROP. Step 7 lands the recovery-type value: "backdoor_drop" is the
@@ -28,7 +39,36 @@ _INCIDENT_RECOVERY = {
     "BACKDOOR_5762": ["backdoor_drop"],
 }
 
+# Phase 3 panel fix — flight-actuator DOMAIN GUARD. correlate emits the GENERIC
+# "single-signal" kind for EVERY tripped non-5762 metric (RTT/mongo/NAS/telemetry/PFCP),
+# so the kind alone cannot tell a command-hijack apart from an identity_access or
+# communication blip. signed_guided (send_signed_mode) is a HIGH/OPER *irreversible flight
+# uplink* (GUIDED 30m re-establish) and must fire ONLY for a command-domain incident — never
+# for an unrelated single-signal. Without this, signing=CONFIRMED_ON (testbed posture) +
+# gcs_proxy verified while web_backend is NOT (backdoor_pause filtered) would make signed_guided
+# the SOLE legal candidate for e.g. a MongoDB anomaly and issue a flight-mode command (PS-7
+# spurious-actuator / safety-surface widening). We gate the flight rtype by the incident's
+# domain, derived from the tripped member metric's config domain (D.METRICS[metric].domain).
+# FAIL-CLOSED: an unrecognized member metric yields no domain -> signed_guided is NOT admitted.
+# Container-isolation (backdoor_pause) stays domain-agnostic. This restricts the candidate set
+# ONLY; the legality signing gate still double-gates signed_guided out under UNKNOWN signing, so
+# the live/replay legal set stays byte-identical (불변식①). Command single-signals
+# (Unauthorized_Command / Signature_Verify_Fail) are unaffected — signed_guided still enters.
+_RTYPE_DOMAIN_GUARD = {"signed_guided": "command"}
+
 _IPV4_RE = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
+
+
+def _incident_domains(inc) -> set[str]:
+    """Domains of an incident's tripped member metrics (config-sourced, D.METRICS —
+    the same table compute_trust reads directly). Unknown metrics contribute nothing
+    (fail-closed for the flight-actuator guard)."""
+    out: set[str] = set()
+    for m in getattr(inc, "members", []) or []:
+        spec = D.METRICS.get(m)
+        if isinstance(spec, dict) and spec.get("domain"):
+            out.add(str(spec["domain"]))
+    return out
 
 # recovery_type -> ENFORCEMENT chokepoint CONTAINER key (finding P4-2) is CONFIG-sourced
 # (recovery_priors[<rtype>].enforce_at + default_enforce_at), NOT an inline literal here: the
@@ -67,7 +107,16 @@ def _candidates(state: MDGState) -> list[Action]:
     seen: set[str] = set()
     out: list[Action] = []
     for inc in incidents:
+        doms = None  # lazily computed once per incident
         for rtype in _INCIDENT_RECOVERY.get(inc.kind, []):
+            # flight-actuator domain guard (do NOT consume `seen` when skipped: another
+            # command-domain incident this tick may still legitimately emit this rtype).
+            guard = _RTYPE_DOMAIN_GUARD.get(rtype)
+            if guard is not None:
+                if doms is None:
+                    doms = _incident_domains(inc)
+                if guard not in doms:
+                    continue
             if rtype in seen:
                 continue
             seen.add(rtype)

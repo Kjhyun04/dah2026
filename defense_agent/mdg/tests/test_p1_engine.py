@@ -14,7 +14,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from mdg.collector.air_side import (AirCommandTap, AirTelemetryTap, _count_packets)  # noqa: E402
+import struct  # noqa: E402
+from mdg.collector.air_side import (AirCommandTap, AirTelemetryTap, _count_packets,  # noqa: E402
+                                    _decode_flight_state, _x25_crc)
 from mdg.collector.base import BaseCollector  # noqa: E402
 from mdg.collector.ingest import Keyring, verify_envelope  # noqa: E402
 from mdg.collector.mongo import MongoLogCollector, parse_mongo_line  # noqa: E402
@@ -154,6 +156,136 @@ def test_air_command_tap_emits_signed_signal():
     # HMAC present + verifies with the shared keyring (PS-2 producer side).
     ok, reason = verify_envelope(env, _kr(), SeqWatermark())
     assert ok, reason
+
+
+# --------------------------------------------------------------------------- #
+# Phase 5 — MAVLink flight-state decode (rel_alt / flight_mode) on the 14560 tap
+# --------------------------------------------------------------------------- #
+def _mav_v2_frame(msgid: int, payload: bytes, crc_extra: int, seq: int = 0) -> bytes:
+    """Assemble a CRC-correct MAVLink v2 frame (magic 0xFD)."""
+    hdr = bytes([0xFD, len(payload), 0, 0, seq, 1, 1,
+                 msgid & 0xFF, (msgid >> 8) & 0xFF, (msgid >> 16) & 0xFF])
+    crc = _x25_crc(hdr[1:] + payload, crc_extra)
+    return hdr + payload + struct.pack("<H", crc)
+
+
+def _tcpdump_hex(frames: bytes, leading_junk: bytes = b"") -> str:
+    """Render bytes as a ``tcpdump -x`` capture (summary line + hex-dump lines). ``leading_junk``
+    stands in for the IP/UDP header the scanner must sync past."""
+    raw = leading_junk + frames
+    out = ["12:00:00.1 IP 10.45.0.4.14550 > 10.45.0.2.14560: UDP, length %d" % len(frames)]
+    for off in range(0, len(raw), 16):
+        chunk = raw[off:off + 16]
+        words = " ".join(chunk[i:i + 2].hex() for i in range(0, len(chunk), 2))
+        out.append("\t0x%04x:  %s" % (off, words))
+    return "\n".join(out)
+
+
+def _hb(custom_mode: int, mav_type: int = 2) -> bytes:                 # QUADROTOR
+    return _mav_v2_frame(0, struct.pack("<IBBBBB", custom_mode, mav_type, 3, 0x81, 4, 3), 50)
+
+
+def _gpi(rel_alt_mm: int) -> bytes:
+    return _mav_v2_frame(33, struct.pack("<IiiiihhhH", 123, 100, 200, 40000, rel_alt_mm, 1, 2, 3, 45), 104)
+
+
+def test_crc_matches_mavlink_reference():
+    # MAVLink CRC-16/MCRF4XX check value for "123456789" is 0x6F91 (extra byte = last char).
+    assert _x25_crc(b"12345678", ord("9")) == 0x6F91
+
+
+def test_decode_flight_state_rel_alt_and_mode():
+    # GUIDED @ 30 m, past a junk IP/UDP header — decoder must sync on the magic byte.
+    st = _decode_flight_state(_tcpdump_hex(_hb(4) + _gpi(30000), leading_junk=b"\x45\x00" + b"\x00" * 26))
+    assert st["rel_alt"] == 30.0 and st["flight_mode"] == "GUIDED"
+    # LAND is decoded verbatim (effect observer keys the S2 non-recovery on it).
+    assert _decode_flight_state(_tcpdump_hex(_hb(9)))["flight_mode"] == "LAND"
+    # No hex / no valid frame -> {} (best-effort; link-health path stays intact).
+    assert _decode_flight_state("") == {}
+    assert _decode_flight_state("random noise no hex") == {}
+
+
+def test_decode_rejects_non_mavlink_magic_bytes():
+    # A stray 0xFD that is NOT a CRC-valid frame must be rejected (no false decode).
+    assert _decode_flight_state(_tcpdump_hex(b"\xFD\x09\x00\x00" + b"\x11" * 20)) == {}
+
+
+def test_telemetry_tap_emits_rel_alt_and_flight_mode():
+    q = queue.Queue()
+    stdout = _tcpdump_hex(_hb(4) + _gpi(30000))
+    be = Backend(mode="mock", mock_table={"tcpdump": stdout})
+    c = AirTelemetryTap(q, _kr(), _KID, backend=be, clock=_clock([100.0] * 6),
+                        netns_prefix=_NSPREFIX)
+    c.tick_once()
+    payloads = [e.payload for e in _drain(q)]
+    metrics = {p["metric"]: p for p in payloads}
+    # Link_Heartbeat (existing, band normal) coexists with the new flight-state rows.
+    assert "Link_Heartbeat" in metrics
+    assert metrics["rel_alt"]["value"] == 30.0 and metrics["rel_alt"]["band"] == "normal"
+    assert metrics["flight_mode"]["value"] == "GUIDED" and metrics["flight_mode"]["band"] == "normal"
+    # All ride the communication / plaintext_mavlink_tap channel so _telemetry_rows carries them.
+    for m in ("rel_alt", "flight_mode"):
+        assert metrics[m]["domain"] == "communication"
+        assert metrics[m]["channel"] == "plaintext_mavlink_tap"
+
+
+def test_telemetry_rows_carries_flight_state():
+    # viewer._telemetry_rows is generic over channel/domain — confirm rel_alt/flight_mode surface.
+    from mdg.viewer.app import _telemetry_rows
+
+    class _Tick:
+        evidence = [
+            {"metric": "rel_alt", "value": 30.0, "band": "normal",
+             "domain": "communication", "channel": "plaintext_mavlink_tap", "source_id": "air_telemetry_tap"},
+            {"metric": "flight_mode", "value": "GUIDED", "band": "normal",
+             "domain": "communication", "channel": "plaintext_mavlink_tap", "source_id": "air_telemetry_tap"},
+            {"metric": "Unauthorized_Command", "value": 1, "band": "warning",
+             "domain": "command", "channel": "plaintext_mavlink_tap", "source_id": "air_command_tap"},
+        ]
+
+    rows = _telemetry_rows(_Tick())
+    got = {r["metric"]: r["value"] for r in rows}
+    assert got.get("rel_alt") == 30.0 and got.get("flight_mode") == "GUIDED"
+    assert "Unauthorized_Command" not in got               # command domain filtered out
+
+
+def _hb_from(custom_mode: int, mav_type: int, sysid: int, compid: int) -> bytes:
+    """HEARTBEAT v2 with explicit sysid/compid (to model the co-resident GCS heartbeat)."""
+    hdr = bytes([0xFD, 6, 0, 0, 0, sysid, compid, 0, 0, 0])   # msgid 0 = HEARTBEAT
+    pl = struct.pack("<IBBBBB", custom_mode, mav_type, 3, 0x81, 4, 3)[:6]
+    crc = _x25_crc(hdr[1:] + pl, 50)
+    return hdr + pl + struct.pack("<H", crc)
+
+
+def test_decode_ignores_gcs_heartbeat_and_keeps_vehicle_mode():
+    # The testbed GCS emits HEARTBEAT sysid=255/compid=190/MAV_TYPE_GCS(6). Placed LAST in the
+    # window it must NOT clobber the vehicle's LAND (autopilot sysid=1/compid=1). Latest-wins would
+    # otherwise report "MODE_0" and defeat S2 LAND detection.
+    vehicle_land = _hb(9)                                    # sysid=1/compid=1 (autopilot), LAND
+    gcs = _hb_from(0, 6, sysid=255, compid=190)             # MAV_TYPE_GCS, last in window
+    st = _decode_flight_state(_tcpdump_hex(vehicle_land + gcs))
+    assert st["flight_mode"] == "LAND"                       # GCS heartbeat ignored, vehicle wins
+    # A GCS heartbeat ALONE yields no flight_mode (nothing to decode from a non-autopilot source).
+    assert "flight_mode" not in _decode_flight_state(_tcpdump_hex(gcs))
+    # expect_sys pins the vehicle sysid: a mismatched sysid (even compid=1) is rejected.
+    assert _decode_flight_state(_tcpdump_hex(_hb(4)), expect_sys=7) == {}
+
+
+def test_telemetry_tap_snapshot_feeds_effect_observer():
+    # Phase 5 wiring: AirTelemetryTap.snapshot() supplies the effect observer's signed_* path.
+    from mdg.safe_exec.observer import make_effect_observer
+
+    stdout = _tcpdump_hex(_hb(4) + _gpi(30000))              # GUIDED @ 30 m (recovered)
+    be = Backend(mode="mock", mock_table={"tcpdump": stdout})
+    c = AirTelemetryTap(queue.Queue(), _kr(), _KID, backend=be, clock=_clock([100.0] * 6),
+                        netns_prefix=_NSPREFIX)
+    assert c.snapshot() == {}                                # empty until first decode (safe)
+    c.tick_once()
+    snap = c.snapshot()
+    assert snap["rel_alt"] == 30.0 and snap["flight_mode"] == "GUIDED"
+    # signed_guided CONFIRMS when fed this live snapshot (was permanently UNCONFIRMED pre-wire).
+    obs = make_effect_observer(telemetry=c.snapshot)
+    assert obs("signed_guided") is True
 
 
 def test_network_collector_first_poll_baseline_then_signal():

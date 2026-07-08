@@ -68,11 +68,15 @@
 
 ---
 
-## S2 — MDG 자율런 기동 (관측 read-only, allow_live=False)
+## S2 — MDG 자율런 기동 (관측 read-only; allow_live 는 env MDG_ALLOW_LIVE 에 따름)
+
+> ★ allow_live 는 env(`MDG_ALLOW_LIVE`) 또는 `--allow-live` 플래그로 결정된다. 배포된 `.env.example`
+> 은 SITL 데모 기본이 `MDG_ALLOW_LIVE=1` 이라 `cp .env.example .env` 시 **allow_live=True**(집행 창 개방).
+> 순수 관측(read-only) 검증을 원하면 `MDG_ALLOW_LIVE=0` 으로 기동할 것. 아래는 read-only(=False) 시나리오.
 
 **DO:**
-1. 서버에서 자율런처 배경기동:
-   `nohup ~/mdg_venv/bin/python -m mdg.live_autorun --out ~/mdg/live_out --run-id <RUN_ID> > ~/mdg/live_out/<RUN_ID>/autorun.log 2>&1 &`
+1. 서버에서 자율런처 배경기동(read-only 검증 시 `MDG_ALLOW_LIVE=0`):
+   `MDG_ALLOW_LIVE=0 nohup ~/mdg_venv/bin/python -m mdg.live_autorun --out ~/mdg/live_out --run-id <RUN_ID> > ~/mdg/live_out/<RUN_ID>/autorun.log 2>&1 &`
    - `Backend(allow_live=False, mode='local')` — 관측(read_only=True)만 실행, 집행은 DRY.
    - recon이 uav_ue 등 host PID를 inspect(read-only)로 풀어 collector netns_prefix 주입.
 2. 정체 회귀 없음 확인: air-tap tcpdump는 짧은 deadline(command 2.0s / telemetry 3.0s) + read-only라

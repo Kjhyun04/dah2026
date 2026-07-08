@@ -34,7 +34,9 @@ class ResponsePlan:
     tier2: str                       # "AUTO" | "OPER"
     skip: bool = False               # idempotent / debounced -> no-op
     operator_required: bool = False  # OPER tier -> defer to operator (side-effect 0)
+    operator_auto_confirmed: bool = False  # Phase 1: OPER widened to auto by sandbox operator_auto
     exec_request: Optional[ExecRequest] = None
+    pause_container: str = ""         # Phase 4: operator_auto docker_pause target (act_host.pause)
     revert_cmd: str = ""
     reason: str = ""
 
@@ -44,11 +46,16 @@ class ResponseController:
 
     def __init__(self, backend: Optional[Backend] = None, docker=None,
                  gate=None, min_ticks: Optional[int] = None,
-                 act_host: Optional[ActHost] = None, smf_table=None):
+                 act_host: Optional[ActHost] = None, smf_table=None,
+                 operator_auto: bool = False):
         self.backend = backend or Backend(allow_live=False)     # operator-go 유보 default
         self.act_host = act_host or ActHost(backend=self.backend, docker=docker)
         self.gate = gate                                        # optional OperatorGate (binding)
         self.min_ticks = min_ticks
+        # Phase 1 (sandbox demo): when True the 2-tier gate widens a registered OPER tool to auto
+        # (docker_pause / flight recovery) so the OPER recovery path executes instead of deferring.
+        # DETERMINISTIC (env bool), transparency preserved via GateDecision.registry_tier (불변식①).
+        self.operator_auto = bool(operator_auto)
         # LIVE SMF session table (SmfSessionTable, ``imsi_for_ip(ip)->imsi|None``) — OPTIONAL. When
         # wired (out-of-graph collector owns it), an ip-kind source selector is cross-checked against
         # the live IMSI<->tun-IP binding so a UE-pool IP RE-ASSIGNED between detection and enforcement
@@ -204,18 +211,61 @@ class ResponseController:
         if bundle_mod.already_applied(world, rule):
             return ResponsePlan(rule, tool_id, "AUTO", skip=True,
                                 reason="idempotent: rule already applied+confirmed")
-        if bundle_mod.debounce_blocked(world, rule, tick_i, self.min_ticks):
+        # Phase 2 (B3/PS-7) — debounce hold. Explicit min_ticks wins; else under operator_auto
+        # (sandbox demo) the hold is SHRUNK to config demo_mode.debounce_ticks so a re-selected
+        # recovery re-binds within the next tick; else None -> bundle's strict physical_action_min.
+        #
+        # The shrink is RESTRICTED to the inert-DRY paths (OPER tools widened by operator_auto that
+        # have NO argv builder here — docker_pause / flight; side-effect 0). The LIVE netns-insertion
+        # tool ``nsenter_input_drop`` is EXCLUDED and keeps the full physical_action_min hold: its
+        # actuator (act_host.drop_argv) uses a NON-idempotent iptables ``-I`` (no ``-C`` pre-check),
+        # and with live observe=None (Phase 4 unwired) effect_confirm never confirms -> already_applied
+        # is always False -> debounce is the SOLE re-actuation throttle. Shrinking it there would re-insert an
+        # identical '-I ... -s <attacker> -j DROP' every demo tick (3x under 1-tick), accumulating N
+        # duplicate rules that the single '-D' de-escalation revert cannot fully undo -> victim netns
+        # keeps blocking the source despite a recorded '복구/해제' (가역성/leak-0 위반). Live insertion
+        # therefore stays 3-tick damped until it is made idempotent or Phase 4 observe is wired.
+        eff_min_ticks = self.min_ticks
+        if (eff_min_ticks is None and self.operator_auto
+                and tool_id != "nsenter_input_drop"):
+            from ..config import loader as _loader
+            eff_min_ticks = int(_loader.demo_mode().get("debounce_ticks", 1))
+        if bundle_mod.debounce_blocked(world, rule, tick_i, eff_min_ticks):
+            _held = eff_min_ticks if eff_min_ticks is not None else bundle_mod.min_debounce_ticks()
             return ResponsePlan(rule, tool_id, "AUTO", skip=True,
-                                reason=f"debounced: applied < {bundle_mod.min_debounce_ticks()} ticks ago")
+                                reason=f"debounced: applied < {_held} ticks ago")
 
-        # 2) 2-tier gate
-        gd = gate_mod.gate_for(tool_id, risk, reversible)
+        # 2) 2-tier gate (operator_auto widens a registered OPER decision to auto — Phase 1)
+        gd = gate_mod.gate_for(tool_id, risk, reversible, self.operator_auto)
         if gd.operator_required:
             return ResponsePlan(rule, tool_id, "OPER", operator_required=True, reason=gd.reason)
+        oper_auto = gd.tier2 == "AUTO_BY_OPERATOR"
 
-        # 3) AUTO tool -> build the netns DROP ExecRequest (dry-safe). (enforce_pid, src_ip) is a
-        # PURE LOOKUP of the Intent's TWO verified selectors (P4-Q1/P4-2); either endpoint
-        # unverified or the two not DISTINCT -> inert DRY (no incoherent same-entity DROP).
+        # 3a) docker_pause widened to auto by operator_auto -> DISPATCH the container pause through
+        # act_host (the duck-typed docker backend). This closes the Phase 4 gap where backdoor_pause
+        # was selected+recorded but NEVER actuated, so ``inspect_paused`` could never reach True and
+        # the S1 회복-완료 signal was unreachable. The enforce_at container KEY is verified (fail-
+        # closed) before dispatch; the pause is reversible (docker unpause) and, like every actuation
+        # here, stays DRY until an operator flips allow_live on the docker backend (누수-0 정합, ②).
+        if tool_id == "docker_pause" and oper_auto:
+            container = (getattr(intent, "enforce_at", "") or "").strip()
+            if container and ResponseController._binding_verified(container, world):
+                return ResponsePlan(rule, tool_id, "AUTO", pause_container=container,
+                                    operator_auto_confirmed=oper_auto,
+                                    revert_cmd=f"docker unpause {container}",
+                                    reason=gd.reason + f" -> docker pause {container}")
+            return ResponsePlan(rule, tool_id, "AUTO", exec_request=None,
+                                operator_auto_confirmed=oper_auto,
+                                reason=gd.reason + " -> inert DRY (pause container unverified)")
+        # 3b) any OTHER OPER tool widened to auto (flight / docker_net_disconnect) has NO actuator
+        # here — its live actuation is operator-tooling deferred. Emit an INERT DRY plan (side-effect
+        # 0) so the sandbox records the enforcement decision without a mis-built argv (누수-0 정합, ②).
+        if tool_id != "nsenter_input_drop":
+            return ResponsePlan(rule, tool_id, "AUTO", exec_request=None,
+                                operator_auto_confirmed=oper_auto,
+                                reason=gd.reason + " -> inert DRY (no argv builder for this tool)")
+        # (enforce_pid, src_ip) is a PURE LOOKUP of the Intent's TWO verified selectors (P4-Q1/P4-2);
+        # either endpoint unverified or the two not DISTINCT -> inert DRY (no incoherent DROP).
         pid, src_ip = self._resolve_endpoints(intent, world)
         argv = None
         from .act_host import drop_argv, drop_revert_cmd
@@ -225,11 +275,21 @@ class ResponseController:
         if argv is not None:
             req = ExecRequest(argv=argv, revert_cmd=revert, reversible=True)
         return ResponsePlan(rule, tool_id, "AUTO", exec_request=req, revert_cmd=revert,
+                            operator_auto_confirmed=oper_auto,
                             reason=gd.reason if req is not None
                             else "AUTO but netns target unresolved -> inert DRY")
 
     # -- run the planned AUTO actuation (Backend.run — DRY unless allow_live) #
     def run_plan(self, plan: ResponsePlan) -> ExecResult:
+        # Phase 4: an operator_auto docker_pause plan actuates via act_host (duck-typed docker
+        # backend), NOT the ExecRequest path. Absent a live docker backend the call degrades to an
+        # operator-go DRY dict (side-effect 0). Normalize the dict result to an ExecResult so the
+        # act node's world_update/ledger contract is unchanged.
+        if plan.pause_container:
+            r = self.act_host.pause(plan.pause_container)
+            return ExecResult(ok=bool(r.get("ok", False)), code=0,
+                              dry_run=bool(r.get("dry_run", False)),
+                              note=r.get("note", f"docker pause {plan.pause_container}"))
         if plan.exec_request is None:
             return ExecResult(ok=True, code=0, dry_run=True,
                               note=f"INERT: no exec_request for rule '{plan.rule}' ({plan.reason})")

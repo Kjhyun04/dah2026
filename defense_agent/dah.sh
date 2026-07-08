@@ -5,7 +5,9 @@
 #   사용: ./dah.sh <verify|test|campaign|autorun|live|viewer|status|help> [flags]
 #
 #   2대 불변식: ① 결정론 라우팅(제어흐름은 LLM 불가시)  ② leak-0 실행(비밀/프로세스 잔여 0).
-#   기본은 전부 오프라인·read-only. 실 상태변경(단일 가역 DROP)은 MDG_ALLOW_LIVE=1 (operator-go).
+#   코드 기본(env 미설정 시)은 오프라인·read-only. 실 상태변경(가역 DROP/pause)은 MDG_ALLOW_LIVE=1(operator-go).
+#   ★주의: 배포된 .env.example 은 SITL 자율복구 데모용으로 MDG_ALLOW_LIVE=1/MDG_OPERATOR_AUTO=1 로 실려 있어
+#   `cp .env.example .env` 시 자율집행 포스처가 된다(monitor/autorun 이 stderr 로 LIVE 경고 배너 출력). 실기체/프로덕션=0.
 set -uo pipefail
 cd "$(dirname "$0")"
 PY=.venv/bin/python; [ -x "$PY" ] || PY=python3
@@ -20,6 +22,9 @@ _load_env() {
   fi
   # MDG_ALLOW_LIVE(operator-go) → live/*.sh 가 읽는 ALLOW_LIVE 로 미러.
   [ -n "${MDG_ALLOW_LIVE:-}" ] && export ALLOW_LIVE="${MDG_ALLOW_LIVE}"
+  # MDG_OPERATOR_AUTO(샌드박스 OPER 자동승인, 신규) → .env 소싱(set -a)으로 이미 export 되나,
+  # 미설정 시에도 파이썬 파서가 안전 기본 False 로 처리(명시만; 값 강제 안 함).
+  export MDG_OPERATOR_AUTO="${MDG_OPERATOR_AUTO:-}"
 }
 
 cmd="${1:-help}"; shift 2>/dev/null || true
@@ -49,7 +54,7 @@ case "$cmd" in
     # 온-호스트 netns 관측(5762 ss / air-tap / PFCP)엔 sudo 필요 → 'sudo -E ./dah.sh monitor' 권장.
     _load_env
     OUT="${OUT:-./live_out}"; RID="${RUN_ID:-monitor}"
-    echo "24/7 상시 감시 시작 (Ctrl-C 종료) · 틱 간격 ${INTERVAL:-2}s · MDG_ALLOW_LIVE=${MDG_ALLOW_LIVE:-0}(0=DRY)"
+    echo "24/7 상시 감시 시작 (Ctrl-C 종료) · 틱 간격 ${INTERVAL:-2}s · MDG_ALLOW_LIVE=${MDG_ALLOW_LIVE:-0}(0=DRY) · MDG_OPERATOR_AUTO=${MDG_OPERATOR_AUTO:-0}(0=escalate)"
     exec $PY -m mdg.live_autorun --out "$OUT" --run-id "$RID" --forever --interval "${INTERVAL:-2}" "$@" ;;
 
   live)     # 온-테스트베드 오케스트레이션 검증 (read-only 기본; ALLOW_LIVE=1 시 집행 창)

@@ -5,6 +5,13 @@ promotes bundle-level chosen_action_risk = max(atomic risk), chosen_action_rever
 = all(op.reversible) as State fields the decide-edge reads. No candidate ->
 chosen_action = None. Debounce (dry_streak) + provenance gate keep injected
 high-severity from triggering auto-response (PS-7).
+
+Phase 2 (B3, sandbox demo) — provenance/debounce RELAXATION: under operator_auto the strict
+"require a trusted source" hold is relaxed to RECORD-THEN-PASS. rank_recovery stamps the chosen
+Intent with provenance_relaxed=True so the ledger/trace records the waiver transparently, and the
+physical-action debounce is shrunk to config demo_mode.debounce_ticks downstream (response.py) so
+an injected high-severity recovery re-binds within the next tick. PRODUCTION (operator_auto off)
+is UNCHANGED: provenance_relaxed stays False and the full debounce hold applies (strict PS-7).
 """
 from __future__ import annotations
 
@@ -67,6 +74,14 @@ def rank_recovery(state: MDGState) -> dict:
     ranked = sorted(feasible, key=_sort_key)
     top = ranked[0]
 
+    # Phase 2 (B3/PS-7) provenance/debounce relaxation — DETERMINISTIC (env bool + config, no LLM,
+    # 불변식①). Under operator_auto (sandbox demo) the strict trusted-source hold on an injected
+    # high-severity recovery is RECORDED-THEN-PASSED: stamp provenance_relaxed=True on the chosen
+    # Intent so the ledger/trace shows the waiver (response.py separately shrinks the debounce to
+    # demo_mode.debounce_ticks). Production (operator_auto off) -> False, strict posture retained.
+    operator_auto = bool(state.get("operator_auto"))
+    provenance_relaxed = operator_auto and bool(loader.demo_mode().get("provenance_relaxed", False))
+
     # atomic bundle = recovery + attack-path block (X4/X6). Here single-op bundle.
     bundle = [top]
     # P4-Q1 — carry the OPAQUE VALIDATED SELECTOR from the ranked candidate's params into the
@@ -83,6 +98,8 @@ def rank_recovery(state: MDGState) -> dict:
         # P4-2 — carry the ENFORCEMENT chokepoint selector alongside the source selector so dispatch
         # can resolve two DISTINCT verified endpoints. Data ONLY (no live resolution here; 불변식②).
         enforce_at=str(top.params.get("enforce_at", "")),
+        # Phase 2 (B3) — record-then-pass waiver marker (demo only; False in production).
+        provenance_relaxed=provenance_relaxed,
     )
     return {
         "chosen_action": intent,

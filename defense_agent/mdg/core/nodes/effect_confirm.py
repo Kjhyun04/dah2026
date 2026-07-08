@@ -25,4 +25,8 @@ def effect_confirm(state: MDGState, observe=None) -> dict:
             continue
         confirmed = bool(observe(rule)) if observe is not None else False
         applied.confirmed = confirmed
+        if confirmed:
+            # before/after delta note (audit/viewer only — NOT an exec gate): records the
+            # unconfirmed->confirmed transition observed by the read-only effect observer.
+            applied.confirm_note = f"effect_confirm: {rule} unconfirmed->confirmed (observe=True)"
     return {"worldstate": updated}

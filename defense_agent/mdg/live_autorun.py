@@ -50,6 +50,7 @@ from .ledger.intent_ledger import IntentLedger, SeqWatermark
 from .llm import build_llm_deps
 from .safe_exec.backend import Backend, ExecRequest
 from .safe_exec.nsenter_helper import build_netns_prefix_map
+from .safe_exec.observer import make_effect_observer
 
 # bounded observation queue (DoS cap: collectors drop-on-Full, never grow — base.py push()).
 _QUEUE_MAX = 20000
@@ -61,6 +62,14 @@ def parse_allow_live(env) -> bool:
     """operator-go gate: allow_live is True ONLY when MDG_ALLOW_LIVE is an explicit truthy
     token. Absent/blank/anything-else -> False (운영 제약 유보 default). Never inferred."""
     return str(env.get("MDG_ALLOW_LIVE", "")).strip().lower() in _TRUE
+
+
+def parse_operator_auto(env) -> bool:
+    """sandbox OPER auto-confirm gate: operator_auto is True ONLY when MDG_OPERATOR_AUTO is an
+    explicit truthy token (same vocabulary as allow_live). Absent/blank/anything-else -> False
+    (안전 기본: OPER 티어는 사람 대기/escalate). SITL/데모 전용 — Phase 1 이 이 값을 gate/edge 로
+    소비해 OPER 대응을 자동승인·집행한다. 결정론(불변식①): env 입력만으로 분기 결정, LLM 불가시."""
+    return str(env.get("MDG_OPERATOR_AUTO", "")).strip().lower() in _TRUE
 
 
 def _make_keyring(run_id: str) -> tuple[Keyring, str]:
@@ -120,6 +129,31 @@ class _SafeExecDocker:
             return {}
         return {t.split("=", 1)[0]: t.split("=", 1)[1] for t in out.split() if "=" in t}
 
+    def pause(self, container: str) -> ExecResult:
+        """Phase 4 S1 actuator: freeze the attacker container (``docker pause``). This is a STATE
+        CHANGE (read_only=False), so it stays operator-go DRY until allow_live is flipped on the
+        backend — the same actuation gate as the netns DROP. Reversible via ``docker unpause``
+        (recorded as revert_cmd). Routes through the single Backend._spawn site (불변식②)."""
+        return self.backend.run(ExecRequest(
+            argv=["docker", "pause", container], timeout_s=8.0, reversible=True,
+            revert_cmd=f"docker unpause {container}"))
+
+    def unpause(self, container: str) -> ExecResult:
+        """Revert of ``pause`` (de-escalation / recover-on-boot). State change -> allow_live-gated."""
+        return self.backend.run(ExecRequest(
+            argv=["docker", "unpause", container], timeout_s=8.0, reversible=True))
+
+    def inspect_paused(self, container: str) -> Optional[bool]:
+        """Phase 4 effect-confirm probe: container's ``.State.Paused`` (read-only inspect).
+
+        Returns True/False when the metadata read succeeds, None on DRY/failure/unresolved so the
+        observer treats an inconclusive read as UNCONFIRMED (never a spurious recovery-confirm).
+        Same single-spawn, read-only ``inspect`` path as pid/network resolution (불변식②)."""
+        out = self._inspect(container, "{{.State.Paused}}")
+        if out is None:
+            return None
+        return out.strip().lower() == "true"
+
 
 def _default_saver():
     """LangGraph checkpointer for the driver's per-tick threads (imported lazily so this
@@ -163,7 +197,8 @@ def _shutdown(collectors, backend, join_timeout: float = 10.0) -> None:
             pass
 
 
-def run(out_dir: str, run_id: str, *, allow_live: bool = False, docker=None,
+def run(out_dir: str, run_id: str, *, allow_live: bool = False, operator_auto: bool = False,
+        docker=None,
         backend: Optional[Backend] = None, max_iters: Optional[int] = None,
         forever: bool = False, tick_interval_s: float = 0.0,
         clock: Optional[Clock] = None, keyring: Optional[Keyring] = None,
@@ -195,6 +230,13 @@ def run(out_dir: str, run_id: str, *, allow_live: bool = False, docker=None,
 
     # -- boot (out-of-graph): role/IP resolve (read-only) + seq/ledger recovery (PS-6/G3) -- #
     state0 = recon_boot(cfg=None, seqwm=seqwm, ledger=ledger, docker=docker, backend=backend)
+    # Phase 1 env->STATE wire: route_after_decide (edges.py) reads the ``operator_auto`` STATE
+    # channel to auto-confirm the OPER path, but recon_boot/initial_state never set it and no node
+    # returns it — deps only bind it as the ACT node kwarg (a node kwarg is NOT a state channel).
+    # Seed it into state0 here so the conditional edge can actually read it. It is a LastValue
+    # channel and the driver carries state forward each tick (re-seed), so this holds on every tick.
+    # Absent/False keeps the legacy escalate posture (회귀 0). Deterministic (불변식①): env bool only.
+    state0["operator_auto"] = bool(operator_auto)
     world = state0.get("worldstate")
     pidmap = dict(getattr(world, "pid", {}) or {})
     netns_prefix_map = build_netns_prefix_map(pidmap)     # container -> nsenter prefix (inert if unresolved)
@@ -214,9 +256,33 @@ def run(out_dir: str, run_id: str, *, allow_live: bool = False, docker=None,
             collectors = list(collectors) + list(epc_collectors)
         except Exception:
             smf_table = None
+    # Phase 4: effect-confirm observer (read-only 회복 관측) -> effect_confirm(observe=...).
+    # Resolves each applied rule to its response_tool and confirms via a READ-ONLY probe:
+    # docker_pause->inspect .State.Paused / nsenter_input_drop->ss (no 5762 ESTAB in target netns) /
+    # send_signed_mode->telemetry rel_alt 30m recovered. All probes go through the single Backend
+    # (불변식②). Was None (effect_confirm always confirmed=False -> no 회복 신호).
+    # Phase 5: wire the live flight-state snapshot from the AirTelemetryTap (14560/14550 decode)
+    # into the observer so send_signed_mode (S2 signed_guided 30m 복귀) can actually CONFIRM.
+    # Duck-typed by ``snapshot`` so a custom/absent collector_builder simply leaves telemetry
+    # None (signed path stays UNCONFIRMED, safe — unchanged Phase 4 posture). Read-only snapshot.
+    telemetry_fn = None
+    for c in collectors:
+        snap = getattr(c, "snapshot", None)
+        if getattr(c, "source_id", None) == "air_telemetry_tap" and callable(snap):
+            telemetry_fn = snap
+            break
+    observe = make_effect_observer(
+        docker=docker, netns_prefix_map=netns_prefix_map, backend=backend, telemetry=telemetry_fn)
     deps = {
         "inbox": inbox, "verify": verify_fn, "clock": clock, "backend": backend,
-        "ledger": ledger, "observe": None, "gate": None,
+        "ledger": ledger, "observe": observe, "gate": None,
+        # Phase 4: the duck-typed docker backend so an operator_auto docker_pause ACTUATES via
+        # act_host.pause (S1 회복). None -> operator-go DRY (fail-safe). Same read-only inspect
+        # backend the effect-observer uses; ``pause`` is state-changing -> allow_live-gated (②).
+        "docker": docker,
+        # Phase 0: sandbox OPER auto-confirm flag -> build_graph 가 gate/edge 로 넘길 배선(실사용 Phase 1).
+        # 기본 False 유지 시 기존 escalate 경로 무변경(회귀 0). 결정론(불변식①): env 입력만으로 결정.
+        "operator_auto": operator_auto,
         # LLM advisory(orient/decide): ANTHROPIC_API_KEY + litellm/jinja2 있으면 활성, 없으면 {None,None}
         # 결정론 폴백(G6). LLM 은 edge-invisible(라우팅/집행 불가시)이라 켜져도 불변식① 무손상.
         **build_llm_deps(),
@@ -237,6 +303,23 @@ def run(out_dir: str, run_id: str, *, allow_live: bool = False, docker=None,
         _shutdown(collectors, backend, join_timeout)
 
 
+def _emit_live_banner(operator_auto: bool) -> None:
+    """Issue#2(b): loud fail-open WARNING to stderr when allow_live is on. The shipped
+    .env.example ships MDG_ALLOW_LIVE=1 (SITL 데모 기본), so the fail-closed narrative is no
+    longer implicit — this banner makes the actual blast radius explicit at every launch."""
+    bar = "=" * 72
+    lines = [
+        "", bar,
+        "  *** LIVE ACTUATION ON (MDG_ALLOW_LIVE=1) — SITL/샌드박스 전용, 실기체 금지 ***",
+        "  상태변경(가역 DROP/pause 등)이 실집행될 수 있음. blast radius 확인 필수.",
+    ]
+    if operator_auto:
+        lines.append(
+            "  *** OPER 자동승인 ON (MDG_OPERATOR_AUTO=1) — 고위험/비가역 명령도 사람 승인 없이 자동집행 ***")
+    lines += [bar, ""]
+    print("\n".join(lines), file=sys.stderr, flush=True)
+
+
 def main(argv: Optional[list[str]] = None) -> int:
     p = argparse.ArgumentParser(
         prog="mdg.live_autorun",
@@ -244,6 +327,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--out", default="./live_out", help="output root dir (run dir = <out>/<run-id>)")
     p.add_argument("--run-id", default=None, help="run id (default: run-<UTC timestamp>)")
     p.add_argument("--max-iters", type=int, default=None, help="driver tick budget (default: config)")
+    p.add_argument("--allow-live", action="store_true", default=False,
+                   help="operator-go: AUTO 티어 실집행 창 개방(플래그). env MDG_ALLOW_LIVE 와 OR 병합 "
+                        "(run_autonomous.sh 가 ALLOW_LIVE=1 시 이 플래그를 전달). 미지정 시 env 가 유일 소스.")
     p.add_argument("--forever", action="store_true",
                    help="24/7 상시 감시 모드 — quiescence/max_iters 무시하고 KeyboardInterrupt 까지 계속 관측.")
     p.add_argument("--interval", type=float, default=2.0,
@@ -251,12 +337,21 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = p.parse_args(argv)
 
     run_id = args.run_id or time.strftime("run-%Y%m%d-%H%M%S", time.gmtime())
-    allow_live = parse_allow_live(os.environ)             # operator-go: default False
+    # operator-go: --allow-live 플래그(run_autonomous.sh 경로) OR env(dah.sh monitor/autorun 경로).
+    # 둘 다 없으면 default False(운영 제약 유보). env 파서가 여전히 유일 truthy 소스, 플래그는 그 위 OR.
+    allow_live = bool(args.allow_live) or parse_allow_live(os.environ)
+    operator_auto = parse_operator_auto(os.environ)       # sandbox OPER auto-confirm: default False
+
+    if allow_live:
+        # Issue#2(b): allow_live=1 이면 monitor/autorun 기동 시 stderr 로 굵은 경고 배너 강제 출력.
+        # 이 경로가 monitor 와 autorun 을 모두 관통하는 단일 chokepoint 다(둘 다 live_autorun 경유).
+        _emit_live_banner(operator_auto)
 
     backend = Backend(allow_live=allow_live, mode="local")
     docker = _SafeExecDocker(backend)                     # boot netns resolution via the single spawn site
     try:
-        run(args.out, run_id, allow_live=allow_live, docker=docker, backend=backend,
+        run(args.out, run_id, allow_live=allow_live, operator_auto=operator_auto,
+            docker=docker, backend=backend,
             max_iters=args.max_iters, forever=args.forever,
             tick_interval_s=(args.interval if args.forever else 0.0))
     except KeyboardInterrupt:
