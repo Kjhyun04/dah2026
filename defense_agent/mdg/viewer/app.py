@@ -122,8 +122,8 @@ def load_panels(run_path: str) -> dict:
     summary = V.summarize(verdicts)
     return {
         "banner": {
-            "text": "AGENT ≠ TRUTH — the agent's decisions are NOT ground truth; the "
-                    "independent Verifier (separate trust root) is authoritative for link health.",
+            "text": "에이전트 ≠ 진실 — 에이전트의 판단은 지상진실(ground truth)이 아니다. "
+                    "독립 Verifier(별도 신뢰근원, replay 전용)가 링크 상태의 권위다.",
             "divergences": summary["agent_truth_divergences"],
             "trust_root": "mdg.verifier (out-of-graph, replay-only, deterministic)",
         },
@@ -155,7 +155,7 @@ _HTML = """<!doctype html><html><head><meta charset="utf-8"><title>MDG Replay Vi
  .ok{color:#7fe0a8}.warn{color:#ffcf6f}.bad{color:#ff8ea3}
  @media(max-width:900px){.grid{grid-template-columns:1fr}}
 </style></head><body>
-<h1>MDG Replay Viewer — 3패널 (동작 · 통신 · 검증)</h1>
+<h1>MDG 방어 뷰어 — 3패널 (동작 · 통신 · 검증) · 실시간 자동갱신</h1>
 <div id="banner"></div>
 <div class="grid">
  <div class="panel"><h2>① 동작 (decision JSONL)</h2><div id="p-action"></div></div>
@@ -165,21 +165,26 @@ _HTML = """<!doctype html><html><head><meta charset="utf-8"><title>MDG Replay Vi
 <script>
 const TOKEN=new URLSearchParams(location.search).get('token')||'';
 const H={headers:{'Authorization':'Bearer '+TOKEN}};
+const LBL={tick:'틱',impact_band:'영향밴드',decision:'결정',enforcement:'집행',incidents:'사건수',ledger:'원장',
+  metric:'지표',value:'값',band:'밴드',src:'소스',agent:'에이전트판단',truth:'진실판정','≠':'≠',reason:'사유'};
 function esc(s){return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
-function tbl(rows,cols){let h='<table><tr>'+cols.map(c=>'<th>'+c+'</th>').join('')+'</tr>';
+function tbl(rows,cols){let h='<table><tr>'+cols.map(c=>'<th>'+(LBL[c]||c)+'</th>').join('')+'</tr>';
  for(const r of rows){h+='<tr>'+cols.map(c=>'<td>'+esc(r[c])+'</td>').join('')+'</tr>';}return h+'</table>';}
-fetch('api/panels',H).then(r=>r.json()).then(d=>{
- if(d.detail){document.getElementById('banner').innerHTML='<div class="banner"><b>ERROR:</b> '+esc(d.detail)+'</div>';return;}
- document.getElementById('banner').innerHTML='<div class="banner"><b>⚠ '+esc(d.banner.text)+'</b>'
-  +'<div class="root">trust root: '+esc(d.banner.trust_root)+' · agent≠truth divergences: '
-  +'<span class="'+(d.banner.divergences?'bad':'ok')+'">'+d.banner.divergences+'</span>'
-  +' · record-time redact: on · read-only</div></div>';
- document.getElementById('p-action').innerHTML=tbl(d.panels.action,['tick','impact_band','decision','enforcement','incidents','ledger']);
- const comm=[];for(const t of d.panels.communication){for(const e of t.telemetry){comm.push({tick:t.tick,metric:e.metric,value:e.value,band:e.band,src:e.source_id});}}
- document.getElementById('p-comm').innerHTML=comm.length?tbl(comm,['tick','metric','value','band','src']):'<i>no telemetry rows</i>';
- const vr=d.panels.verification.map(v=>({tick:v.tick,agent:v.agent_decision,truth:v.truth_verdict,'≠':v.agent_truth_divergence?'⚠':'',reason:v.reason}));
- document.getElementById('p-verify').innerHTML=tbl(vr,['tick','agent','truth','≠','reason']);
-});
+function load(){
+ fetch('api/panels',H).then(r=>r.json()).then(d=>{
+  if(d.detail){document.getElementById('banner').innerHTML='<div class="banner"><b>오류:</b> '+esc(d.detail)+'</div>';return;}
+  document.getElementById('banner').innerHTML='<div class="banner"><b>⚠ '+esc(d.banner.text)+'</b>'
+   +'<div class="root">신뢰근원(trust root): '+esc(d.banner.trust_root)+' · 에이전트≠진실 불일치: '
+   +'<span class="'+(d.banner.divergences?'bad':'ok')+'">'+d.banner.divergences+'</span>'
+   +' · 기록시점 마스킹: on · 읽기전용 · 마지막 갱신 '+new Date().toLocaleTimeString('ko-KR')+'</div></div>';
+  document.getElementById('p-action').innerHTML=tbl(d.panels.action,['tick','impact_band','decision','enforcement','incidents','ledger']);
+  const comm=[];for(const t of d.panels.communication){for(const e of t.telemetry){comm.push({tick:t.tick,metric:e.metric,value:e.value,band:e.band,src:e.source_id});}}
+  document.getElementById('p-comm').innerHTML=comm.length?tbl(comm,['tick','metric','value','band','src']):'<i>텔레메트리 행 없음</i>';
+  const vr=d.panels.verification.map(v=>({tick:v.tick,agent:v.agent_decision,truth:v.truth_verdict,'≠':v.agent_truth_divergence?'⚠':'',reason:v.reason}));
+  document.getElementById('p-verify').innerHTML=tbl(vr,['tick','agent','truth','≠','reason']);
+ }).catch(e=>{document.getElementById('banner').innerHTML='<div class="banner"><b>연결 오류:</b> '+esc(e)+' (감시/뷰어 실행 확인)</div>';});
+}
+load(); setInterval(load, 3000);   // ★ 3초마다 실시간 자동 갱신 (run.jsonl 성장 반영)
 </script></body></html>"""
 
 

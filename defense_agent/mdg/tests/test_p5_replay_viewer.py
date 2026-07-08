@@ -288,7 +288,7 @@ def test_viewer_panels_and_failclosed():
         p = os.path.join(d, "run.jsonl")
         _record_to(p)
         panels = viewer.load_panels(p)
-        assert "AGENT ≠ TRUTH" in panels["banner"]["text"]
+        assert "에이전트 ≠ 진실" in panels["banner"]["text"]
         assert panels["banner"]["divergences"] == 2
         assert panels["record_time_redact"] is True and panels["read_only"] is True
         assert len(panels["panels"]["action"]) == 3
