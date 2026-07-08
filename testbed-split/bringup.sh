@@ -5,11 +5,17 @@
 #   사용:  bash ~/testbed-split/bringup.sh          # 실제 생성
 #          bash ~/testbed-split/bringup.sh --check  # 비파괴 사전검증(아무것도 안 바꿈)
 set -uo pipefail
-TB="$HOME/testbed"; SPLIT="$HOME/testbed-split"
+# 경로 자기결정(수동 cp positioning 불필요): 이 스크립트 위치=testbed-split, 그 형제 dir=testbed.
+#   → git clone 후 ~/dah2026/testbed-split/bringup.sh 를 바로 실행해도, ~/testbed-split 로 옮겨도 동작.
+SPLIT="$(cd "$(dirname "$0")" && pwd)"
+TB="$(cd "$SPLIT/../testbed" 2>/dev/null && pwd)"; [ -d "$TB" ] || TB="$HOME/testbed"
 RAN="$TB/compose/docker-compose.ran.yml"
 SGI="$TB/compose/docker-compose.sgi.yml"
 EPC="$SPLIT/compose/docker-compose.epc-split.yml"
+[ -d "$TB" ] && [ -f "$RAN" ] || { echo "ERROR: testbed 경로 해석 실패(TB=$TB). git clone 구조 확인."; exit 1; }
 cd "$TB"
+# docker 접근 프리플라이트: 00-server-setup 후 '재로그인' 안 했으면 여기서 명확히 실패(연쇄 permission denied 방지).
+docker ps >/dev/null 2>&1 || { echo "ERROR: docker 접근 불가 — 00-server-setup.sh 실행 뒤 '재로그인(exit→재접속)' 또는 'newgrp docker' 필요."; exit 1; }
 log(){ printf "\n\033[1;35m===== %s =====\033[0m\n" "$*"; }
 
 wait_tun(){ local IP; for i in $(seq 1 30); do IP="$(docker exec "$1" ip -o -4 addr show tun_srsue 2>/dev/null | awk '{print $4}' | cut -d/ -f1)"; [ -n "${IP:-}" ] && { echo "  $1 tun=$IP"; return 0; }; sleep 2; done; echo "  WARN $1 tun 미생성 — docker logs $1"; }

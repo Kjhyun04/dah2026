@@ -12,17 +12,15 @@
 에이전트가 **인스턴스 내 같은 키**를 쓰므로 C2·서명·배포가 전부 정합(키불일치 0). 새 인스턴스에서:
 
 ```bash
+# ★ 수동 cp 불필요 — bringup 이 경로를 자기해석(testbed-split 형제 dir=testbed). clone 위치에서 바로 실행.
 git clone https://github.com/Kjhyun04/dah2026 ~/dah2026
-cp -r ~/dah2026/testbed ~/testbed
-cp -r ~/dah2026/testbed-split ~/testbed-split
-cp -r ~/dah2026/defense_agent ~/defense_agent
-bash ~/testbed/scripts/00-server-setup.sh     # docker+SCTP+TUN → 그다음 반드시 재로그인(docker 그룹)
-# ── 재로그인(exit 후 재접속) 후 ──
-bash ~/testbed-split/bringup.sh               # .mav-sign-key/.env-aria 자동생성 → 이미지 빌드 + 20 컨테이너
-docker logs -f gcs_c2                          # 2~3분 양방향 C2 유지 확인 (Ctrl-C)
+bash ~/dah2026/testbed/scripts/00-server-setup.sh   # docker+SCTP+TUN+python venv/openssl/curl
+# ── ★반드시 재로그인 (docker 그룹): exit → 다시 ssh 접속 ──
+bash ~/dah2026/testbed-split/bringup.sh             # 키 자동생성·sgi_test 재시도·경로 자기해석 → 이미지 빌드 + 19 컨테이너
+docker logs -f gcs_c2                                # 2~3분 양방향 C2 유지 확인 (Ctrl-C)
 # ── 방어 에이전트 ──
-cd ~/defense_agent && python3 -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]"
-./dah.sh verify && ./dah.sh test               # 무결성 게이트 + pytest
+cd ~/dah2026/defense_agent && python3 -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]"
+./dah.sh verify && ./dah.sh test                     # ALL GATES PASS + 193 passed / 1 skipped
 ```
 > **시크릿 자동생성(자체정합):** `.mav-sign-key`(bringup 0-pre)·`.env-aria`(70-aria-up)가 없으면 fresh
 > 64-hex로 생성되어 인스턴스 내 모든 컴포넌트가 동일 키를 쓴다. 방어 에이전트는 **key-free**(서명은 gcs_c2
