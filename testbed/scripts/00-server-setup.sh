@@ -20,6 +20,10 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker-compose-v2 \
   || sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker-compose-plugin \
   || log "! compose 플러그인 설치 실패 — 수동확인"
 
+log "에이전트 실행 전제(python3-venv/pip · defense_agent 의 python -m venv + pip install -e)"
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv python3-pip \
+  || log "! python3-venv/pip 설치 실패 — 수동확인(apt install python3-venv python3-pip)"
+
 log "SCTP 로드 + 부팅 영속(S1AP 필수)"
 sudo modprobe sctp
 echo sctp | sudo tee /etc/modules-load.d/sctp.conf >/dev/null
