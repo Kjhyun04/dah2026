@@ -23,6 +23,7 @@ if [ "${1:-}" = "--check" ]; then
   for f in "$EPC" "$RAN" "$SGI" scripts/70-aria-up.sh scripts/80-web-up.sh scripts/71-verify-aria.sh scripts/81-verify-web.sh scripts/10-build-images.sh images/web compose/configs/ran/ue2.conf; do
     [ -e "$f" ] && echo "   ok  $f" || { echo "   FAIL 없음: $f"; fail=1; }
   done
+  [ -s "$TB/.mav-sign-key" ] && echo "   ok  .mav-sign-key 존재" || echo "   auto-gen 예정 .mav-sign-key (bringup 실행 시 fresh 생성 — git clone 배포 정상)"
   echo "[2] compose 유효성(docker compose config)"
   docker compose -f "$EPC" config -q 2>/dev/null && echo "   ok  epc-split" || { echo "   FAIL epc-split 파싱"; fail=1; }
   docker compose -f "$RAN" config -q 2>/dev/null && echo "   ok  ran" || { echo "   FAIL ran 파싱"; fail=1; }
@@ -50,6 +51,16 @@ if [ "${1:-}" = "--check" ]; then
 fi
 
 # ─────────────────────────── 실제 콜드스타트 ───────────────────────────
+# 0-pre) 서명키 자기치유(judge-runnable): git clone 배포는 시크릿(.mav-sign-key) 미포함이므로,
+#   없으면 여기서 fresh 생성한다(64-hex, proxy sign/verify 가 같은 파일을 마운트 → 인스턴스 내 자체정합).
+#   이미 존재하면(기존 서버와 '키 동일'로 전송한 경우 등) 보존한다. .env-aria 는 70-aria-up 이 동일 방식.
+SIGN_KEY="$TB/.mav-sign-key"
+if [ -s "$SIGN_KEY" ]; then
+  echo "  .mav-sign-key 존재(보존)"
+else
+  openssl rand -hex 32 > "$SIGN_KEY" && chmod 600 "$SIGN_KEY" && echo "  .mav-sign-key 생성(fresh 64-hex · 자체정합)"
+fi
+
 # 0) external 네트워크 보장(split-epc 기동 전 필수). net_core 는 split compose 가 생성.
 log "0/7 네트워크"
 docker network inspect net_cellular >/dev/null 2>&1 || docker network create --subnet 10.44.0.0/24 net_cellular

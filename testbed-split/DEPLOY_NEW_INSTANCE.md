@@ -6,7 +6,34 @@
 
 ---
 
-## 0. (기존 서버에서 1회) 배포 패키지 생성
+## 0-A. git clone 배포 (권장 · 단독 실행 · 시크릿 자동생성) ★감독관용
+
+**이 경로만으로 완결**된다(패키지·키 전송 불필요). 테스트베드가 자체 키를 생성하고 proxy sign/verify·ARIA·
+에이전트가 **인스턴스 내 같은 키**를 쓰므로 C2·서명·배포가 전부 정합(키불일치 0). 새 인스턴스에서:
+
+```bash
+git clone https://github.com/Kjhyun04/dah2026 ~/dah2026
+cp -r ~/dah2026/testbed ~/testbed
+cp -r ~/dah2026/testbed-split ~/testbed-split
+cp -r ~/dah2026/defense_agent ~/defense_agent
+bash ~/testbed/scripts/00-server-setup.sh     # docker+SCTP+TUN → 그다음 반드시 재로그인(docker 그룹)
+# ── 재로그인(exit 후 재접속) 후 ──
+bash ~/testbed-split/bringup.sh               # .mav-sign-key/.env-aria 자동생성 → 이미지 빌드 + 20 컨테이너
+docker logs -f gcs_c2                          # 2~3분 양방향 C2 유지 확인 (Ctrl-C)
+# ── 방어 에이전트 ──
+cd ~/defense_agent && python3 -m venv .venv && . .venv/bin/activate && pip install -e .
+./dah.sh verify && ./dah.sh test               # 무결성 게이트 + pytest
+```
+> **시크릿 자동생성(자체정합):** `.mav-sign-key`(bringup 0-pre)·`.env-aria`(70-aria-up)가 없으면 fresh
+> 64-hex로 생성되어 인스턴스 내 모든 컴포넌트가 동일 키를 쓴다. 방어 에이전트는 **key-free**(서명은 gcs_c2
+> 위임)라 키를 쥐지 않는다. → **감독관은 위 명령만 입력하면 실행된다.** 키불일치 문제 없음.
+
+> 아래 §0~§5(패키지 + '키 동일' 전송)는 **기존 서버와 키·아티팩트를 맞춰야 할 때만** 쓴다(옛 캡처 pcap
+> 재사용·서버 간 상호통신 등). 단독 데모/제출 실행에는 위 **0-A**로 충분하다.
+
+---
+
+## 0. (기존 서버에서 1회) 배포 패키지 생성 — (§0~§5는 '키 동일' 연속성용, 선택)
 
 ```bash
 bash ~/testbed-split/package.sh          # → ~/dah-testbed-deploy.tgz (소스 + 시크릿, 약 61KB)
