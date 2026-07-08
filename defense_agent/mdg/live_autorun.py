@@ -47,6 +47,7 @@ from .core.driver import run_driver
 from .core.graph import build_graph
 from .core.recon import recon_boot
 from .ledger.intent_ledger import IntentLedger, SeqWatermark
+from .llm import build_llm_deps
 from .safe_exec.backend import Backend, ExecRequest
 from .safe_exec.nsenter_helper import build_netns_prefix_map
 
@@ -216,7 +217,9 @@ def run(out_dir: str, run_id: str, *, allow_live: bool = False, docker=None,
     deps = {
         "inbox": inbox, "verify": verify_fn, "clock": clock, "backend": backend,
         "ledger": ledger, "observe": None, "gate": None,
-        "llm_orient": None, "llm_decide": None,           # LLM advisory OFF -> deterministic core (불변식①)
+        # LLM advisory(orient/decide): ANTHROPIC_API_KEY + litellm/jinja2 있으면 활성, 없으면 {None,None}
+        # 결정론 폴백(G6). LLM 은 edge-invisible(라우팅/집행 불가시)이라 켜져도 불변식① 무손상.
+        **build_llm_deps(),
         "smf_table": smf_table,                           # P4 stale-binding guard (b) live re-attribution
         "source_domains": source_domains_fn(collectors),  # {source_id -> domain} for liveness (P3-Q5)
         "checkpointer": saver_factory(),                  # per-tick threads; driver prunes t-1 (P3)
