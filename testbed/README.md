@@ -3,7 +3,7 @@
 공격 계층 없는 **인프라 중심(infra-only)** 4G UAV C2 테스트베드.
 Open5GS(4G EPC) + srsRAN(ZMQ 가상 RF) + ArduPilot SITL · **PDCP EEA2/EIA2 + 종단(end-to-end) ARIA-256-GCM** · SGi측 GCS · 커스텀 웹 대시보드(로그 + 3D, 클라이언트 렌더).
 
-> **상태: 분리코어(epc-split) + Rogue-UE = 20 컨테이너 · 원-커맨드 `bringup.sh` · 2026-07-08**
+> **상태: 분리코어(epc-split) + Rogue-UE = 19 컨테이너 · 원-커맨드 `bringup.sh` · 2026-07-08**
 
 > ⚠️ **범위·안전 경고 (Scope & Safety)**
 > - 본 테스트베드는 **인가된 격리 샌드박스의 SITL(software-in-the-loop) 전용**이다. **실기체(real airframe)가 아니다.**
@@ -90,12 +90,12 @@ ssh-keygen -R <옛IP>     # known_hosts에서 옛 IP 항목 제거
 
 ## 파트 3 — 테스트베드 생성
 
-현재 구성 = **분리코어(epc-split) + Rogue-UE(2셀/2UE) = 20 컨테이너**. (구 `up-all.sh`/단일-epc는 **사용 금지** — 파트 8 참조.)
+현재 구성 = **분리코어(epc-split) + Rogue-UE(2셀/2UE) = 19 컨테이너**. (구 `up-all.sh`/단일-epc는 **사용 금지** — 파트 8 참조.)
 
 ### A) 기존 서버 / 재시작·AMI 복원 후 — 원-커맨드
 ```bash
 bash ~/testbed-split/bringup.sh --check   # 비파괴 사전검증(권장) → CHECK PASS
-bash ~/testbed-split/bringup.sh           # 20 컨테이너를 '검증된 순서'로 콜드스타트
+bash ~/testbed-split/bringup.sh           # 19 컨테이너를 '검증된 순서'로 콜드스타트
 ```
 `bringup.sh` 흐름: 네트워크 → 분리코어 EPC → 가입자 2명(uav + attacker) → **RAN(eNB→20s→UE 순차, ZMQ desync 회피)** → SGi 라우트 → **ARIA lockstep** → web → G4/G5 검증. 근거 순서: 파트 6(복구 절차).
 
@@ -103,7 +103,7 @@ bash ~/testbed-split/bringup.sh           # 20 컨테이너를 '검증된 순서
 
 ### B) 신규 인스턴스 — 2-스텝 배포 (ARIA·서명 키까지 동일)
 
-목적: 새 EC2 인스턴스에서 **기존과 동일한 테스트베드**(분리코어 EPC + RAN 2셀/2UE + SITL + ARIA + web, 20 컨테이너)를 재현한다. ARIA·서명 키까지 동일하게 전송 → 이후 공격/방어 에이전트 배포·실행 시 **키불일치 오류 0**.
+목적: 새 EC2 인스턴스에서 **기존과 동일한 테스트베드**(분리코어 EPC + RAN 2셀/2UE + SITL + ARIA + web, 19 컨테이너)를 재현한다. ARIA·서명 키까지 동일하게 전송 → 이후 공격/방어 에이전트 배포·실행 시 **키불일치 오류 0**.
 
 **STEP 0 — (기존 서버에서 1회) 배포 패키지 생성**
 ```bash
@@ -133,13 +133,13 @@ bash ~/testbed/scripts/00-server-setup.sh
 ```bash
 bash ~/testbed/scripts/01-preflight.sh           # (선택) docker/compose/SCTP/TUN 확인
 bash ~/testbed-split/bringup.sh --check          # (권장) 비파괴 사전검증 → CHECK PASS
-bash ~/testbed-split/bringup.sh                  # 이미지 자동빌드 + 20 컨테이너 검증 순서 기동
+bash ~/testbed-split/bringup.sh                  # 이미지 자동빌드 + 19 컨테이너 검증 순서 기동
 ```
 
 **동일성 범위 (정직 · honest scope)**
 | 항목 | 동일? |
 |---|---|
-| 20 컨테이너 구성·토폴로지·포트 | ✅ 완전 동일(소스 결정) |
+| 19 컨테이너 구성·토폴로지·포트 | ✅ 완전 동일(소스 결정) |
 | **ARIA 키·서명 키** | ✅ 동일(`.env-aria`·`.mav-sign-key` 전송) → **에이전트 배포 시 키불일치 0** |
 | UE풀 tun IP(`10.45.0.x`) | 동적 할당(재시작마다 변동) — **정찰로 특정, 하드코딩 금지** |
 | 접속 IP(Elastic IP) | 인스턴스별 상이 — **에이전트 config의 `host`만 교체** |

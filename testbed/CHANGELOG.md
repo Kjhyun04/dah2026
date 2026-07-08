@@ -3,7 +3,7 @@
 ## 2026-07-08 · 원-커맨드 생성 · 배포 · 문서 정리
 
 ### 원-커맨드 콜드스타트
-- **`testbed-split/bringup.sh`** (+`--check` 비파괴 사전검증): 분리코어(epc-split)+Rogue-UE(2셀/2UE) **20 컨테이너**를 검증된 순서로 생성.
+- **`testbed-split/bringup.sh`** (+`--check` 비파괴 사전검증): 분리코어(epc-split)+Rogue-UE(2셀/2UE) **19 컨테이너**를 검증된 순서로 생성.
   네트워크 선생성 → 분리코어 EPC → 가입자 2명 → **RAN(eNB→20s→UE 순차, ZMQ desync 회피)** → SGi 라우트 → **ARIA lockstep** → web → G4/G5.
 - 절대금지(`RECOVERY_C2_AFTER_RESTORE.md` §1) 내장 회피: monolithic `up-all.sh`/`docker-compose.epc.yml`, eNB·UE 동시 재생성, `--remove-orphans`.
 - 근본 에러(문서화): RAN attach는 재시작 후 자동복구 안 됨(UE RRC IDLE→detach→C2 붕괴) → 순서·lockstep으로만 안정.

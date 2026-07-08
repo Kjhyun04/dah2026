@@ -1,6 +1,6 @@
 ﻿# 신규 인스턴스에 테스트베드 배포 (B안 · 2-스텝 · 키 동일)
 
-> 목적: 새 EC2 인스턴스에서 **기존과 동일한 테스트베드**(분리코어 EPC + RAN 2셀/2UE + SITL + ARIA + web, 20 컨테이너)를 재현.
+> 목적: 새 EC2 인스턴스에서 **기존과 동일한 테스트베드**(분리코어 EPC + RAN 2셀/2UE + SITL + ARIA + web, 19 컨테이너)를 재현.
 > ARIA·서명 키까지 **동일**하게 전송 → 이후 공격/방어 에이전트 배포·실행 시 **키불일치 오류 없음**.
 > 근거: `RECOVERY_C2_AFTER_RESTORE.md`(검증 순서), `00-server-setup.sh`, `bringup.sh`.
 
@@ -64,7 +64,7 @@ bash ~/testbed/scripts/00-server-setup.sh
 ```bash
 bash ~/testbed/scripts/01-preflight.sh          # (선택) docker/compose/SCTP/TUN 확인
 bash ~/testbed-split/bringup.sh --check          # (권장) 비파괴 사전검증 → CHECK PASS
-bash ~/testbed-split/bringup.sh                  # 이미지 자동빌드 + 20 컨테이너 검증 순서 기동
+bash ~/testbed-split/bringup.sh                  # 이미지 자동빌드 + 19 컨테이너 검증 순서 기동
 ```
 `bringup.sh`가 하는 일: 네트워크 생성 → 분리코어 EPC → 가입자 2명 → **RAN(eNB→20s→UE 순차, ZMQ desync 회피)** → SGi 라우트 → **ARIA lockstep** → web → 검증. (상세: 스크립트 헤더 / `RECOVERY_C2_AFTER_RESTORE.md`)
 
@@ -78,7 +78,7 @@ bash ~/testbed-split/bringup.sh                  # 이미지 자동빌드 + 20 �
 
 | 항목 | 동일? |
 |---|---|
-| 20 컨테이너 구성·토폴로지·포트 | ✅ 완전 동일(소스 결정) |
+| 19 컨테이너 구성·토폴로지·포트 | ✅ 완전 동일(소스 결정) |
 | **ARIA 키·서명 키** | ✅ 동일(.env-aria·.mav-sign-key 전송) → **에이전트 배포 시 키불일치 0** |
 | UE풀 tun IP(10.45.0.x) | 동적 할당(재시작마다 변동) — 정찰로 특정, 하드코딩 금지 |
 | 접속 IP(Elastic IP) | 인스턴스별 상이 — 에이전트 config의 host만 교체 |
