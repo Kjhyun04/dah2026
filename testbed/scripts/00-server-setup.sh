@@ -11,9 +11,15 @@ log(){ printf '\033[1;36m[SETUP]\033[0m %s\n' "$*"; }
 log "apt update"
 sudo apt-get update -qq
 
-log "docker.io + SCTP 커널모듈 설치"
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-  docker.io "linux-modules-extra-$(uname -r)"
+log "docker.io 설치"
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker.io
+
+# SCTP(S1AP 필수): 최신 커널(예: Ubuntu 26.04 kernel 7.x-aws)은 sctp 가 base linux-modules 에 내장되어
+# modprobe 만으로 로드된다. linux-modules-extra-<kernel> 는 있으면 설치(구커널 대비)하되 없어도 실패시키지
+# 않는다(아래 modprobe 로 실검증). 예전엔 docker.io 와 묶여, 이 패키지 부재 시 docker 까지 통째 실패했음.
+log "SCTP 커널모듈(가능 시 linux-modules-extra; 최신 커널은 base 내장이라 불필요)"
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "linux-modules-extra-$(uname -r)" 2>/dev/null \
+  || log "  linux-modules-extra-$(uname -r) 미제공 — base 모듈로 진행(modprobe 로 확인)"
 
 log "docker compose 플러그인"
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker-compose-v2 \
@@ -25,7 +31,7 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv python3-
   || log "! 전제 패키지 설치 실패 — 수동확인(apt install python3-venv python3-pip openssl curl)"
 
 log "SCTP 로드 + 부팅 영속(S1AP 필수)"
-sudo modprobe sctp
+sudo modprobe sctp || { log "! sctp 모듈 로드 실패 — S1AP 불가(커널에 sctp 부재, 매우 드묾). 확인 필요."; exit 1; }
 echo sctp | sudo tee /etc/modules-load.d/sctp.conf >/dev/null
 
 log "TUN 확인/로드"
