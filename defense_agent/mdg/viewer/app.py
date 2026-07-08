@@ -161,6 +161,16 @@ def _telemetry_rows(tick: play.TickView) -> list[dict]:
 _FLIGHT_TARGET_ALT = 30.0                       # S2 복귀 목표 고도(m) — 스파크라인 기준선
 _RECOVERY_STEPS = (("detect", "탐지"), ("respond", "대응"),
                    ("enforce", "집행"), ("confirm", "확인"), ("recover", "회복"))
+# send_signed_mode(S2 물리 복귀)만의 메커니즘 주석: 자율 랭킹은 가역 봉쇄를 항상 위로 두어 서명복귀를
+# 선택하지 않으므로 respond=운영자 명시선택(operator-select), enforce=키 보유 gcs_c2 위임 발행,
+# confirm=하강중 30m 대역 통과가 아닌 rel_alt 30m 정착 관측. PRESENTATION ONLY(밴드/집행 판정 불변).
+_SIGNED_TOOLS = {"send_signed_mode"}
+_SIGNED_STEP_NOTES = {"respond": "operator-select", "enforce": "gcs_c2 위임", "confirm": "rel_alt 30m"}
+
+
+def _is_signed_recovery(tool: str, rule: str) -> bool:
+    """True for the S2 signed-mode physical-return recovery (send_signed_mode / signed_* rule)."""
+    return tool in _SIGNED_TOOLS or str(rule or "").startswith("signed")
 
 
 def _flight_series(comm_panel: list[dict]) -> list[dict]:
@@ -290,13 +300,18 @@ def _recovery_events(ticks: list, band_by_tick: dict, flight: list[dict]) -> lis
                 "recover": (recover_tick is not None) or confirmed}
         tickmap = {"detect": detect_tick, "respond": first_tick, "enforce": enforce_tick,
                    "confirm": confirm_tick, "recover": recover_tick}
-        steps = [
-            {"key": k, "label": lbl, "done": done[k], "tick": tickmap[k],
-             **({"auto": ev["operator_auto_confirmed"]} if k == "enforce" else {})}
-            for k, lbl in _RECOVERY_STEPS
-        ]
+        signed = _is_signed_recovery(ev["tool"], rule)
+        steps = []
+        for k, lbl in _RECOVERY_STEPS:
+            step = {"key": k, "label": lbl, "done": done[k], "tick": tickmap[k]}
+            if k == "enforce":
+                step["auto"] = ev["operator_auto_confirmed"]
+            # S2 서명복귀 메커니즘 주석(대응=operator-select · 집행=gcs_c2 위임 · 확인=rel_alt 30m)
+            if signed and k in _SIGNED_STEP_NOTES:
+                step["note"] = _SIGNED_STEP_NOTES[k]
+            steps.append(step)
         out.append({
-            "rule": rule, "tool": ev["tool"], "tier": tier,
+            "rule": rule, "tool": ev["tool"], "tier": tier, "signed": signed,
             "revert_cmd": ev["revert_cmd"],
             "operator_auto_confirmed": ev["operator_auto_confirmed"],
             "provenance_relaxed": ev["provenance_relaxed"],
@@ -482,6 +497,7 @@ _HTML = """<!doctype html><html><head><meta charset="utf-8"><title>MDG 방어 �
  .rsep{color:#3f5168}
  .rtk{color:#7f8ea3;font-size:10px}
  .rauto{background:#1a2740;border:1px solid #3a5a8a;color:#9fc4f0;font-size:10px;padding:0 5px;border-radius:4px}
+ .rnote{background:#14202e;border:1px solid #2b4a5e;color:#8fd0e0;font-size:9px;padding:0 5px;border-radius:4px;margin-left:2px}
  .ralt{background:#0f2a1e;border:1px solid #2f6b4a;color:#8fe7b8;font-size:10px;padding:0 5px;border-radius:4px}
  .rmeta{font-size:11px;color:#9fb0c4;margin-top:9px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
  .spark{display:block;width:100%;height:66px;background:#0b111c;border-radius:6px;margin-bottom:5px}
@@ -609,11 +625,13 @@ function renderRecovery(rec){
    const steps=(e.steps||[]).map(s=>{
      const tk=(s.tick!=null)?(' <span class="rtk">#'+s.tick+'</span>'):'';
      const au=(s.key==='enforce'&&s.auto)?' <span class="rauto">auto</span>':'';
-     return '<span class="rstep '+(s.done?'done':'pending')+'">'+(s.done?'✓':'○')+' '+esc(s.label)+au+tk+'</span>';
+     const nt=s.note?(' <span class="rnote">'+esc(s.note)+'</span>'):'';   // 서명복귀 메커니즘 주석
+     return '<span class="rstep '+(s.done?'done':'pending')+'">'+(s.done?'✓':'○')+' '+esc(s.label)+nt+au+tk+'</span>';
    }).join('<span class="rsep">→</span>');
    const band='<span class="badge b-'+(e.band_after||'Green')+'">'+(BANDLBL[e.band_after]||'⚪ ?')+'</span>';
    cards+='<div class="rcard"><div class="rtitle">복구 진행 · '+esc(e.tool)
-     +' <span class="rtier">'+esc(e.tier)+'</span></div>'
+     +' <span class="rtier">'+esc(e.tier)+'</span>'
+     +(e.signed?' <span class="ralt">S2 물리 복귀 30m</span>':'')+'</div>'
      +'<div class="rsteps">'+steps+'</div>'
      +'<div class="rmeta">'+(e.band_before?('밴드 '+esc(e.band_before)+' → '):'')+band
      +((e.alt_after!=null)?(' · <span class="ralt">고도 '+((e.alt_before!=null)?(esc((+e.alt_before).toFixed(1))+'→'):'')+esc((+e.alt_after).toFixed(1))+'m'+((Math.abs((+e.alt_after)-30)<=5)?' ✓30m':'')+'</span>'):'')

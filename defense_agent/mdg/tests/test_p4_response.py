@@ -285,6 +285,81 @@ def test_signer_emit_is_key_free():
 
 
 # --------------------------------------------------------------------------- #
+# Item B — emit_signed LIVE promotion: gcs_c2 signed-sender via the SINGLE Backend spawn
+# --------------------------------------------------------------------------- #
+class _RecordingBackend:
+    """Fake single-spawn owner: records every ExecRequest and returns a scripted ExecResult.
+    ``allow_live`` is settable so emit_signed's live gate can be exercised without a real docker."""
+
+    def __init__(self, allow_live=True, ok=True, dry_run=False, note="spawned"):
+        self.allow_live = allow_live
+        self._res = (ok, dry_run, note)
+        self.reqs = []
+
+    def run(self, req):
+        from mdg.safe_exec.backend import ExecResult
+        self.reqs.append(req)
+        ok, dry_run, note = self._res
+        return ExecResult(ok=ok, code=0, dry_run=dry_run, note=note)
+
+
+def test_emit_signed_live_delegates_via_single_backend_spawn():
+    """allow_live=True: emit_signed triggers EXACTLY ONE Backend spawn with the docker-exec argv
+    ``docker exec gcs_c2 python3 /gcs_signed_correct.py GUIDED 30`` — the gcs_c2 sender signs there
+    (key stays in gcs_c2). MDG opens no file; the spawn is mutating (read_only=False)."""
+    be = _RecordingBackend(allow_live=True, ok=True, dry_run=False, note="MOCK exec")
+    emit = signer_shim.emit_signed(_signed_intent(), backend=be)
+    assert len(be.reqs) == 1                                # SINGLE Backend spawn (불변식②)
+    assert be.reqs[0].argv == ["docker", "exec", "gcs_c2", "python3",
+                               "/gcs_signed_correct.py", "GUIDED", "30"]
+    assert be.reqs[0].read_only is False                   # mutating -> allow_live + semaphore path
+    assert emit.ok and not emit.dry_run
+    assert emit.delegate == "gcs_c2" and emit.command_digest
+    assert emit.extra.get("mode") == "GUIDED" and emit.extra.get("alt") == 30
+
+
+def test_emit_signed_live_reflects_backend_dry_run():
+    """Even on the live-requested path, if the Backend itself is DRY (allow_live flag on but the
+    run returns dry_run — e.g. operator-go), emit mirrors that: ok+dry_run, still one spawn."""
+    be = _RecordingBackend(allow_live=True, ok=True, dry_run=True, note="DRY-RUN")
+    emit = signer_shim.emit_signed(_signed_intent(), backend=be)
+    assert len(be.reqs) == 1 and emit.ok and emit.dry_run
+
+
+def test_emit_signed_dry_path_never_spawns():
+    """allow_live=False (default operator-go 유보): digest-only, NO Backend spawn (legacy behaviour
+    unchanged) — the fake backend's run() is never reached."""
+    be = _RecordingBackend(allow_live=False)
+    emit = signer_shim.emit_signed(_signed_intent(), backend=be)
+    assert be.reqs == []                                   # no spawn on the dry path
+    assert emit.dry_run and emit.ok and "no signing key held" in emit.note
+
+
+def test_defense_agent_runtime_is_key_free_asset_excluded():
+    """Static KEY-FREE (verify_signer_no_keyopen, tree-wide): no defense_agent RUNTIME module
+    references a signing key. The ONLY file that names /sign.key is the gcs_c2-side asset, which is
+    DEPLOYED INTO gcs_c2 and executed THERE — the key never enters the MDG process. tests/ and
+    verify/ legitimately mention the token (assertions) and are not runtime actuation code."""
+    import mdg
+    root = os.path.dirname(os.path.abspath(mdg.__file__))
+    asset_rel = os.path.join("safe_exec", "assets", "gcs_signed_correct.py")
+    offenders = []
+    for dp, _dn, fns in os.walk(root):
+        rel_dir = os.path.relpath(dp, root)
+        if rel_dir.split(os.sep)[0] in ("tests", "verify"):
+            continue
+        for fn in fns:
+            if not fn.endswith(".py"):
+                continue
+            rel = os.path.relpath(os.path.join(dp, fn), root)
+            src = open(os.path.join(dp, fn), "r", encoding="utf-8").read()
+            if "sign.key" in src.lower() and rel != asset_rel:
+                offenders.append(rel)
+    assert offenders == [], f"defense_agent runtime references a signing key: {offenders}"
+    assert os.path.exists(os.path.join(root, asset_rel)), "gcs_c2 signed sender asset missing"
+
+
+# --------------------------------------------------------------------------- #
 # Item 3 — send_signed_mode dispatch: KEY-FREE emit + gcs_c2 delegation under operator_auto
 # --------------------------------------------------------------------------- #
 def _signed_intent():

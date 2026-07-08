@@ -72,6 +72,17 @@ def parse_operator_auto(env) -> bool:
     return str(env.get("MDG_OPERATOR_AUTO", "")).strip().lower() in _TRUE
 
 
+def parse_operator_pick(env) -> str:
+    """① operator-select input: the recovery_type OR tool_id the operator explicitly picks from the
+    legal candidate set (env MDG_OPERATOR_PICK). Returns the stripped token, "" when unset/blank.
+    When set AND matching a legal Action, rank_recovery promotes it to chosen_action (overriding the
+    autonomous ranking that permanently demotes send_signed_mode below the reversible blockades); a
+    blank/non-matching value leaves the autonomous ranking intact (fail-safe). Unlike allow_live/
+    operator_auto this is NOT a boolean gate — it carries a value — so it is NOT run through _TRUE.
+    결정론(불변식①): env 문자열만으로 결정, LLM 불가시."""
+    return str(env.get("MDG_OPERATOR_PICK", "")).strip()
+
+
 def _make_keyring(run_id: str) -> tuple[Keyring, str]:
     """Ephemeral per-run HMAC keyring. Collectors sign and ``verify`` verifies in the SAME
     process, so a fresh random key needs no persistence and never touches source or State
@@ -198,7 +209,7 @@ def _shutdown(collectors, backend, join_timeout: float = 10.0) -> None:
 
 
 def run(out_dir: str, run_id: str, *, allow_live: bool = False, operator_auto: bool = False,
-        docker=None,
+        operator_pick: str = "", docker=None,
         backend: Optional[Backend] = None, max_iters: Optional[int] = None,
         forever: bool = False, tick_interval_s: float = 0.0,
         clock: Optional[Clock] = None, keyring: Optional[Keyring] = None,
@@ -237,6 +248,10 @@ def run(out_dir: str, run_id: str, *, allow_live: bool = False, operator_auto: b
     # channel and the driver carries state forward each tick (re-seed), so this holds on every tick.
     # Absent/False keeps the legacy escalate posture (회귀 0). Deterministic (불변식①): env bool only.
     state0["operator_auto"] = bool(operator_auto)
+    # ① operator-select: seed the picked recovery_type/tool_id into the STATE channel rank_recovery
+    # reads (same seed-once-carry-each-tick pattern as operator_auto — LastValue, no node returns it).
+    # Blank -> autonomous ranking (회귀 0). Deterministic (env string only, 불변식①).
+    state0["operator_pick"] = str(operator_pick or "")
     world = state0.get("worldstate")
     pidmap = dict(getattr(world, "pid", {}) or {})
     netns_prefix_map = build_netns_prefix_map(pidmap)     # container -> nsenter prefix (inert if unresolved)
@@ -283,6 +298,9 @@ def run(out_dir: str, run_id: str, *, allow_live: bool = False, operator_auto: b
         # Phase 0: sandbox OPER auto-confirm flag -> build_graph 가 gate/edge 로 넘길 배선(실사용 Phase 1).
         # 기본 False 유지 시 기존 escalate 경로 무변경(회귀 0). 결정론(불변식①): env 입력만으로 결정.
         "operator_auto": operator_auto,
+        # ① operator-select: thread the picked token through deps too (rank_recovery reads it from
+        # the seeded STATE channel; deps carries it for parity with operator_auto / future binders).
+        "operator_pick": str(operator_pick or ""),
         # LLM advisory(orient/decide): ANTHROPIC_API_KEY + litellm/jinja2 있으면 활성, 없으면 {None,None}
         # 결정론 폴백(G6). LLM 은 edge-invisible(라우팅/집행 불가시)이라 켜져도 불변식① 무손상.
         **build_llm_deps(),
@@ -341,6 +359,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     # 둘 다 없으면 default False(운영 제약 유보). env 파서가 여전히 유일 truthy 소스, 플래그는 그 위 OR.
     allow_live = bool(args.allow_live) or parse_allow_live(os.environ)
     operator_auto = parse_operator_auto(os.environ)       # sandbox OPER auto-confirm: default False
+    operator_pick = parse_operator_pick(os.environ)       # ① operator-select token: default "" (off)
 
     if allow_live:
         # Issue#2(b): allow_live=1 이면 monitor/autorun 기동 시 stderr 로 굵은 경고 배너 강제 출력.
@@ -351,7 +370,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     docker = _SafeExecDocker(backend)                     # boot netns resolution via the single spawn site
     try:
         run(args.out, run_id, allow_live=allow_live, operator_auto=operator_auto,
-            docker=docker, backend=backend,
+            operator_pick=operator_pick, docker=docker, backend=backend,
             max_iters=args.max_iters, forever=args.forever,
             tick_interval_s=(args.interval if args.forever else 0.0))
     except KeyboardInterrupt:

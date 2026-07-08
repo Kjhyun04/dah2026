@@ -170,6 +170,23 @@ def test_effect_confirm_stays_unconfirmed_without_effect():
     assert applied.confirmed is False and applied.confirm_note == ""
 
 
+def test_effect_confirm_signed_confirms_on_next_tick_snapshot():
+    """Item C alignment: after the signed enforce (gcs_c2 delegation, Item B) the drone climbs, so the
+    NEXT tick's air-tap snapshot reads rel_alt≈30 / mode GUIDED and effect_confirm flips signed_guided
+    confirmed. A LAND-persisting snapshot on the enforce tick stays UNCONFIRMED (no false confirm)."""
+    # enforce-tick telemetry: still LAND at 12m -> unconfirmed
+    world = WorldState().with_applied(AppliedRule(rule="signed_guided", confirmed=False))
+    obs_land = make_effect_observer(telemetry=lambda: {"rel_alt": 12.0, "flight_mode": "LAND"})
+    out0 = effect_confirm({"worldstate": world}, observe=obs_land)
+    assert out0["worldstate"].applied["signed_guided"].confirmed is False
+    # next-tick telemetry: recovered to 30m GUIDED -> confirmed
+    obs_up = make_effect_observer(telemetry=lambda: {"rel_alt": 30.2, "flight_mode": "GUIDED"})
+    out1 = effect_confirm(out0, observe=obs_up)
+    applied = out1["worldstate"].applied["signed_guided"]
+    assert applied.confirmed is True
+    assert "unconfirmed->confirmed" in applied.confirm_note
+
+
 if __name__ == "__main__":
     import traceback
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]

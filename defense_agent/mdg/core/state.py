@@ -106,7 +106,7 @@ class Intent(BaseModel):
     # operator_auto_confirmed=True + authority="sandbox-auto" so an auditor can distinguish an
     # auto-confirmed OPER enforcement from a native AUTO one. Defaults keep every other path intact.
     operator_auto_confirmed: bool = False
-    authority: str = ""                    # "" | "sandbox-auto" (who authorized the enforcement)
+    authority: str = ""                    # "" | "sandbox-auto" | "operator-select" (who authorized)
     # Phase 2 (PS-7/B3, sandbox demo): when the injected-high-severity provenance/debounce gate is
     # RELAXED under operator_auto (record-then-pass), rank_recovery stamps provenance_relaxed=True so
     # the ledger/trace transparently records that the strict trusted-source hold was waived for the
@@ -208,6 +208,13 @@ class MDGState(TypedDict, total=False):
     # and act records the enforcement as operator-auto-confirmed. Absent/False -> unchanged posture.
     operator_auto: bool
     operator_auto_confirmed: bool
+    # ① operator-select routing input: env-sourced string (recovery_type or tool_id) the operator
+    # explicitly picks from the legal candidate set. When it matches a legal Action, rank_recovery
+    # promotes THAT action to chosen_action (overriding the autonomous ranking) and marks
+    # authority="operator-select"; blank/non-matching -> autonomous ranking stands (fail-safe).
+    # Seeded into state0 by live_autorun (like operator_auto) and carried each tick (LastValue).
+    # Deterministic (a string, never an LLM field, 불변식①).
+    operator_pick: str
 
 
 def initial_state(config_version: str) -> MDGState:

@@ -107,10 +107,21 @@ def act(state: MDGState, backend: Backend | None = None, ledger=None, clock=None
     # operator-auto-confirmed enforcement from a native AUTO one (transparency; registry_tier stays
     # OPER upstream). authority names WHO authorized it — the sandbox, not a human operator.
     op_auto_confirmed = bool(getattr(plan, "operator_auto_confirmed", False))
+    # ① operator-select PRESERVATION: when the operator EXPLICITLY picked this candidate,
+    # rank_recovery stamped chosen.authority="operator-select". Do NOT let the operator_auto widen
+    # clobber that human provenance to "sandbox-auto" — the durable ledger must show WHO authorized
+    # (Item A goal #3). This is the PRIMARY S2 path: operator picks send_signed_mode with
+    # operator_auto ON -> gate widens flight to AUTO_BY_OPERATOR -> plan.operator_auto_confirmed=True.
+    # We keep operator_auto_confirmed=True (sandbox auto-actuated) AND authority="operator-select"
+    # (human selected) so the audit shows BOTH. Absent an inbound operator-select, native AUTO keeps
+    # authority="sandbox-auto" (op_auto_confirmed) / "" as before (fail-safe, no regression).
+    inbound_authority = getattr(chosen, "authority", "")
+    authority = inbound_authority if inbound_authority == "operator-select" else (
+        "sandbox-auto" if op_auto_confirmed else "")
     intent = chosen.model_copy(update={
         "ts": ts, "revert_cmd": plan.revert_cmd or chosen.revert_cmd,
         "operator_auto_confirmed": op_auto_confirmed,
-        "authority": "sandbox-auto" if op_auto_confirmed else "",
+        "authority": authority,
     })
     ledger_update = ledger.record_intent(intent) if ledger is not None else {"ledger": [intent]}
 

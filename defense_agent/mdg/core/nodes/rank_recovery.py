@@ -16,6 +16,7 @@ is UNCHANGED: provenance_relaxed stays False and the full debounce hold applies 
 from __future__ import annotations
 
 from ...config import loader
+from ...safe_exec.signer_shim import command_digest
 from ..scoring import recovery_score
 from ..state import Action, Intent, MDGState
 
@@ -38,6 +39,22 @@ def rank_recovery(state: MDGState) -> dict:
         return {"chosen_action": None, "chosen_action_risk": "LOW",
                 "chosen_action_reversible": True}
 
+    # ① OPERATOR-SELECT (env->STATE, DETERMINISTIC, 불변식①): when the operator explicitly picks a
+    # candidate (MDG_OPERATOR_PICK -> state['operator_pick'], seeded by live_autorun like
+    # operator_auto), promote the MATCHING legal Action to chosen_action, bypassing the autonomous
+    # ranking that permanently demotes the reversible-blockade tools below send_signed_mode. Match is
+    # by recovery_type OR tool_id (accepts either spelling). A blank/non-matching pick is IGNORED
+    # (the autonomous ranking stands — fail-safe). No LLM: a pure string equality over the closed
+    # legal set. The promotion is honored even if the pick is below the feasibility floor: it is a
+    # HUMAN authorization, so it must not be re-gated by the autonomous feasibility heuristic.
+    pick = str(state.get("operator_pick") or "").strip()
+    operator_selected = None
+    if pick:
+        for a in legal:
+            if a.recovery_type == pick or a.tool_id == pick:
+                operator_selected = a
+                break
+
     rp = loader.recovery_priors()
     priors = rp.get("recovery_priors", {})
     # feasibility gate compares success_probability, NOT recovery_score (M6/E-2). Accept the
@@ -59,10 +76,6 @@ def rank_recovery(state: MDGState) -> dict:
     # Ranking among feasible = composite recovery_score. (M6/E-2 reconciliation — see
     # DESIGN note: the doc's "recovery_score>=0.7" and the 20-40pt trust-delta priors
     # do not reconcile; success_probability is the calibrated feasibility signal.)
-    feasible = [a for a in legal if _succ(a) >= feasible_min]
-    if not feasible:
-        return {"chosen_action": None, "chosen_action_risk": "LOW",
-                "chosen_action_reversible": True}
     # PP-1 binding contract (panel-1 step d + risk-note 3): sort on an EXPLICIT deterministic
     # key tuple, NOT on a single score with sort-stability. recovery_score compresses to
     # ~0.14-0.38 so ties are common; relying on input order would break replay reproducibility
@@ -71,8 +84,16 @@ def rank_recovery(state: MDGState) -> dict:
     def _sort_key(a: Action) -> tuple:
         return (-score(a), _RISK_ORDER[a.risk], 0 if a.reversible else 1, a.recovery_type)
 
-    ranked = sorted(feasible, key=_sort_key)
-    top = ranked[0]
+    if operator_selected is not None:
+        # operator-select overrides the autonomous ranking AND the feasibility gate (human authority).
+        top = operator_selected
+    else:
+        feasible = [a for a in legal if _succ(a) >= feasible_min]
+        if not feasible:
+            return {"chosen_action": None, "chosen_action_risk": "LOW",
+                    "chosen_action_reversible": True}
+        ranked = sorted(feasible, key=_sort_key)
+        top = ranked[0]
 
     # Phase 2 (B3/PS-7) provenance/debounce relaxation — DETERMINISTIC (env bool + config, no LLM,
     # 불변식①). Under operator_auto (sandbox demo) the strict trusted-source hold on an injected
@@ -100,7 +121,18 @@ def rank_recovery(state: MDGState) -> dict:
         enforce_at=str(top.params.get("enforce_at", "")),
         # Phase 2 (B3) — record-then-pass waiver marker (demo only; False in production).
         provenance_relaxed=provenance_relaxed,
+        # ① operator-select provenance: mark WHO chose this action so the ledger/trace shows the
+        # human authorization (vs the autonomous ranking). "" for the autonomous path (회귀 0).
+        authority="operator-select" if operator_selected is not None else "",
     )
+    if operator_selected is not None:
+        # COMMAND-BIND the operator-selected Intent (PS-9): stamp the KEY-FREE command_digest so the
+        # binding travels ON chosen_action into the OperatorGate authorization (escalate.issue on the
+        # operator_auto-off route) and into act's enforced Intent under operator_auto (model_copy
+        # preserves it) — a captured approval minted for a different command cannot authorize this
+        # one. command_digest is a pure sha256 over identifying fields; NO signing key is opened
+        # (verify_signer_no_keyopen — the uplink signature stays with gcs_c2).
+        intent = intent.model_copy(update={"command_digest": command_digest(intent)})
     return {
         "chosen_action": intent,
         "chosen_action_risk": _bundle_risk(bundle),

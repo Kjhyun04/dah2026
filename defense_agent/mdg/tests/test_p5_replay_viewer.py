@@ -414,6 +414,41 @@ def test_recovery_panel_lifecycle_and_flight():
         assert act0["attack_signals"] == []        # (whereas the recovery band above shows Red)
 
 
+def test_recovery_panel_signed_mechanism_annotations():
+    """Item C: the send_signed_mode (S2 물리 복귀) recovery event renders its mechanism —
+    대응(operator-select) → 집행(gcs_c2 위임) → 확인(rel_alt 30m) — as per-step notes, and the
+    event is flagged ``signed`` so the card shows the S2 physical-return context. The base labels
+    (탐지/대응/집행/확인/회복) are unchanged (presentation-only enrichment)."""
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "run.jsonl")
+        applied_unconf = {"applied": {"signed_guided": {
+            "rule": "signed_guided", "confirmed": False}}}
+        applied_conf = {"applied": {"signed_guided": {
+            "rule": "signed_guided", "confirmed": True}}}
+        intent = {"rule": "signed_guided", "tool_id": "send_signed_mode",
+                  "operator_gate": False}
+        _write_lines(p, [
+            ("sense", {"tick_i": 1, "evidence": [_tele("rel_alt", 12), _tele("flight_mode", "LAND")],
+                       "incidents": [{"members": ["Unauthorized_Command"]}]}),
+            ("act", {"ledger": [intent], "worldstate": applied_unconf}),
+            ("sense", {"tick_i": 2, "evidence": [_tele("rel_alt", 30), _tele("flight_mode", "GUIDED")]}),
+            ("effect_confirm", {"worldstate": applied_conf}),
+        ])
+        rec = viewer.load_panels(p)["recovery"]
+        assert len(rec["events"]) == 1
+        e = rec["events"][0]
+        assert e["signed"] is True and e["tool"] == "send_signed_mode"
+        note = {s["label"]: s.get("note") for s in e["steps"]}
+        assert note["대응"] == "operator-select"
+        assert note["집행"] == "gcs_c2 위임"
+        assert note["확인"] == "rel_alt 30m"
+        # 탐지/회복 steps carry NO mechanism note (only respond/enforce/confirm annotated)
+        assert note["탐지"] is None and note["회복"] is None
+        # containment recoveries stay un-annotated / signed=False
+        assert viewer._is_signed_recovery("nsenter_input_drop", "backdoor_drop") is False
+        assert viewer._is_signed_recovery("send_signed_mode", "signed_guided") is True
+
+
 def test_recovery_band_prefers_engine_impact_over_view_band():
     """Unit: `_recovery_band` uses the engine's authoritative per-tick impact_band (Green/Yellow/Red)
     when present, and falls back to incident-presence (`_detect_band`, standing signals INCLUDED)
