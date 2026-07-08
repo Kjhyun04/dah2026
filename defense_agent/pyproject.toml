@@ -12,6 +12,8 @@ dependencies = [
     "langgraph-checkpoint>=2.0",
     "grpcio>=1.60",
     "httpx>=0.27",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
 ]
 
 # 회귀 테스트 실행(./dah.sh test)용. `pip install -e ".[dev]"` 로 포함.
