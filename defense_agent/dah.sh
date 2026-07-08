@@ -29,7 +29,9 @@ case "$cmd" in
     exec $PY verify.py ;;
 
   test)     # pytest 회귀 (기준선 ~192 passed / 2 skipped)
-    # 2 SKIP = langgraph 의존 그래프-컴파일 테스트로, langgraph 부재 시 예상된 SKIP(실패 아님).
+    # pytest 는 dev 의존 → 'pip install -e ".[dev]"'. 없으면 안내(감독관 친화).
+    # langgraph 부재 시 그래프-컴파일 테스트만 SKIP(예상, 실패 아님).
+    $PY -c "import pytest" 2>/dev/null || { echo "pytest 미설치 → 'pip install -e \".[dev]\"' 후 재실행 (또는 오프라인 러너: $PY mdg/tests/test_p1_engine.py)"; exit 1; }
     exec $PY -m pytest mdg/tests -q "$@" ;;
 
   campaign) # 오프라인 결정론 6공격 캠페인 → report.json (헤드라인 오프라인 증거)

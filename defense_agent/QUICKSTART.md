@@ -24,7 +24,7 @@ dah.sh                        = 위 전부를 감싼 단일 런처
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
-pip install -e .
+pip install -e ".[dev]"    # 런타임+pytest. 런타임만이면 'pip install -e .'
 cp .env.example .env       # live/status 쓸 때만 값 채움(오프라인 실행엔 불필요)
 ```
 

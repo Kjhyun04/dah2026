@@ -21,7 +21,7 @@ bash ~/testbed/scripts/00-server-setup.sh     # docker+SCTP+TUN → 그다음 �
 bash ~/testbed-split/bringup.sh               # .mav-sign-key/.env-aria 자동생성 → 이미지 빌드 + 20 컨테이너
 docker logs -f gcs_c2                          # 2~3분 양방향 C2 유지 확인 (Ctrl-C)
 # ── 방어 에이전트 ──
-cd ~/defense_agent && python3 -m venv .venv && . .venv/bin/activate && pip install -e .
+cd ~/defense_agent && python3 -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]"
 ./dah.sh verify && ./dah.sh test               # 무결성 게이트 + pytest
 ```
 > **시크릿 자동생성(자체정합):** `.mav-sign-key`(bringup 0-pre)·`.env-aria`(70-aria-up)가 없으면 fresh

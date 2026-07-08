@@ -53,7 +53,7 @@ split-core) 전용 **Mission-centric Defense Gateway(MDG)** 방어 AI 에이전�
 # ── 0) 설치 (공통) ──
 git clone <repo-url> && cd defense_agent
 python3 -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -e .
+pip install -e ".[dev]"    # 런타임+pytest(테스트용). 런타임만이면 'pip install -e .'
 
 # ── 오프라인 (비밀·테스트베드 불필요) ──
 ./dah.sh verify              # 무결성 게이트 (ALL GATES PASS 확인)
@@ -78,7 +78,7 @@ MDG_ALLOW_LIVE=1 ./dah.sh autorun   # (operator 승인 시) 단일 가역 DROP �
 ```bash
 git clone <repo-url> && cd defense_agent
 python3 -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
-pip install -e .                                       # pyproject.toml 의존성
+pip install -e ".[dev]"                                       # pyproject.toml 의존성
 cp .env.example .env                                   # (선택) live/status 쓸 때만 값 채움
 ./dah.sh verify        # 무결성 게이트 (오프라인·무해, 테스트베드/비밀 불필요)
 ./dah.sh test          # pytest 회귀 (기준선 ~192 passed / 2 skipped)
