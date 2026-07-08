@@ -24,6 +24,7 @@ from ..core.state import Intent
 from ..core.worldstate import WorldState
 from .act_host import ActHost
 from .backend import Backend, ExecRequest, ExecResult
+from .signer_shim import emit_signed
 
 
 @dataclass
@@ -37,6 +38,7 @@ class ResponsePlan:
     operator_auto_confirmed: bool = False  # Phase 1: OPER widened to auto by sandbox operator_auto
     exec_request: Optional[ExecRequest] = None
     pause_container: str = ""         # Phase 4: operator_auto docker_pause target (act_host.pause)
+    signed_intent: Optional[Intent] = None  # send_signed_mode: KEY-FREE emit target (emit_signed)
     revert_cmd: str = ""
     reason: str = ""
 
@@ -257,9 +259,27 @@ class ResponseController:
             return ResponsePlan(rule, tool_id, "AUTO", exec_request=None,
                                 operator_auto_confirmed=oper_auto,
                                 reason=gd.reason + " -> inert DRY (pause container unverified)")
-        # 3b) any OTHER OPER tool widened to auto (flight / docker_net_disconnect) has NO actuator
-        # here — its live actuation is operator-tooling deferred. Emit an INERT DRY plan (side-effect
-        # 0) so the sandbox records the enforcement decision without a mis-built argv (누수-0 정합, ②).
+        # 3a2) send_signed_mode widened to auto by operator_auto -> EMIT the KEY-FREE signed-mode
+        # correction command (GUIDED/LOITER 30 m hold or RTL). MDG holds NO uplink-signing key on
+        # ANY path: the emit computes ONLY the command_digest (token material) and DELEGATES the
+        # actual signature to gcs_c2 (which already holds its own key) over an authenticated channel
+        # (E11 non-proliferation — the emitter is statically key-free, verify_signer_no_keyopen). The
+        # enforce_at chokepoint (gcs_proxy) must be a VERIFIED binding first (fail-closed, same gate
+        # the legality precondition role_verified.gcs resolves to) — else inert DRY, no emit. Under
+        # allow_live=False this stays operator-go DRY (SITL acceptance is server-deploy verified).
+        if tool_id == "send_signed_mode" and oper_auto:
+            enforce = (getattr(intent, "enforce_at", "") or "").strip()
+            if enforce and ResponseController._binding_verified(enforce, world):
+                return ResponsePlan(rule, tool_id, "AUTO", signed_intent=intent,
+                                    operator_auto_confirmed=oper_auto,
+                                    reason=gd.reason + f" -> emit send_signed_mode "
+                                    f"(KEY-FREE, delegate gcs_c2, enforce_at={enforce})")
+            return ResponsePlan(rule, tool_id, "AUTO", exec_request=None,
+                                operator_auto_confirmed=oper_auto,
+                                reason=gd.reason + " -> inert DRY (signed-mode enforce_at unverified)")
+        # 3b) any OTHER OPER tool widened to auto (docker_net_disconnect) has NO actuator here — its
+        # live actuation is operator-tooling deferred. Emit an INERT DRY plan (side-effect 0) so the
+        # sandbox records the enforcement decision without a mis-built argv (누수-0 정합, ②).
         if tool_id != "nsenter_input_drop":
             return ResponsePlan(rule, tool_id, "AUTO", exec_request=None,
                                 operator_auto_confirmed=oper_auto,
@@ -290,6 +310,15 @@ class ResponseController:
             return ExecResult(ok=bool(r.get("ok", False)), code=0,
                               dry_run=bool(r.get("dry_run", False)),
                               note=r.get("note", f"docker pause {plan.pause_container}"))
+        # send_signed_mode: emit a KEY-FREE authorization (command_digest only) and DELEGATE the
+        # signature to gcs_c2 — MDG never opens a signing-key path (verify_signer_no_keyopen). The
+        # emit's dry_run mirrors backend.allow_live (operator-go 유보 -> digest-only DRY; live ->
+        # delegated out-of-band signing). NO local spawn (the delegation is out-of-band).
+        if plan.signed_intent is not None:
+            emit = emit_signed(plan.signed_intent, backend=self.backend)
+            note = (f"send_signed_mode emit (KEY-FREE, delegate {emit.delegate}, "
+                    f"digest {emit.command_digest[:12]}…): {emit.note}")
+            return ExecResult(ok=bool(emit.ok), code=0, dry_run=bool(emit.dry_run), note=note)
         if plan.exec_request is None:
             return ExecResult(ok=True, code=0, dry_run=True,
                               note=f"INERT: no exec_request for rule '{plan.rule}' ({plan.reason})")

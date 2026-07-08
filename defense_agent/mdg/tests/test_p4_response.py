@@ -285,6 +285,79 @@ def test_signer_emit_is_key_free():
 
 
 # --------------------------------------------------------------------------- #
+# Item 3 — send_signed_mode dispatch: KEY-FREE emit + gcs_c2 delegation under operator_auto
+# --------------------------------------------------------------------------- #
+def _signed_intent():
+    # send_signed_mode enforced at the gcs_proxy chokepoint (recovery_priors), the container the
+    # legality precondition role_verified.gcs dynamically resolves to.
+    return Intent(rule="signed_guided", tool_id="send_signed_mode", decision_id="s1",
+                  config_version=CFG, enforce_at="gcs_proxy",
+                  target="gcs_proxy", target_kind="role")
+
+
+def test_send_signed_mode_stays_oper_without_operator_auto():
+    """Default posture: send_signed_mode (flight·HIGH·irreversible) is OPER — no emit, no exec."""
+    ctrl = ResponseController(backend=_SpyBackend())        # backend.run must not be reached
+    w = _world(role_verified={"gcs_proxy": True})
+    plan, res = ctrl.dispatch(_signed_intent(), w, 0, risk="HIGH", reversible=False)
+    assert plan.operator_required and res is None
+    assert plan.signed_intent is None
+
+
+def test_send_signed_mode_emits_key_free_delegated_under_operator_auto(monkeypatch):
+    """operator_auto widens send_signed_mode to AUTO_BY_OPERATOR -> run_plan EMITS a KEY-FREE
+    authorization (command_digest only) and DELEGATES the signature to gcs_c2. allow_live=False ->
+    the emit stays operator-go DRY. No signing-key file is EVER opened (verify_signer_no_keyopen)."""
+    import builtins as _b
+    opened: list = []
+    _real_open = _b.open
+
+    def _spy_open(path, *a, **k):                            # trip on ANY file open during emit
+        opened.append(str(path))
+        return _real_open(path, *a, **k)
+
+    ctrl = ResponseController(backend=Backend(allow_live=False), operator_auto=True)
+    w = _world(role_verified={"gcs_proxy": True})
+    plan = ctrl.plan(_signed_intent(), w, 0, risk="HIGH", reversible=False)   # config load (unrelated)
+    assert plan.tier2 == "AUTO" and not plan.operator_required and not plan.skip
+    assert plan.operator_auto_confirmed and plan.signed_intent is not None
+    # the EMIT itself must open NO file (a signing-key read would show here) — wrap only run_plan.
+    monkeypatch.setattr(_b, "open", _spy_open)
+    res = ctrl.run_plan(plan)
+    monkeypatch.undo()
+    assert res.ok and res.dry_run                            # operator-go 유보: digest-only DRY
+    assert "gcs_c2" in res.note and "KEY-FREE" in res.note   # delegation surfaced to the ledger
+    assert opened == [], f"emit opened a file (must be key-free): {opened}"
+
+
+def test_send_signed_mode_inert_when_enforce_unverified():
+    """Fail-closed: operator_auto but the enforce_at chokepoint is NOT a verified binding -> inert
+    DRY, no emit target (never delegate for an unverified enforcement point)."""
+    ctrl = ResponseController(backend=Backend(allow_live=False), operator_auto=True)
+    w = _world(role_verified={})                            # gcs_proxy NOT verified
+    plan, res = ctrl.dispatch(_signed_intent(), w, 0, risk="HIGH", reversible=False)
+    assert plan.signed_intent is None and plan.exec_request is None
+    assert res.dry_run and "INERT" in res.note
+
+
+def test_act_send_signed_mode_operator_auto_records_and_applies_dry():
+    """Full act wiring: under operator_auto a legal send_signed_mode records the enforcement Intent
+    (authority=sandbox-auto), emits KEY-FREE, and applies the rule (unconfirmed — observer confirms
+    later on 30 m recovery). Side-effect stays DRY (allow_live=False)."""
+    from mdg.core.worldstate import SigningObs
+    chosen = _signed_intent()
+    w = _world(role_verified={"gcs_proxy": True}, signing=SigningObs.CONFIRMED_ON)
+    led = _SpyLedger()
+    out = act(_state(chosen, risk="HIGH", reversible=False, world=w),
+              backend=Backend(allow_live=False), ledger=led, operator_auto=True)
+    assert out["dry_streak"] == 0
+    assert len(led.intents) == 1 and not led.intents[0].operator_gate   # EXECUTED, not deferred
+    assert led.intents[0].operator_auto_confirmed and led.intents[0].authority == "sandbox-auto"
+    assert "signed_guided" in out["worldstate"].applied
+    assert out["worldstate"].applied["signed_guided"].confirmed is False  # observer confirms later
+
+
+# --------------------------------------------------------------------------- #
 # response.py — ResponseController plan/dispatch
 # --------------------------------------------------------------------------- #
 def test_response_plan_auto_builds_dry_exec():

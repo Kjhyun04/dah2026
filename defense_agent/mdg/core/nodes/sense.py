@@ -15,7 +15,13 @@ this tick (proof the collector emitted); silence never clears it. ``source_domai
 from __future__ import annotations
 
 from ..state import Incident, MDGState, SensorEv
-from ..worldstate import WorldState
+from ..worldstate import SigningObs, WorldState
+
+# The uav_proxy §9-B signing drop-line evidence (SignLogCollector). Its OBSERVATION is the
+# ONLY authoritative promoter of world.signing here (P2-Q2/P3-Q2). Matched on BOTH the metric
+# and the collector channel so an unrelated 'Signing_Drop'-named signal cannot spoof the latch.
+_SIGNING_METRIC = "Signing_Drop"
+_SIGNING_CHANNEL = "uav_proxy_signlog"
 
 
 def _drain(inbox) -> list:
@@ -67,6 +73,19 @@ def sense(state: MDGState, inbox=None, verify=None, clock=None,
     # merge worldstate (single authoritative object replace)
     world: WorldState = state.get("worldstate") or WorldState(
         config_version=state.get("config_version", ""))
+
+    # signing posture MONOTONIC LATCH (P2-Q2/P3-Q2): a verified uav_proxy signing drop-line
+    # observation (SignLogCollector) is the ONLY promoter — UNKNOWN -> CONFIRMED_ON, once and
+    # never back. Observation is REQUIRED (fail-safe asymmetry): no drop-line this tick leaves
+    # signing untouched, silence never promotes, and a banner alone never promotes (only the
+    # drop evidence does). Already-CONFIRMED postures are left intact (idempotent latch). Only
+    # PS-2-verified evidence reaches this list, so a forged latch is structurally excluded.
+    if world.signing is SigningObs.UNKNOWN:
+        for ev in evidence:
+            if (getattr(ev, "metric", "") == _SIGNING_METRIC
+                    and getattr(ev, "channel", "") == _SIGNING_CHANNEL):
+                world.signing = SigningObs.CONFIRMED_ON
+                break
 
     # liveness present-set bookkeeping (P3-Q5): map watchdog sensor_loss -> dead domain,
     # clear a domain only on a live emission for it (asymmetric; silence never clears).

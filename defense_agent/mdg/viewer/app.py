@@ -482,6 +482,7 @@ _HTML = """<!doctype html><html><head><meta charset="utf-8"><title>MDG 방어 �
  .rsep{color:#3f5168}
  .rtk{color:#7f8ea3;font-size:10px}
  .rauto{background:#1a2740;border:1px solid #3a5a8a;color:#9fc4f0;font-size:10px;padding:0 5px;border-radius:4px}
+ .ralt{background:#0f2a1e;border:1px solid #2f6b4a;color:#8fe7b8;font-size:10px;padding:0 5px;border-radius:4px}
  .rmeta{font-size:11px;color:#9fb0c4;margin-top:9px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
  .spark{display:block;width:100%;height:66px;background:#0b111c;border-radius:6px;margin-bottom:5px}
  /* 2단 레이아웃: 좌=공격 로그 · 우=상시 취약 노드 상태 */
@@ -615,6 +616,7 @@ function renderRecovery(rec){
      +' <span class="rtier">'+esc(e.tier)+'</span></div>'
      +'<div class="rsteps">'+steps+'</div>'
      +'<div class="rmeta">'+(e.band_before?('밴드 '+esc(e.band_before)+' → '):'')+band
+     +((e.alt_after!=null)?(' · <span class="ralt">고도 '+((e.alt_before!=null)?(esc((+e.alt_before).toFixed(1))+'→'):'')+esc((+e.alt_after).toFixed(1))+'m'+((Math.abs((+e.alt_after)-30)<=5)?' ✓30m':'')+'</span>'):'')
      +(e.revert_cmd?(' · <span class="muted">revert: '+esc(e.revert_cmd)+'</span>'):'')
      +(e.provenance_relaxed?' · <span class="rauto">provenance_relaxed</span>':'')+'</div></div>';
   }

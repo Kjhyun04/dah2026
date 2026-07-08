@@ -1,12 +1,13 @@
 """Collector — out-of-graph long-lived daemons; keyring owner (PS-2/PS-5).
 
-Six collectors (P1 observation engine):
+Seven collectors (P1 observation engine):
   AirCommandTap          air-side netns sidecar — gcs_proxy eth0 UDP:14556 (command)
   AirTelemetryTap        air-side netns sidecar — 14560 + uav_ue lo:14550 cross-tap
   NetworkMetricCollector network — NF :9090 Prometheus polling (httpx)
   WebProbeCollector      web — 5762 ss-only, pool=1
   MongoLogCollector      mongo — docker logs stdout JSON
   MissionConfigCollector mission — config-derived context
+  SignLogCollector       command — uav_proxy docker logs §9-B signing drop-line (P3-Q2)
 
 ``build_collectors`` wires the standard set against one output queue + keyring.
 """
@@ -23,13 +24,14 @@ from .mission import MissionConfigCollector
 from .mme_log import MmeLogTail
 from .mongo import MongoLogCollector
 from .network import NetworkMetricCollector
+from .sign_log import SignLogCollector
 from .smf_session import SmfSessionCollector, SmfSessionTable
 from .web import WebProbeCollector
 
 __all__ = [
     "BaseCollector", "AirCommandTap", "AirTelemetryTap", "NetworkMetricCollector",
     "WebProbeCollector", "MongoLogCollector", "MissionConfigCollector",
-    "SmfSessionCollector", "SmfSessionTable", "MmeLogTail", "ansi_strip",
+    "SignLogCollector", "SmfSessionCollector", "SmfSessionTable", "MmeLogTail", "ansi_strip",
     "Keyring", "SensorEnvelope", "compute_hmac", "verify_envelope",
     "build_collectors", "build_epc_collectors", "build_source_domains",
 ]
@@ -53,7 +55,7 @@ def build_collectors(out_queue: "_queue.Queue", keyring: Keyring, kid: str, *,
                      backend=None, clock=None,
                      netns_prefix_map: Optional[dict[str, list[str]]] = None,
                      ) -> list[BaseCollector]:
-    """Instantiate the standard 6-collector set sharing one queue + keyring/kid.
+    """Instantiate the standard 7-collector set sharing one queue + keyring/kid.
     Each collector signs its envelopes with ``kid``; ``sense`` verifies at drain.
 
     ``netns_prefix_map`` (container -> nsenter prefix) is the recon->collector bridge
@@ -79,6 +81,11 @@ def build_collectors(out_queue: "_queue.Queue", keyring: Keyring, kid: str, *,
         WebProbeCollector(out_queue, keyring, kid, netns_prefix=m.get("uav_ue"), **common),
         MongoLogCollector(out_queue, keyring, kid, **common),
         MissionConfigCollector(out_queue, keyring, kid, **common),
+        # §9-B uplink-signing posture: uav_proxy drop-line tail (P3-Q2). netns-agnostic
+        # (docker logs, like Mongo). Its ``Signing_Drop`` evidence latches world.signing ->
+        # CONFIRMED_ON in sense (MONOTONIC). domain='command' -> registered in the source-
+        # domain map (build_source_domains) for watchdog liveness attribution.
+        SignLogCollector(out_queue, keyring, kid, **common),
     ]
 
 

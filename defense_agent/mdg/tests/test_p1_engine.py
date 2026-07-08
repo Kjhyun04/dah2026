@@ -351,6 +351,36 @@ def test_mongo_collector_dedupe():
     assert len(_drain(q)) == 1                          # deduped within window
 
 
+def test_sign_log_parse_and_dedupe():
+    from mdg.collector.sign_log import SignLogCollector, parse_signing_line
+    # ANSI + emoji drop line -> derived secret-free Signing_Drop payload (cumulative projected)
+    drop = "\x1b[31m[proxy] ⛔ 서명검증 실패 → SITL 차단 (누적 7)\x1b[0m"
+    p = parse_signing_line(drop)
+    assert p is not None and p["metric"] == "Signing_Drop" and p["value"] == 7
+    assert p["band"] == "normal" and p["channel"] == "uav_proxy_signlog"  # band=normal -> zero distrust
+    # secret-free (PS-3): payload is only the derived closed key-set; no raw line / peer tuple
+    assert set(p) == {"metric", "value", "band", "domain", "channel", "confidence", "source"}
+    assert "누적" not in " ".join(str(v) for v in p.values())   # no raw log text projected
+    # positive-only: banner / unrelated / null -> None (silence≠OFF, never promotes)
+    assert parse_signing_line("[proxy] 🔒 MAVLink2 서명 강제 ON") is None
+    assert parse_signing_line("[proxy] some unrelated line") is None
+    assert parse_signing_line(None) is None and parse_signing_line("") is None
+    # collector: emits once per cumulative within the dedupe window
+    q = queue.Queue()
+    be = Backend(mode="mock", mock_table={"docker": drop + "\n" + drop})
+    c = SignLogCollector(q, _kr(), _KID, backend=be, clock=_clock([1.0] * 4))
+    c.tick_once()
+    envs = _drain(q)
+    assert len(envs) == 1 and envs[0].payload["value"] == 7
+
+
+def test_sign_log_inert_without_backend():
+    from mdg.collector.sign_log import SignLogCollector
+    # no backend wired -> _observe returns None -> no emission (fail-safe: signing stays UNKNOWN)
+    c = SignLogCollector(queue.Queue(), _kr(), _KID, backend=None, clock=_clock([1.0] * 3))
+    assert c.collect() == []
+
+
 def test_mission_collector_edge_triggered():
     q = queue.Queue()
     prof = {"mission_type": "Recon", "mission_phase": "En-route", "mission_priority": "High",

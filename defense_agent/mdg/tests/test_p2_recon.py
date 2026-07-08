@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from mdg.collector.log_common import ansi_strip  # noqa: E402
 from mdg.collector.smf_session import (SmfSessionTable, parse_smf_line)  # noqa: E402
 from mdg.core.recon import recon_boot  # noqa: E402
-from mdg.core.worldstate import SigningObs  # noqa: E402
+from mdg.core.worldstate import SigningObs, WorldState  # noqa: E402
 from mdg.safe_exec.backend import Backend  # noqa: E402
 from mdg.targets.behavioral import (AnchorEvidence,  # noqa: E402
                                     apply_behavioral_verification,
@@ -248,6 +248,71 @@ def test_recon_boot_inert_without_docker():
     w = st["worldstate"]
     assert w.pid == {} and not any(w.role_verified.values())
     assert w.reach and w.signing is SigningObs.UNKNOWN   # baseline still assembled (P2-Q2)
+
+
+# --------------------------------------------------------------------------- #
+# P3-Q2: signing drop-line observation latches world.signing (MONOTONIC, fail-safe)
+# and unblocks send_signed_mode legality (signing + role_verified.gcs)
+# --------------------------------------------------------------------------- #
+def _sign_ev(seq=1):
+    from mdg.core.state import SensorEv
+    return SensorEv(source_id="uav_signlog", seq=seq, metric="Signing_Drop", value=3,
+                    band="normal", domain="command", channel="uav_proxy_signlog",
+                    verified=True, tamper=False)
+
+
+def _sense_with(evs, world=None):
+    import queue as _q
+    from mdg.core.nodes.sense import sense
+    inbox = _q.Queue()
+    for e in evs:
+        inbox.put(e)
+    st = {"worldstate": world} if world is not None else {}
+    return sense(st, inbox=inbox, verify=lambda env: (True, "ok", env))
+
+
+def test_signing_latch_confirmed_on_drop_observed():
+    # drop-line evidence observed -> UNKNOWN promotes to CONFIRMED_ON
+    out = _sense_with([_sign_ev()])
+    assert out["worldstate"].signing is SigningObs.CONFIRMED_ON
+
+
+def test_signing_latch_unknown_when_no_observation():
+    # no drop evidence this tick -> stays UNKNOWN (fail-safe: silence/absence never promotes)
+    assert _sense_with([])["worldstate"].signing is SigningObs.UNKNOWN
+    # an unrelated signal (wrong metric/channel) must NOT promote (no spoof of the latch)
+    from mdg.core.state import SensorEv
+    bogus = SensorEv(source_id="x", seq=1, metric="Signing_Drop", value=1, band="normal",
+                     channel="not_the_signlog", verified=True, tamper=False)
+    assert _sense_with([bogus])["worldstate"].signing is SigningObs.UNKNOWN
+
+
+def test_signing_latch_is_monotonic():
+    # once CONFIRMED_ON, a later tick with NO observation keeps it CONFIRMED_ON (latched)
+    w = WorldState(signing=SigningObs.CONFIRMED_ON)
+    assert _sense_with([], world=w)["worldstate"].signing is SigningObs.CONFIRMED_ON
+
+
+def test_send_signed_mode_legal_iff_signing_confirmed_and_gcs_verified():
+    from mdg.core.legality import is_legal
+    from mdg.core.state import Action
+    act = Action(tool_id="send_signed_mode", params={"enforce_at": "gcs_proxy"}, risk="HIGH")
+    cfg = "mdg-cfg-test"
+    # CONFIRMED_ON + role_verified.gcs (resolved via enforce_at=gcs_proxy) -> legal
+    on = WorldState(signing=SigningObs.CONFIRMED_ON, role_verified={"gcs_proxy": True},
+                    config_version=cfg)
+    ok, why = is_legal(act, on, cfg)
+    assert ok, why
+    # UNKNOWN signing -> illegal (unmet precondition: signing) — the live/boot posture
+    unk = WorldState(signing=SigningObs.UNKNOWN, role_verified={"gcs_proxy": True},
+                     config_version=cfg)
+    ok2, _ = is_legal(act, unk, cfg)
+    assert not ok2
+    # CONFIRMED_ON but gcs NOT verified -> illegal (unmet precondition: role_verified.gcs)
+    norole = WorldState(signing=SigningObs.CONFIRMED_ON, role_verified={"gcs_proxy": False},
+                        config_version=cfg)
+    ok3, _ = is_legal(act, norole, cfg)
+    assert not ok3
 
 
 def _run_all() -> int:
