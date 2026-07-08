@@ -53,7 +53,14 @@ case "$cmd" in
 
   viewer)   # read-only 뷰어 (루프백 바인드 127.0.0.1 · PS-8) — run.jsonl 3패널
     _load_env
+    # 뷰어는 fail-secure(PS-8): 토큰 없으면 모든 데이터 라우트 401. 미설정 시 세션용 랜덤토큰
+    # 자동생성(익명 거부 유지) 후 접속 URL 을 그대로 출력 → 감독관은 그 URL 만 브라우저에 붙이면 됨.
+    if [ -z "${MDG_VIEWER_TOKEN:-}" ]; then
+      export MDG_VIEWER_TOKEN="$(openssl rand -hex 16 2>/dev/null || echo "demo$$")"
+      echo "뷰어 토큰(자동생성): $MDG_VIEWER_TOKEN"
+    fi
     SRC="${1:-live_out/live/run.jsonl}"; shift 2>/dev/null || true
+    echo "★ 브라우저: http://127.0.0.1:${PORT:-8787}/?token=${MDG_VIEWER_TOKEN}  (로컬은 ssh -L 후 localhost)"
     exec $PY -m mdg.viewer.app "$SRC" --host 127.0.0.1 --port "${PORT:-8787}" "$@" ;;
 
   status)   # read-only 테스트베드 스냅샷 (컨테이너 + run.jsonl 탐지 tail); 상태변경 0
