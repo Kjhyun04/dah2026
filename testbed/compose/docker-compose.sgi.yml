@@ -3,10 +3,10 @@ name: dahv2
 
 networks:
   net_sgi:
+    # bringup(step 0)이 net_sgi 를 미리 docker network create 하므로 compose 는 참조만 한다.
+    # external 누락 시 compose 가 관리를 시도→"not created by compose" 라벨오류로 sgi_test 미생성(18/19).
+    external: true
     name: net_sgi
-    ipam:
-      config:
-        - subnet: 172.30.0.0/24
 
 services:
   sgi_test:
