@@ -1,0 +1,87 @@
+gcs_recovery_trigger — S2 signed physical-recovery via gcs.py TRIGGER-FILE polling
+==================================================================================
+
+STATUS: LIVE-VERIFIED working path (2026-07-09). Supersedes the standalone
+`gcs_signed_correct.py` sender, which does NOT work (see that file's docstring: the
+SITL signing link — udpin:127.0.0.1:14550 + setup_signing(sign_outgoing=True) — is
+exclusively held by gcs.py, so a second exec'd process cannot receive telemetry or
+emit on it).
+
+WHY A TRIGGER FILE
+------------------
+In gcs_c2, gcs.py is the ONLY process that:
+  - binds udpin:0.0.0.0:14550 (owns the telemetry/command socket), and
+  - called setup_signing(bytes.fromhex(<key from /sign.key>), sign_outgoing=True)
+    (owns the sole outgoing-signed uplink to the SITL).
+So the ONLY code that can push a SIGNED recovery command is gcs.py itself. MDG must
+therefore ask gcs.py to act rather than open its own link. It does this by writing a
+small trigger file that gcs.py polls each loop. MDG never holds or names a key
+(verify_signer_no_keyopen) — the signature stays entirely inside gcs.py.
+
+MDG SIDE (signer_shim._delegate_argv, emit_signed allow_live=True) — the ONE spawn:
+------------------------------------------------------------------------------------
+  docker exec gcs_c2 sh -c 'printf "%s %s" "$1" "$2" > /tmp/mdg_correct' sh <MODE> <ALT>
+
+  - Single Backend._spawn / ExecRequest (불변식②, leak-0). mode/alt are POSITIONAL
+    args ($1/$2), never interpolated into the shell string (no injection surface).
+  - File content is exactly "<MODE> <ALT>", e.g. "GUIDED 30".
+  - allow_live=False (default, operator-go 유보): NO spawn, digest-only DRY (unchanged).
+
+GCS.PY SIDE — the trigger-polling block NOW INTEGRATED into the deployed gcs.py loop:
+------------------------------------------------------------------------------------
+(As of 2026-07-09 this block is committed directly in both deployed copies —
+testbed-v2/gcs/gcs.py and dah2026-submission/testbed/gcs/gcs.py — and
+`_poll_recovery_trigger(m)` is called once per main-loop iteration. docker-compose.gcs.yml
+mounts ../gcs/gcs.py:/gcs.py:ro and runs `python3 /gcs.py`, so a clean README-only deploy
+already consumes the trigger — no hand-patch required. The reference form:)
+
+  TRIGGER = "/tmp/mdg_correct"
+  COPTER_GUIDED = 4
+
+  def _poll_recovery_trigger(master):
+      """Once per loop: if the MDG trigger file exists, read '<MODE> <ALT>' and issue a
+      SIGNED set_mode(GUIDED)+arm+takeoff(alt) on THIS link, then remove the file."""
+      try:
+          with open(TRIGGER, "r") as fh:
+              parts = fh.read().split()
+      except FileNotFoundError:
+          return
+      finally:
+          try:
+              os.remove(TRIGGER)          # consume once; delete even on parse issues
+          except OSError:
+              pass
+      mode = parts[0] if parts else "GUIDED"
+      try:
+          alt = float(parts[1]) if len(parts) > 1 else 30.0
+      except ValueError:
+          alt = 30.0
+      # (a) take authority back into GUIDED (signed — this link did setup_signing(sign_outgoing=True))
+      master.mav.command_long_send(
+          master.target_system, master.target_component,
+          mavutil.mavlink.MAV_CMD_DO_SET_MODE, 0,
+          mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED, COPTER_GUIDED,
+          0, 0, 0, 0, 0)
+      # (b) ARM
+      master.mav.command_long_send(
+          master.target_system, master.target_component,
+          mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, 0,
+          1, 0, 0, 0, 0, 0, 0)
+      # (c) climb/return to <alt> m
+      master.mav.command_long_send(
+          master.target_system, master.target_component,
+          mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0,
+          0, 0, 0, 0, 0, 0, alt)
+
+  Call `_poll_recovery_trigger(master)` once per main-loop iteration (target_system/
+  target_component are already learned by gcs.py from heartbeats). Live-confirmed to
+  transition the drone to armed=True, mode=GUIDED.
+
+INVARIANTS PRESERVED
+--------------------
+  - KEY-FREE MDG: the defense_agent runtime names no key path and opens no key file.
+    The signature is produced only inside gcs.py with its own /sign.key.
+  - leak-0 / single spawn: MDG's delegation is exactly one Backend._spawn (the trigger
+    write); the actual signed actuation runs asynchronously in gcs.py's poll loop and is
+    decoupled from the spawn deadline (signer_shim._DELEGATE_TIMEOUT_S bounds only a hung
+    docker exec, not any flight sequence).

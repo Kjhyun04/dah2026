@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
-"""gcs_signed_correct.py — SIGNED recovery-correction sender (RUNS INSIDE gcs_c2 ONLY).
+"""gcs_signed_correct.py — SIGNED recovery-correction sender (REFERENCE / SUPERSEDED).
 
-This asset is AUTHORED in the defense_agent repo but is NOT imported or executed by the MDG
-process. The MDG mainloop DEPLOYS it into the ``gcs_c2`` container (docker cp) and MDG triggers it
-via a single Backend spawn:
+!!! DOES NOT WORK AS A STANDALONE SENDER — DO NOT DEPLOY (live-verified 2026-07-09) !!!
+Inside gcs_c2, ``gcs.py`` is the SOLE owner of the SITL signing link: it alone binds
+``udpin:127.0.0.1:14550`` and did ``setup_signing(sign_outgoing=True)`` with /sign.key. A SECOND
+process (this sender, exec'd independently) therefore cannot receive telemetry on 14550 nor emit on
+that signed link — the socket is already held by gcs.py, so this sender's heartbeat wait times out
+and its commands never reach the SITL. This file is kept ONLY as the reference implementation of the
+signed set_mode(GUIDED)+return-to-alt sequence (the exact convention gcs.py's trigger handler mirrors).
 
-    docker exec gcs_c2 python3 /gcs_signed_correct.py <mode> <alt>
+REAL (live-verified) recovery path — gcs.py TRIGGER-FILE polling, see the standard form in
+``assets/gcs_recovery_trigger.README``:
+  1. MDG delegates by WRITING a trigger file inside gcs_c2 (signer_shim._delegate_argv):
+        docker exec gcs_c2 sh -c 'printf "%s %s" "$1" "$2" > /tmp/mdg_correct' sh <MODE> <ALT>
+  2. The DEPLOYED gcs.py polls /tmp/mdg_correct each loop; when present it reads "<MODE> <ALT>" and
+     issues set_mode(GUIDED)+COMPONENT_ARM_DISARM(arm)+NAV_TAKEOFF(alt) over ITS OWN signing link,
+     then deletes the file. The signature is produced by gcs.py with its own key — MDG stays KEY-FREE.
 
 KEY OWNERSHIP (E11 non-proliferation): the MAVLink uplink-signing key lives ONLY inside gcs_c2
 (``/sign.key``, the same key ``/gcs.py`` already uses). MDG never opens, reads, names, or copies it
@@ -33,8 +43,11 @@ SIGN_KEYFILE = "/sign.key"          # gcs_c2-local signing key (SAME key /gcs.py
 LINK = "udpout:127.0.0.1:14550"     # local signed uplink → ARIA proxy → uav_proxy verify → SITL
 COPTER_GUIDED_CUSTOM_MODE = 4       # ArduCopter GUIDED custom_mode
 
-# --- blocking-time budget (LOAD-BEARING INVARIANT — pairs with signer_shim._DELEGATE_TIMEOUT_S) --
-# The Backend spawn that runs this sender (``docker exec gcs_c2 python3 <sender> …``) enforces a
+# --- blocking-time budget (HISTORICAL — this standalone sender is SUPERSEDED; see the header) ------
+# NOTE: this budget applied to the OLD ``docker exec gcs_c2 python3 <sender> …`` model, which does NOT
+# work (the SITL link is owned by gcs.py). It is retained only as reference for the signed sequence;
+# the live path (gcs.py trigger polling) is asynchronous and NOT bounded by _DELEGATE_TIMEOUT_S.
+# (historical) The Backend spawn that ran this sender enforced a
 # HARD deadline (signer_shim._DELEGATE_TIMEOUT_S). If this sender's worst-case blocking exceeds that
 # deadline the process group is SIGKILLed MID-SEQUENCE — and the S2 physical return can be silently
 # truncated (GUIDED set but the 30 m reposition never issued, or issued only once). So every

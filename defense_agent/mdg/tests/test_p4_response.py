@@ -304,14 +304,17 @@ class _RecordingBackend:
 
 
 def test_emit_signed_live_delegates_via_single_backend_spawn():
-    """allow_live=True: emit_signed triggers EXACTLY ONE Backend spawn with the docker-exec argv
-    ``docker exec gcs_c2 python3 /gcs_signed_correct.py GUIDED 30`` — the gcs_c2 sender signs there
-    (key stays in gcs_c2). MDG opens no file; the spawn is mutating (read_only=False)."""
+    """allow_live=True: emit_signed triggers EXACTLY ONE Backend spawn that WRITES the recovery
+    trigger file inside gcs_c2 — ``docker exec gcs_c2 sh -c 'printf "%s %s" "$1" "$2" >
+    /tmp/mdg_correct' sh GUIDED 30`` — after which gcs.py (the sole SITL signing-link owner) polls
+    the file and signs the set_mode+arm+takeoff with its own key. MDG opens no file; mode/alt are
+    passed as sh POSITIONAL args (no injection); the spawn is mutating (read_only=False)."""
     be = _RecordingBackend(allow_live=True, ok=True, dry_run=False, note="MOCK exec")
     emit = signer_shim.emit_signed(_signed_intent(), backend=be)
     assert len(be.reqs) == 1                                # SINGLE Backend spawn (불변식②)
-    assert be.reqs[0].argv == ["docker", "exec", "gcs_c2", "python3",
-                               "/gcs_signed_correct.py", "GUIDED", "30"]
+    assert be.reqs[0].argv == ["docker", "exec", "gcs_c2", "sh", "-c",
+                               'printf "%s %s" "$1" "$2" > /tmp/mdg_correct', "sh", "GUIDED", "30"]
+    assert "/tmp/mdg_correct" in be.reqs[0].argv[5]        # trigger-file write, not a sender exec
     assert be.reqs[0].read_only is False                   # mutating -> allow_live + semaphore path
     assert emit.ok and not emit.dry_run
     assert emit.delegate == "gcs_c2" and emit.command_digest

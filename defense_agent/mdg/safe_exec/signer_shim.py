@@ -39,20 +39,24 @@ from .backend import ExecRequest  # single-spawn owner request type (불변식�
 # MDG delegates the actual signature to the container that already holds the key. We name the
 # delegate endpoint but NEVER a key path — the emitter must remain key-free.
 GCS_SIGN_DELEGATE = "gcs_c2"          # out-of-band signer (already holds its own key)
-# The signed-correction sender is AUTHORED here as an asset (assets/gcs_signed_correct.py) but is
-# DEPLOYED INTO gcs_c2 by the mainloop (docker cp) — MDG only names the in-container path and the
-# recovery (mode, altitude) parameters. The signing key stays INSIDE gcs_c2: this module never names
-# a key path and never reads a file (verify_signer_no_keyopen).
-GCS_SIGNED_SENDER = "/gcs_signed_correct.py"   # sender path INSIDE gcs_c2 (mainloop deploys it)
+# LIVE-VERIFIED delegation path (2026-07-09): the recovery is delegated to gcs_c2 by WRITING a
+# TRIGGER FILE, not by exec-ing a standalone sender. Inside gcs_c2, ``gcs.py`` is the SOLE owner of
+# the SITL signing link (it alone holds the udpin:14550 socket and did setup_signing(sign_outgoing=
+# True) with its own in-container key). A second process cannot receive telemetry or emit on that link, so a
+# standalone sender (the old assets/gcs_signed_correct.py approach) does NOT work. Instead gcs.py
+# polls ``GCS_TRIGGER_FILE`` each loop; when present it reads "<MODE> <ALT>" and issues the SIGNED
+# set_mode(GUIDED)+arm+takeoff(alt) over ITS OWN link, then deletes the file. MDG's delegation is
+# therefore "record the trigger", never "run a signer": this module still names no key path and
+# opens no file (verify_signer_no_keyopen); the signature stays entirely inside gcs_c2 (E11).
+GCS_TRIGGER_FILE = "/tmp/mdg_correct"  # recovery trigger polled by gcs.py inside gcs_c2 (MDG writes it)
 _RECOVERY_MODE = "GUIDED"             # the flight mode that accepts the 30 m reposition (S2 return)
 _RECOVERY_ALT_M = 30                  # home/hover relative altitude (arducopter --home=...,30)
-# Backend spawn hard deadline for the gcs_c2 signed sender (R1). LOAD-BEARING INVARIANT: this MUST
-# exceed the sender's worst-case blocking budget with margin, or Backend._spawn SIGKILLs the process
-# group MID-SEQUENCE and the S2 physical return truncates silently (GUIDED set but the 30 m reposition
-# never issued). gcs_signed_correct.py bounds its worst case to
-#   HEARTBEAT_TIMEOUT_S + 2*(POS_TIMEOUT_S + SETTLE_S) = 5 + 2*(2+1) = 11s  (+ small connect overhead).
-# 30s leaves >2.5x headroom for heartbeat delay / lossy-UDP jitter after a command-hijack (contended
-# uplink) while still bounding a truly hung sender. Keep in lockstep with the asset's budget constants.
+# Backend spawn hard deadline for the TRIGGER-FILE write (R1). The spawn only runs
+# ``docker exec gcs_c2 sh -c 'printf "%s %s" "$1" "$2" > /tmp/mdg_correct' sh <MODE> <ALT>`` — a near-instant metadata
+# write — so this deadline bounds ONLY a hung ``docker exec`` (daemon / IO stall), not any flight
+# sequence. The ACTUAL signed actuation happens ASYNCHRONOUSLY inside gcs.py's poll loop and is
+# decoupled from (never truncated by) this deadline. 30s leaves ample headroom for a busy docker
+# daemon while still SIGKILLing a truly stuck spawn.
 _DELEGATE_TIMEOUT_S = 30.0
 
 
@@ -262,11 +266,17 @@ def _recovery_mode_alt(intent) -> tuple[str, int]:
 
 
 def _delegate_argv(mode: str, alt: int) -> list[str]:
-    """The single Backend-spawn argv: ``docker exec gcs_c2 python3 <sender> <mode> <alt>``.
+    """The single Backend-spawn argv: WRITE the recovery TRIGGER FILE inside gcs_c2.
 
-    MDG passes ONLY the recovery mode + altitude. It never passes, names, or opens a key — the sender
-    (already inside gcs_c2) reads gcs_c2's own key and signs there (E11 non-proliferation)."""
-    return ["docker", "exec", GCS_SIGN_DELEGATE, "python3", GCS_SIGNED_SENDER, mode, str(alt)]
+    ``docker exec gcs_c2 sh -c 'printf "%s %s" "$1" "$2" > /tmp/mdg_correct' sh <mode> <alt>``
+
+    MDG only RECORDS "<MODE> <ALT>" (e.g. ``GUIDED 30``) into gcs_c2's trigger file. The deployed
+    gcs.py — the SOLE owner of the SITL signing link — polls that file and issues the SIGNED
+    set_mode(GUIDED)+arm+takeoff(alt) with ITS OWN key, then removes the file. MDG never passes,
+    names, or opens a key (E11 non-proliferation). ``mode``/``alt`` are handed to ``sh`` as POSITIONAL
+    args ($1/$2), never interpolated into the shell string, so there is no injection surface."""
+    return ["docker", "exec", GCS_SIGN_DELEGATE, "sh", "-c",
+            f'printf "%s %s" "$1" "$2" > {GCS_TRIGGER_FILE}', "sh", mode, str(alt)]
 
 
 def emit_signed(intent, backend=None) -> SignerEmit:
@@ -276,10 +286,11 @@ def emit_signed(intent, backend=None) -> SignerEmit:
     material) and return a DRY result — NO spawn, NO file access (unchanged legacy behaviour).
 
     allow_live=True (operator-approved live promotion): DELEGATE the signature to ``gcs_c2`` (which
-    already holds its own key) by triggering, through the SOLE subprocess owner ``Backend.run``
-    (불변식②, a single spawn site), ``docker exec gcs_c2 python3 <sender> <mode> <alt>``. The sender
-    signs INSIDE gcs_c2 and pushes DO_SET_MODE GUIDED + a 30 m relative-altitude return to the SITL
-    over the already-trusted gcs_c2 signing path. This function never opens, reads, or names a
+    already holds its own key) by WRITING the recovery TRIGGER FILE, through the SOLE subprocess owner
+    ``Backend.run`` (불변식②, a single spawn site):
+    ``docker exec gcs_c2 sh -c 'printf "%s %s" "$1" "$2" > /tmp/mdg_correct' sh <MODE> <ALT>``. The deployed gcs.py — the
+    only owner of the SITL signing link — polls that file and issues the SIGNED set_mode(GUIDED)+arm+
+    takeoff(alt) with its own key, then removes it. This function never opens, reads, or names a
     signing-key path (verify_signer_no_keyopen); it only builds an argv and hands it to Backend.run.
     """
     dg = command_digest(intent)
@@ -289,8 +300,9 @@ def emit_signed(intent, backend=None) -> SignerEmit:
                           note="operator-go 유보: key-free digest only; sign delegated to gcs_c2 "
                                "(no signing key held, E11 non-proliferation)")
     # Live promotion: authorization must have been operator-approved (OperatorGate.verify). The
-    # signature is issued by the gcs_c2 delegate out-of-band; MDG only triggers it via the single
-    # Backend spawn and never re-mounts the key. A missing/invalid backend fails inert (no spawn).
+    # signature is issued by the gcs_c2 delegate out-of-band (gcs.py polls the trigger file); MDG only
+    # RECORDS the trigger via the single Backend spawn and never re-mounts the key. A missing/invalid
+    # backend fails inert (no spawn).
     if not callable(getattr(backend, "run", None)):
         return SignerEmit(ok=False, dry_run=True, command_digest=dg,
                           note="live emit requested but no Backend spawn owner supplied (inert)")
@@ -300,8 +312,7 @@ def emit_signed(intent, backend=None) -> SignerEmit:
     return SignerEmit(ok=bool(getattr(res, "ok", False)),
                       dry_run=bool(getattr(res, "dry_run", False)),
                       command_digest=dg,
-                      note=(f"delegate to {GCS_SIGN_DELEGATE} signed sender via Backend spawn "
-                            f"(docker exec {GCS_SIGN_DELEGATE} python3 {GCS_SIGNED_SENDER} "
-                            f"{mode} {alt}; key stays in {GCS_SIGN_DELEGATE}, E11): "
-                            f"{getattr(res, 'note', '')}"),
+                      note=(f"delegate to {GCS_SIGN_DELEGATE} via Backend spawn: write trigger "
+                            f"'{mode} {alt}' -> {GCS_TRIGGER_FILE} (gcs.py polls + signs with its "
+                            f"own key; MDG holds no key, E11): {getattr(res, 'note', '')}"),
                       extra={"mode": mode, "alt": alt, "argv": argv})
