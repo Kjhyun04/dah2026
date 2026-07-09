@@ -19,6 +19,23 @@ docker compose -f compose/docker-compose.gcs.yml up -d --force-recreate
 log "UAV측: SITL(→127.0.0.1 프록시) + uav_proxy (SITL+GPS+proxy 함께 재생성)"
 docker compose -f compose/docker-compose.uav.yml up -d --force-recreate
 
+# ── 5762 백도어 관측 계수 체인(DAH5762) — bringup 정본 경로에 설치(항상 on · 관측 전용, DROP 없음) ──
+#   방어 WebProbe 가 SYN 카운터(iptables -nvxL DAH5762)를 읽어, 5s ss 스냅샷이 놓치는 짧은 5762
+#   백도어 연결까지 결정론 포착. 정상 5762 legit 없음(C2=14550 서명·GPS=14540 lo)이라 순수 공격신호.
+#   uav_ue netns(3/7 RAN에서 생성, uav compose 재생성에도 유지)에 설치. netns 진입 root 필요 → sudo -n,
+#   실패 시 무해 degrade(|| true, ss 경로는 계속 동작). 트래픽·공격성공 불변(가역·무해).
+UAV_PID="$(docker inspect -f '{{.State.Pid}}' uav_ue 2>/dev/null || true)"
+if [ -n "$UAV_PID" ]; then
+  _ns(){ sudo -n nsenter -t "$UAV_PID" -n "$@" 2>/dev/null || nsenter -t "$UAV_PID" -n "$@" 2>/dev/null; }
+  _ns iptables -N DAH5762 2>/dev/null || _ns iptables -F DAH5762 || true
+  _ns iptables -C INPUT -p tcp --dport 5762 -j DAH5762 2>/dev/null || _ns iptables -A INPUT -p tcp --dport 5762 -j DAH5762 || true
+  _ns iptables -A DAH5762 -i lo -j RETURN || true
+  _ns iptables -A DAH5762 -p tcp --syn -j NFLOG --nflog-group 5762 --nflog-prefix DAH5762_SYN \
+    || _ns iptables -A DAH5762 -p tcp --syn -m comment --comment DAH5762_SYN -j RETURN || true
+  _ns iptables -A DAH5762 -j RETURN || true
+  log "DAH5762 관측 계수 체인 설치(5762 SYN 카운터 · DROP 없음)"
+fi
+
 log "C2 왕복 대기(20s)..."; sleep 20
 log "gcs_c2 로그:"; docker logs gcs_c2 2>&1 | tail -4 || true
 log "완료 — 검증: scripts/71-verify-aria.sh (G4)"
