@@ -56,7 +56,10 @@ case "$cmd" in
     # (goal.p4=signing_bypass mode=5 등 다른 목표는 GOAL=goals/goal.p4.yaml 로 오버라이드.)
     CONFIG="${CONFIG:-configs/config.live.yaml}"; GOAL="${GOAL:-goals/goal.land.yaml}"
     SUP_WINDOW="${SUP_WINDOW:-200}"; TAP="${TAP:-gcs_proxy}"
-    : "${OPENROUTER_API_KEY:?export OPENROUTER_API_KEY (또는 .env.openrouter) 필요}"
+    # 활성 LLM 키 env = config.live.yaml api_key_env(=${LLM_API_KEY_ENV:-LLM_API_KEY}) 와 동일 규약.
+    #   .env 에 그 이름의 키를 채우면 됨(아무 플랫폼). 관례키 재사용 시 LLM_API_KEY_ENV 로 이름 지정.
+    KEYENV="${LLM_API_KEY_ENV:-LLM_API_KEY}"
+    [ -n "${!KEYENV:-}" ] || { echo "ERROR: LLM 키 없음 — .env 의 ${KEYENV} 를 채우세요('=' 뒤 공백 없이). 예: LLM_MODEL=openrouter/anthropic/claude-sonnet-4  LLM_API_KEY=<키>"; exit 1; }
     ARIA="$(grep -oE '[0-9a-fA-F]{64}' "${_ARIA_F:-/nonexistent}" 2>/dev/null | head -1)"
     [ -n "$ARIA" ] || { echo "ERROR: ARIA key 없음 — testbed .env-aria(../testbed | ~/testbed | ~/dah2026/testbed) 미발견. 테스트베드 bringup 을 먼저 실행하세요."; exit 1; }
     GCS_PID="$(docker inspect -f '{{.State.Pid}}' "$TAP" 2>/dev/null)"
@@ -123,7 +126,7 @@ print('  mode', hb.custom_mode if hb else None, 'armed', bool(hb.base_mode&128) 
 attack_agent 런처 — ./dah.sh <명령>   (에이전트 본체는 python run.py / run_live_gate5.py)
   verify     8개 무결성 게이트 (오프라인·무해)
   recon      정찰 폐루프 (오프라인 mock)
-  campaign   라이브 캠페인 + 독립 감독 (헤드라인)   [OPENROUTER_API_KEY 필요]
+  campaign   라이브 캠페인 + 독립 감독 (기본 goal.land)   [.env: LLM_MODEL + LLM_API_KEY]
   land       지속 착륙 시각화 데모 (대시보드 고도↓)  [명시 승인 하]
   viewer     뷰어 3패널 (127.0.0.1:8090)
   status     컨테이너 + 드론 상태
