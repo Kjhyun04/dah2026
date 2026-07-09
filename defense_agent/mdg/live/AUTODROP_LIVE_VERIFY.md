@@ -1,26 +1,36 @@
-# 자율 DROP 라이브 검증 명세 (SSH) — 11단계 배선 후 testbed 실집행 검증
+# nsenter DROP 라이브 검증 명세 (SSH) — DROP 경로 관통·안전·불변식보존 검증
 
-> 대상: `docs/CODE_AUDIT_20260708.md` 최소 변경셋 11단계 배포 후, 실제 testbed(`<TESTBED-IP>`)에서
-> **자율 DROP 경로가 관통·안전·불변식보존**임을 검증. 단위테스트로 닫을 수 없는 **라이브-전용 사항** 중심.
+> ⚠ **정정(2026-07-09 · 5762 백도어 벡터 제거).** 본 명세는 원래 **5762 시리얼 백도어** 트리거의
+> 자율 DROP(`WebProbe`→`Port_5762_State`→`BACKDOOR_5762` incident→`backdoor_drop` rtype,
+> enforce_at=uav_ue)을 검증했다. 이 5762 탐지·복구 경로는 **코드에서 전량 제거**되었다
+> (WebProbeCollector·Port_5762_State·BACKDOOR_5762·backdoor_drop·read_port_state tool·s3b_5762.sh).
+> **★ `nsenter_input_drop` DROP 메커니즘 자체(2-엔드포인트 chokepoint⟂source 안전 assert·fail-closed
+> inert·record_intent·revert·누수-0)는 존속**하며, 이제 이 도구를 참조하는 복구는
+> `pfcp_firewall`(트리거 `PFCP_Delete_Attempt`→`PFCP_DELETE`/CR01, enforce_at **gcs_proxy**)·
+> `mongo_acl`(트리거 `DB_Access`, enforce_at **web_backend**)이다. 단, `recovery_priors.yaml`대로
+> **두 경로 모두 현재 operator-only/비자율(inert)**: PFCP는 correlate가 귀속 소스 없음→`target=""`
+> fail-closed(자율 DROP 미발화)·gcs_proxy가 net_core PFCP를 chokepoint 못 함, mongo_acl은
+> orphan(select_policy 후보 미방출). 즉 5762가 제공하던 **완전 자율(AUTO-tier 실발화) DROP은 제거**
+> 되었고, DROP 메커니즘은 PFCP/mongo에 배선된 채 **operator-go**로 남는다.
+> **아래 §0 상수는 현행 트리거(gcs_proxy/web_backend)로 갱신했으며, §A~§G의 관통·실집행 절차와
+> 2026-07-08 실집행 기록은 제거된 5762 경로를 대상으로 한 원 절차로, nsenter DROP 메커니즘·안전·
+> 불변식의 참조 구현이자 역사적 감사기록으로 보존한다**(감사 정본: `docs/LIVE_VERIFICATION_STATUS_20260708.md`).
+>
+> 대상: 실제 testbed(`<TESTBED-IP>`)에서 **nsenter DROP 경로가 관통·안전·불변식보존**임을 검증.
+> 단위테스트로 닫을 수 없는 **라이브-전용 사항** 중심.
 > 지위: DROP(상태변경)은 **operator 명시 승인** 하에서만. 기본 read-only/DRY. 2대 불변식·운영제약 우선.
 >
-> ✅ 이름 확정(구현 완료 2026-07-08): `source`(SensorEv 필드)·`BACKDOOR_5762`(incident.kind)·
-> `backdoor_drop`(rtype, response_tool=nsenter_input_drop·enforce_at=uav_ue·succ=0.85). 로컬 pytest
-> **159 passed**·verify 9종 PASS. 신규 관통테스트 `tests/test_p7_backdoor_drop.py`.
->
-> ⚠⚠ **이중 operator-go 게이트(발화 필수조건)**: uav_ue/attacker_ue는 UE-pool이라 legality가 읽는
-> `role_verified[uav_ue]`/source 검증이 **True가 되려면 recon이 `allow_live`로 stage-2 tun 스캔을
-> 실행**해야 함(부팅 inspect만으론 미검증→legality illegal→inert). 즉 자율 DROP엔 **(a) live recon
-> 리졸브 + (b) 집행 allow_live 둘 다** operator-go 필요. 이것이 fail-closed의 핵심이자 배포 급소.
+> ⚠⚠ **이중 operator-go 게이트**: UE-pool source(attacker_ue) 검증이 **True가 되려면 recon이
+> `allow_live`로 stage-2 tun 스캔을 실행**해야 함(부팅 inspect만으론 미검증→legality illegal→inert).
+> 즉 DROP 집행엔 **(a) live recon 리졸브 + (b) 집행 allow_live 둘 다** operator-go 필요. fail-closed의 핵심.
 
 ## 0. 공통 상수·해석 (매 실행 런타임 재해석, 하드코드 금지)
 | 항목 | 라이브 실측(예시, 동적) | 해석법 |
 |---|---|---|
 | UAV | uav_ue, tun `10.45.0.2`, netns `4026532572` | `docker exec uav_ue ip -4 addr show tun_srsue` |
 | attacker | attacker_ue, tun `10.45.0.13`, cellular `10.44.0.31` | 동상, `-s` DROP 소스=tun IP |
-| enforce chokepoint | **uav_ue**(5762 LISTEN netns) | `docker inspect -f {{.State.Pid}} uav_ue` |
-| 5762 LISTEN | uav_ue netns arducopter | `nsenter --target <uav_ue pid> --net -- ss -tlnH \| grep 5762` |
-| 공격도구 | `~/dah_exec/CAMPAIGN/serial5762.py <mode>` (via `lib/run.sh`) | targets.env UAV_SERIAL=10.45.0.2:5762로 교정필 |
+| enforce chokepoint | **gcs_proxy**(pfcp_firewall)·**web_backend**(mongo_acl) — `recovery_priors.enforce_at` | `docker inspect -f {{.State.Pid}} <role>` |
+| 공격도구 | `~/dah_exec/B_TM2_V3/pfcp_delete.py`(PFCP delete) · mongo 접속 유발 (via `lib/run.sh`) | targets.env 참조 |
 
 **안전 assert(전 스텝 fail-closed):** `attacker_tun != uav_tun` · `enforce_pid>0` · DROP `-s`는 attacker_tun(≠UAV). 하나라도 실패 → abort.
 
@@ -154,7 +164,12 @@ allow_live=False라 Backend가 DRY 반환 → **그래프가 무엇을 DROP하�
 
 ---
 
-## G. 라이브 검증 실행 기록 (2026-07-08, 진행)
+## G. 라이브 검증 실행 기록 (2026-07-08) — ⚠ 제거된 5762 경로의 역사적 기록
+
+> ⚠ 아래 기록은 **제거된 5762 백도어 트리거**(BACKDOOR_5762/backdoor_drop, enforce_at=uav_ue)에
+> 대한 2026-07-08 실집행 감사기록이다. 해당 자율 DROP 경로는 코드에서 제거되었으므로 현행 동작이
+> 아니며, nsenter DROP 메커니즘·안전·불변식(2-엔드포인트·revert·누수-0)의 실증 provenance로만 보존한다.
+> 현행 PFCP/mongo 트리거는 operator-go/inert(상단 정정 배너 참조).
 
 ### 완료 (배포+DRY)
 - **A GATE0 ✅**: 서버 배포 후 pytest **170 passed·1 skipped**, verify graph(28)·routing(21)·no_fw_subproc(119)·leak0(16) PASS. langgraph-checkpoint **2.1.2**(≥2.0.25 → P3 pruning 활성).

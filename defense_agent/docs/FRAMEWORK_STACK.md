@@ -86,7 +86,7 @@ act → verify → sense
 - LangGraph `act` 노드는 nsenter/docker/tcpdump를 **직접 안 부른다**. 손수 `Backend.run(ExecRequest)`(timeout+setsid+라벨 reap, Robo Duck R1~R6 계승)에 위임.
 - `record_intent(ledger)`는 **guard 밖**·실행 직전 항상 기록{rule,revert_cmd,ts,decision_id}. `recover_on_boot`가 이전 run 스캔→누수 정리(G3).
 - LangGraph `checkpointer`는 revert/operator-gate 시맨틱을 모르므로 **actuation 원장으로 안 쓴다**(상태 영속·recover 편의로만 보조 가능, 원장은 우리 ledger가 정본).
-- Collector는 **그래프 밖** 장수 async 데몬. sense가 큐를 non-blocking 드레인. 5762=ss-only·pool=1.
+- Collector는 **그래프 밖** 장수 async 데몬. sense가 큐를 non-blocking 드레인. 관측은 read-only·pool=1.
 
 ### 2.3 grep0 (Verifier 분리)
 - Verifier는 **별 프로세스/별 그래프**. `verify_grep0`(정적)로 core 그래프가 verifier 판정권을 import 못 함을 강제.
@@ -96,7 +96,7 @@ act → verify → sense
 
 ## 3. replay / verify-suite
 - **replay(H-J):** 노드 I/O(evidence→decision→verifier_truth)를 JSONL 녹화. 심사원은 `--replay run.jsonl`로 FastAPI 뷰어 3패널 재생. **pip-free보다 이게 이식성의 본선.**
-- **verify-suite(GATE0/1, pytest):** `verify_tools`(27 tool 계약·유령0) · **`verify_graph`(LG: compile·11노드·엣지 도달성)** · **`verify_routing`(불변식①: 조건부 엣지 LLM 미참조·수치 분기)** · **`verify_no_fw_subproc`(불변식②: 노드 subprocess 0·safe-exec만)** · `verify_grep0`(Verifier↛decider) · `verify_keys`(3키 분리·argv 누수0) · `verify_parsers`(regex vs fixture) · `verify_leak0`(GATE1 통합).
+- **verify-suite(GATE0/1, pytest):** `verify_tools`(26 tool 계약·유령0) · **`verify_graph`(LG: compile·11노드·엣지 도달성)** · **`verify_routing`(불변식①: 조건부 엣지 LLM 미참조·수치 분기)** · **`verify_no_fw_subproc`(불변식②: 노드 subprocess 0·safe-exec만)** · `verify_grep0`(Verifier↛decider) · `verify_keys`(3키 분리·argv 누수0) · `verify_parsers`(regex vs fixture) · `verify_leak0`(GATE1 통합).
 
 ---
 

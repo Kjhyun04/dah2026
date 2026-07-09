@@ -18,7 +18,7 @@ testbed(<TESTBED-IP>) 상태변경 자동실행 **0**. 라이브 상태변경(ns
 ## Phase별 결과
 
 ### P0 — 형식코어 + LangGraph 스캐폴드 — 통과 ✅
-**산출 파일(대표)**: `core/state.py`(MDGState TypedDict, operator.add 3채널 리듀서, `to_record()` allow-field projection), `core/worldstate.py`(닫힌술어 pydantic 모델), `core/scoring.py`(E5~E8·E19 수식), `core/edges.py`(2개 결정론 조건부엣지), `core/advice.py`(tighten_only), `core/graph.py`(build_graph 11노드·recursion_limit=16), `core/nodes/*`(sense·correlate·compute_trust·compute_impact·orient·select_policy·rank_recovery·decide·act·effect_confirm·escalate), `tools/registry.py`(27 tool Literal 화이트리스트), `tools/defresult.py`, `safe_exec/backend.py`, `collector/ingest.py`, `ledger/intent_ledger.py`, `config/*.yaml`(5종), `verify/*`(6종), `tests/test_math.py`. (전체 목록: 첨부 빌드데이터 P0)
+**산출 파일(대표)**: `core/state.py`(MDGState TypedDict, operator.add 3채널 리듀서, `to_record()` allow-field projection), `core/worldstate.py`(닫힌술어 pydantic 모델), `core/scoring.py`(E5~E8·E19 수식), `core/edges.py`(2개 결정론 조건부엣지), `core/advice.py`(tighten_only), `core/graph.py`(build_graph 11노드·recursion_limit=16), `core/nodes/*`(sense·correlate·compute_trust·compute_impact·orient·select_policy·rank_recovery·decide·act·effect_confirm·escalate), `tools/registry.py`(26 tool Literal 화이트리스트), `tools/defresult.py`, `safe_exec/backend.py`, `collector/ingest.py`, `ledger/intent_ledger.py`, `config/*.yaml`(5종), `verify/*`(6종), `tests/test_math.py`. (전체 목록: 첨부 빌드데이터 P0)
 
 **검증**: self-verify 전부 PASS — verify_tools 178 · verify_graph 13 · verify_routing 12 · verify_grep0 278 · verify_keys 173 · verify_no_fw_subproc 94, test_math 15/15, compileall clean. 파이프라인/act/escalate 라우팅·redact·seq-watermark·ingest-HMAC 통합검증 통과.
 
@@ -31,7 +31,7 @@ testbed(<TESTBED-IP>) 상태변경 자동실행 **0**. 라이브 상태변경(ns
 락된 계약대로 이미 완전 구현되어 있어 재작성 없이 동작 검증. 표준 레이아웃 매핑:
 - `safe_exec/backend.py` — Backend.run 유일 subprocess 경로(mock/local, allow_live 기본 False→DRY). PrioritySemaphore(1), nsenter pool=1.
 - `safe_exec/safeexec.py` — R1 하드타임아웃 · R2 setsid 프로세스그룹 · R3 라벨 `dah_def` · R4 컨테이너-스코프 reap · R5 secret stdin · R6 멱등 teardown.
-- `collector/`(6종) — AirCommandTap(gcs_proxy:14556)·AirTelemetryTap(uav_ue lo:14550 교차 D-1)·NetworkMetricCollector(:9090 양수카운터 diff, 음수게이지 회피 P4-3)·WebProbeCollector(5762 ss-only pool=1)·MongoLogCollector(docker logs id22943)·MissionConfigCollector. 전부 그래프 밖 데몬 스레드, bounded queue DoS캡.
+- `collector/`(5종) — AirCommandTap(gcs_proxy:14556)·AirTelemetryTap(uav_ue lo:14550 교차 D-1)·NetworkMetricCollector(:9090 양수카운터 diff, 음수게이지 회피 P4-3)·MongoLogCollector(docker logs id22943)·MissionConfigCollector. 전부 그래프 밖 데몬 스레드, bounded queue DoS캡. (SmfSessionCollector·SignLogCollector는 P2/P3에서 추가 배선.)
 - `ingest/server.py` — gRPC :50051 mTLS·loopback 강제(PS-8)·max 256KiB. `ingest/verify.py` — 드레인 시점 HMAC→seq(HWM)→ts skew 순 검증.
 - `ledger/intent_ledger.py` — record_intent JSONL append+fsync(부작용 前·guard 밖), SeqWatermark(HWM+seen-bitmap fsync), boot_recover.
 - `watchdog.py` — G7 독립 스레드, collector heartbeat 감시→서명 sensor_loss 봉투 인큐.
@@ -40,7 +40,6 @@ testbed(<TESTBED-IP>) 상태변경 자동실행 **0**. 라이브 상태변경(ns
 - (low) `verify/verify_no_fw_subproc.py` — 스캔 루트가 core/*만 커버. collector/·watchdog·ingest/·ledger/·tools/·targets/ 미스캔(현재 clean, grep 확인). 스캔 루트 확장 권고.
 - (low) `verify/verify_no_fw_subproc.py` — docstring이 "subprocess import는 backend.py만"이라 하나 safeexec.py도 import(teardown TCB, spawn 없음). docstring 정정 권고.
 - (low) `ingest/verify.py` — verify_envelope가 seq를 먼저 소비 후 ts skew 체크. fail-closed 방향·착취 불가(HMAC 선게이트). retransmit-after-skew 운영요구 시 순서 조정.
-- (info) `tests/test_p1_engine.py` — 5762 connect-0/pool=1 계약이 구조·기능 검증되나 명시적 assert 없음(암묵 커버). 선택적 pin.
 
 ### P2 — 정찰/타깃 해석 — 통과 ✅ (잔여 0)
 **산출 파일**: `targets/resolve.py`(role→container→IP 2단계 verify: inspect Pid/IP → tun_srsue nsenter 스캔, docker exec→nsenter 전송교체 P2-Q1), `targets/inputspec.py`(하드코딩 IP 0, config 소스), `targets/behavioral.py`, `core/recon.py`(recon_boot: signing=UNKNOWN 3치 P2-Q2, 닫힌 reach 어휘 시드, RTT baseline, PS-6 HWM+ledger recover), `collector/smf_session.py`(IMSI↔동적tun-IP 양방향, ANSI-strip, stale evict, P4-4 조인), `config/defaults.py`, `tests/test_p2_recon.py`.
@@ -77,9 +76,9 @@ testbed(<TESTBED-IP>) 상태변경 자동실행 **0**. 라이브 상태변경(ns
 - (info/accepted) `verifier/verifier.py` — P5-Q3: `gcs_proxy_alive`는 coarse presence 확인(음수/침묵 탐지기 없음). gcs_proxy 컨테이너 존재 유지하며 명령평면 위조하는 MITM은 단독으로 CROSS_ROOT_INCONSISTENT 미유발. anti-spoof는 텔레메트리 루트의 드론측 lo:14550 교차탭에 의존. 문서화된 수용 한계(P5 리그레션 아님).
 
 ### P6 — E2E 하네스 + 정직성 + 보고서 — 통과 ✅
-**산출 파일**: `campaign/e2e.py`(6 실증공격 재생→탐지→대응→검증, langgraph-free `_TickExecutor`가 실 11노드+edges 재사용·production과 byte-identical run.jsonl, PS-2 ingest 실통과, 실집행 DRY), `campaign/honest.py`(5 disclosed limitation+banner), `campaign/artifacts.py`(AttackOutcome/CampaignResult→6장 보고서), `campaign/RUNBOOK.md`(라이브 실집행 절차·가역/복원표·롤백), `tests/test_p6_campaign.py`.
+**산출 파일**: `campaign/e2e.py`(5 실증공격 재생→탐지→대응→검증, langgraph-free `_TickExecutor`가 실 11노드+edges 재사용·production과 byte-identical run.jsonl, PS-2 ingest 실통과, 실집행 DRY), `campaign/honest.py`(5 disclosed limitation+banner), `campaign/artifacts.py`(AttackOutcome/CampaignResult→6장 보고서), `campaign/RUNBOOK.md`(라이브 실집행 절차·가역/복원표·롤백), `tests/test_p6_campaign.py`.
 
-**6공격 결과**: A1 명령하이재킹(command floor71 Red), A2 PFCP storm(session floor71 Red, verified B-1), A3 무인증명령 반복(Yellow), A4 5762 backdoor(Yellow), A5 mongo(under-weighted→Green, dilution 실증), A6 telemetry silence(Yellow via E8 bump, verified D-1, agent≠truth 2발산).
+**5공격 결과**: A1 명령하이재킹(command floor71 Red), A2 PFCP storm(session floor71 Red, verified B-1), A3 무인증명령 반복(Yellow), A5 mongo(under-weighted→Green, dilution 실증), A6 telemetry silence(Yellow via E8 bump, verified D-1, agent≠truth 2발산).
 
 **불변식**: 라우팅 수치/불린만(①), Backend.run 단일경로·노드 spawn 0·Verifier 별프로세스(②), live_executions=0 하드가드.
 
@@ -94,7 +93,7 @@ testbed(<TESTBED-IP>) 상태변경 자동실행 **0**. 라이브 상태변경(ns
 |--------|------|------|------|
 | **GATE0** | 형식코어·불변식·정적검증 | ✅ PASS | verify 6종+test_math 전부 PASS, compileall clean. 2불변식 정적 재확인(verify_routing/grep0). |
 | **GATE1** | 누수-0 실집행 실측 | ⏸ 코드·DRY 검증 완료 / 라이브 실측 **operator-go 유보** | Backend allow_live=False 구조 강제. secret-canary=0(리플레이·run 레벨). 라이브 nsenter/pause/서명 미실행. |
-| **GATE2** | 효력(탐지·대응·독립검증) | ✅ 오프라인 GREEN / 라이브 효력 실측 유보 | P5 4속성 GREEN, P6 6공격 재생 탐지·대응·독립검증·정직성 통과. 실 testbed 집행은 operator-go. |
+| **GATE2** | 효력(탐지·대응·독립검증) | ✅ 오프라인 GREEN / 라이브 효력 실측 유보 | P5 4속성 GREEN, P6 5공격 재생 탐지·대응·독립검증·정직성 통과. 실 testbed 집행은 operator-go. |
 
 ## 다음 실행 절차 — 라이브 캠페인 operator-go 조건
 1. **환경 패리티**: operator-go 환경에 langgraph·litellm 설치, `test_graph_parity`(P6 잔여) 실행하여 컴파일 그래프 = _TickExecutor 패리티 폐쇄.
@@ -108,9 +107,9 @@ testbed(<TESTBED-IP>) 상태변경 자동실행 **0**. 라이브 상태변경(ns
 - **라이브 실집행 0**: 전 Phase는 코드+하네스+DRY/mock/read-only까지. nsenter DROP·docker pause·서명명령 등 상태변경은 실제 testbed에서 미실행(operator-go 유보). GATE1/2의 라이브 실측은 미검증.
 - **LLM 라이브 미실증**: litellm 로컬 부재로 실 엔드포인트 temp0/fallback 미실행. 오프라인은 G6 결정론 폴백으로 정합 유지되나, 라이브 모델 응답 결정론은 sign-off 필요.
 - **langgraph 미설치(D-2)**: 컴파일 그래프 런타임 패리티 로컬 미실행. topology 단일소스로 구조 보장만.
-- **탐지 사각(P6 disclosed)**: V4 탐지불가, 5762 blind spot, mission-weighted dilution(A5 mongo→Green 희석 실증), 6공격 중 4공격 미검증(독립 verified는 A2/A6 등 일부), blast-radius self-DoS 가능성.
+- **탐지 사각(P6 disclosed)**: V4 탐지불가, mission-weighted dilution(A5 mongo→Green 희석 실증), 5공격 중 3공격 미검증(독립 verified는 A2/A6), blast-radius self-DoS 가능성.
 - **anti-spoof 한계(P5-Q3)**: gcs_proxy presence-only 확인. 컨테이너 유지형 MITM 단독 미탐, 텔레 교차탭 의존.
 - **캘리브레이션 미확정**: 회복 priors/임계값은 도메인 sign-off 대기(결정론·배선은 정상).
 
 ## 총평
-P0~P6 전 Phase가 락된 `DESIGN_DECISIONS.md` 계약대로 동작 코드(스텁 0)로 구현·검증되었으며, 2대 불변식(결정론 제어흐름·누수-0 실행)과 testbed 상태변경 자동실행 금지 운영제약을 위반 없이 준수한다 — GATE0는 정적·오프라인 전 항목 GREEN이고, P5/P6의 리플레이 결정론·독립검증·6공격 재생까지 오프라인 효력이 실증되었다. 다만 프로젝트의 본질적 정직 한계는 명확하다: 모든 라이브 상태변경과 LLM 실호출이 설계상 `allow_live=False`/도구 부재로 봉인되어 있어 GATE1(누수-0 실측)과 GATE2(라이브 효력)는 코드·DRY 수준까지만 확정되고 실 testbed 집행은 전적으로 operator-go에 유보된다. 따라서 현 산출물은 "실집행 직전까지 검증 완료된, 감사가능·되돌이가능한 방어 파이프라인"으로 요약되며, 남은 것은 새 코드가 아니라 operator 승인 하의 환경 패리티(langgraph/litellm)·모델/캘리브레이션 sign-off·라이브 실측 6단계 절차의 순차 집행이다.
+P0~P6 전 Phase가 락된 `DESIGN_DECISIONS.md` 계약대로 동작 코드(스텁 0)로 구현·검증되었으며, 2대 불변식(결정론 제어흐름·누수-0 실행)과 testbed 상태변경 자동실행 금지 운영제약을 위반 없이 준수한다 — GATE0는 정적·오프라인 전 항목 GREEN이고, P5/P6의 리플레이 결정론·독립검증·5공격 재생까지 오프라인 효력이 실증되었다. 다만 프로젝트의 본질적 정직 한계는 명확하다: 모든 라이브 상태변경과 LLM 실호출이 설계상 `allow_live=False`/도구 부재로 봉인되어 있어 GATE1(누수-0 실측)과 GATE2(라이브 효력)는 코드·DRY 수준까지만 확정되고 실 testbed 집행은 전적으로 operator-go에 유보된다. 따라서 현 산출물은 "실집행 직전까지 검증 완료된, 감사가능·되돌이가능한 방어 파이프라인"으로 요약되며, 남은 것은 새 코드가 아니라 operator 승인 하의 환경 패리티(langgraph/litellm)·모델/캘리브레이션 sign-off·라이브 실측 6단계 절차의 순차 집행이다.

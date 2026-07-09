@@ -1,5 +1,21 @@
 # CHANGELOG — defense_agent (MDG)
 
+## 2026-07-09 · 5762 시리얼 백도어 벡터 제거
+
+### 제거 (코드 · 문서 정합)
+- **5762 백도어 탐지·복구 전 경로 삭제**: `WebProbeCollector`(uav_ue:5762 ss ESTAB 관측) ·
+  `Port_5762_State` 신호 · correlate `BACKDOOR_5762` incident · `backdoor_drop` recovery(rtype) ·
+  레지스트리 `read_port_state` tool(**TOOL_COUNT 27→26**) · 라이브 스크립트 `live/s3b_5762.sh` ·
+  campaign `A4_5762_backdoor` 시나리오. 남은 로스터 = **A1/A2/A3/A5/A6**(5공격).
+- **★ 유지 — `nsenter_input_drop` DROP 메커니즘 존속**: AUTO-tier nsenter+iptables DROP 도구 자체와
+  2-엔드포인트(chokepoint⟂source) 안전 assert·fail-closed inert·record_intent·revert(누수-0) 불변식은
+  그대로 유지된다. 이제 이 도구를 참조하는 복구는 `pfcp_firewall`(enforce_at gcs_proxy,
+  트리거 `PFCP_Delete_Attempt`→`PFCP_DELETE`/CR01)·`mongo_acl`(enforce_at web_backend,
+  트리거 `DB_Access`)이다. 단, `recovery_priors.yaml` 주석대로 **두 경로 모두 현재 operator-only/
+  비자율(inert)**: PFCP는 correlate가 귀속 소스 없음→`target=""` fail-closed(자율 DROP 미발화),
+  mongo_acl은 orphan(select_policy가 후보로 미방출). 즉 5762가 제공하던 "자율 nsenter DROP"의
+  트리거는 제거되었고, 메커니즘은 PFCP/mongo에 배선된 채 operator-go로 남는다.
+
 ## 2026-07-08 · 라이브 검증 · 품질강화 · 배포 스캐폴딩
 
 ### 라이브 검증 (서버 · 인가된 격리 샌드박스)

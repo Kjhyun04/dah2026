@@ -40,14 +40,14 @@
 
 `python -m mdg.campaign.e2e` → `report.json`:
 - `live_state_changes: 0` · `live_executions: 0`
-- 6공격 탐지 6/6 (독립검증 2: A2 PFCP·A6 telemetry), agent≠truth 발산 2(A6, D-1)
-- 결과: A1 Red · A2 Red(verified) · A3 Yellow · A4 Yellow · A5 Green(mission-weighted 희석 실증) · A6 Yellow(verified)
+- 5공격 탐지 5/5 (독립검증 2: A2 PFCP·A6 telemetry), agent≠truth 발산 2(A6, D-1)
+- 결과: A1 Red · A2 Red(verified) · A3 Yellow · A5 Green(mission-weighted 희석 실증) · A6 Yellow(verified)
 
 ---
 
-## 3. V1 — 관측원 정합 (read-only) — ✅ 6/6 라이브
+## 3. V1 — 관측원 정합 (read-only) — ✅ 5/5 라이브
 
-배포된 collector 6종의 실 데이터소스를 라이브 확인(파서 기준):
+배포된 collector 5종의 실 데이터소스를 라이브 확인(파서 기준):
 
 | 관측원 | 라이브 근거 |
 |---|---|
@@ -56,7 +56,6 @@
 | NetworkMetric `SMF:9090` | `s5c_rx_deletesession 9`·`createsession 10` — 단조 트립신호 |
 | SmfSession `SMF log` | `UE IMSI[001010000000001] IPv4[10.45.0.4]` — IMSI↔동적IP(P4-1) |
 | MongoLog `docker logs epc_mongo` | `id:22943 remote:10.44.0.31` — RAN측 DB접속 신호 |
-| WebProbe `uav_ue:5762` | `LISTEN backlog=5` — 백도어 소켓 |
 
 ## 4. V2 — collector 라이브 관측 (read-only, 실 Evidence 방출) — ✅
 
@@ -77,7 +76,6 @@
 |---|---|---|
 | docker 컨테이너 수 | 20 | **20 (diff 0)** |
 | 잔존 tcpdump/nsenter proc | 0 (실측; count 2는 스냅샷 명령 자체 매칭) | **0** |
-| 5762 ESTAB | 0 | **0** (WebProbe ss-only·미connect·pool=1) |
 
 → 관측 subprocess는 timeout/count로 자기종료 + R1~R6 reap. **누수 0·사이드카 미생성**(nsenter 방식).
 
@@ -119,13 +117,13 @@
 - **라이브 집행 범위**: V4에서 **nsenter DROP만** operator 승인 하 가역 집행(설치→revert, 흔적 0). **docker pause·서명명령(비가역)은 미실행.** 집행 메커니즘·가역성은 실증됐으나, attacker 미도달로 **실 공격 트래픽 차단(E4 effect)은 미실증**.
 - **LLM 라이브 미실증**: litellm 엔드포인트 실호출 미수행(오프라인 G6 결정론 폴백으로 정합 유지). 모델 응답 결정론은 sign-off 대기.
 - **캘리브레이션 미확정**: thresholds/recovery priors 도메인 sign-off 대기(결정론·배선은 정상).
-- **탐지 사각(공개)**: V4 키위조 탐지불가·5762 blind·mission-weighted 희석(A5→Green)·anti-spoof presence-only(P5-Q3).
+- **탐지 사각(공개)**: V4 키위조 탐지불가·mission-weighted 희석(A5→Green)·anti-spoof presence-only(P5-Q3).
 
 ## 7. V5 — 자율구동 실증 + 다틱 정체 근본원인(driver) 규명·수정 + 세마포어/관측 하드닝, S2~S5 실집행
 
 ### 7.1 자율구동 실증 (idle + A5 mongo 자율탐지)
 
-`live_autorun.py`(recon + 6 collector + `build_graph` + `run_driver` + `Backend(allow_live=True)`)로
+`live_autorun.py`(recon + 5 collector + `build_graph` + `run_driver` + `Backend(allow_live=True)`)로
 **operator 없이 그래프가 자율 순환**하며 관측→탐지 실증:
 - **idle** 상태: 명령평면 baseline=Green(0 신호), 텔레 HB normal — 오탐 0.
 - **A5 mongo** 자율탐지: `MongoLog`가 RAN CIDR(`remote:10.44.0.3x`) DB 접속을 실시간 포착 →
@@ -167,7 +165,7 @@ state=S·no-syscall). 최초엔 air-tap 세마포어 경합으로 추정했으�
 
 **불변식 무손상:** ②누수-0 — R1(`kill_group`)·R6(`reap_proc`) teardown은 `_spawn` 내부라 세마포어와
 독립적으로 read-only 경로에서도 실행. ①결정론 제어흐름 — driver의 fresh thread_id는 결정론이고
-분기는 스케줄링만 변경(라우팅 무영향). 5762 pool=1 의도 무손상(WebProbe ss는 read-only·미connect).
+분기는 스케줄링만 변경(라우팅 무영향). read-only 관측 pool=1 의도 무손상(collector ss는 read-only·미connect).
 
 ### 7.4 S2 재검증 결과 — 다틱 자율런 완주 PASS (수정 적용 후)
 
@@ -189,7 +187,6 @@ S1~S5 절차를 명세. 2대 불변식·운영제약이 항상 우선.
 | S1 근본원인 수정·베이스라인 | §7.2 driver 수정 | driver `stream(None)` 정체 규명·수정, pytest 154 무회귀 | ✅ 완료 |
 | S2 MDG 자율런(다틱) | `live/run_autonomous.sh` | 관측, **6틱 6초 완주·집행0·누수0**(정체 해소 실증, §7.4) | ✅ 완료 |
 | S3-a A2 PFCP teardown | `live/s3a_pfcp.sh` | 공격주입→탐지→즉시 복원(UAV 세션 삭제 금지 assert) | 집행 중 |
-| S3-b A4 5762 백도어 | `live/s3b_5762.sh` | 연결만·즉시종료, WebProbe ESTAB 탐지 | 집행 중 |
 | S3-c A1 무서명 명령 | `live/s3c_command.sh` | AirCommandTap + uav_proxy 서명차단 카운터 실증 | 집행 중 |
 | S4 E4 자율 차단 | `live/s4_e4_autodrop.sh` | **유일 상태변경** — 단일 가역 nsenter DROP(operator 승인·즉시 revert·흔적 0) | 승인 대기 |
 | S5 종료·누수-0 | (STEP_SPEC §S5) | allow_live=False 원복, BEFORE/AFTER diff 0 | 대기 |

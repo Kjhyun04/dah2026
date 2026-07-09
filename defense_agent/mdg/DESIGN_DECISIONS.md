@@ -581,13 +581,13 @@ tests/                      # verify_* 게이트(pytest)
 
 **불변식.** PID 취득 read-only, 미해석 inert=오대상 탭 구조차단(운영제약 정합). argv 조립≠spawn(불변식②, Backend 단일경로). core sock 미접근(verify_grep0 PASS). ①② PASS.
 
-## P1-Q3 — P1은 6 collector만 출하, SMF/MME 로그 collector는 파서 페이즈로 이월 [P4-1/P4-5]
+## P1-Q3 — P1은 5 collector만 출하, SMF/MME 로그 collector는 파서 페이즈로 이월 [P4-1/P4-5]
 
-**결정.** P4-1/P4-5가 락한 SMF IMSI↔IP 세션테이블(`smf_session.py`)·MME attach 로그테일(`mme_log.py`)은 **P1에서 미구현**, 후속 파서/verify_parsers 페이즈로 이월. P1 출하 = 기존 6 collector(air 2·network·web·mongo·mission).
+**결정.** P4-1/P4-5가 락한 SMF IMSI↔IP 세션테이블(`smf_session.py`)·MME attach 로그테일(`mme_log.py`)은 **P1에서 미구현**, 후속 파서/verify_parsers 페이즈로 이월. P1 출하 = 기존 5 collector(air 2·network·mongo·mission).
 
-**근거.** 둘 다 mongo와 동일한 docker-logs 메커니즘의 추가 collector이나 (a) P1이 아직 보류한 sock-proxy logs 접근에 의존(P1-Q1로 경계는 확정됐으나 구현은 파서 페이즈), (b) bounded `collect()` 모델과 별도 파싱 계약 필요, (c) IMSI PII 취급 → 누수-0 리뷰 대상. P1 관측엔진 골격을 6종으로 고정하고 세션-상관 collector는 파서 확정과 함께 배선.
+**근거.** 둘 다 mongo와 동일한 docker-logs 메커니즘의 추가 collector이나 (a) P1이 아직 보류한 sock-proxy logs 접근에 의존(P1-Q1로 경계는 확정됐으나 구현은 파서 페이즈), (b) bounded `collect()` 모델과 별도 파싱 계약 필요, (c) IMSI PII 취급 → 누수-0 리뷰 대상. P1 관측엔진 골격을 5종으로 고정하고 세션-상관 collector는 파서 확정과 함께 배선.
 
-**불변식.** 신규 collector 0 추가로 P1 스코프 불변. 6 collector 계약(HMAC 봉투·bounded collect·inert 가드) 유지. ①② 불변.
+**불변식.** 신규 collector 0 추가로 P1 스코프 불변. 5 collector 계약(HMAC 봉투·bounded collect·inert 가드) 유지. ①② 불변.
 
 ---
 
@@ -622,7 +622,7 @@ tests/                      # verify_* 게이트(pytest)
 
 **전이 권위 게이트(락).** `signing`은 오직 **uav_proxy 출처 관측**으로만 전이:
 - `→ CONFIRMED_ON`: uav_proxy 드롭로그 `⛔ 서명검증 실패 → SITL 차단 (누적 N)` / `🔒 서명 강제 ON` 기동배너 / `/api/signing` enforced(실집행 증명). §A-2대로 서명 **성공은 per-packet 로그 부재** → 성공스트림 파싱 금지, 실패카운터/기동배너/API만 admissible. (드롭카운터 재시작 리셋 위험은 기동배너/API 병용으로 완화.)
-- `→ CONFIRMED_OFF`: uav_proxy OFF배너 / 미서명 명령 SITL 도달·actuate 관측(5762 직결 포함)만. 침묵으로 추론 금지.
+- `→ CONFIRMED_OFF`: uav_proxy OFF배너 / 미서명 명령 SITL 도달·actuate 관측만. 침묵으로 추론 금지.
 - **전이 없음(UNKNOWN 유지)**: gcs_proxy env·uav env·docker inspect·드롭0(증거부재). **env-ON은 승격 근거로 불충분**(설정의도≠실집행; 검증기 사망 시 false-confidence). MEMORY 오판가드 코드화.
 
 **기대치≠관측치(핵심).** `spec.signing_expected`(§9-B 정책 기대치, config-only 불변)는 trust prior로만, `world.signing`을 **절대 미세팅**(expected=on→CONFIRMED_ON 자동승격 금지 = gcs env 오판/기대치=진실 혼동 원천차단). recon은 out-of-graph라 로그테일 안 함 → 부팅 확정소스 부재가 아키텍처적으로 정당(확정은 P3+ col_uav 드롭로그/배너/API 수집기 위임).
@@ -636,7 +636,7 @@ tests/                      # verify_* 게이트(pytest)
 - `mdg/config/defaults.py`·`inputspec.py` — `signing_expected: bool`(정책 기대치, 관측 미세팅) 유지·주석 명문화.
 - 검증: `test_p2_recon.py:171,184`(`w.signing is SigningObs.UNKNOWN`으로 정정). 라이브 legality: UNKNOWN/CONFIRMED_OFF send_signed_mode ILLEGAL, CONFIRMED_ON+role_verified.gcs LEGAL 확인.
 
-**전이 소비(P4 forward 계약, 본 P2 미배선).** expected↔observed 델타는 **수치로만** 결정론 채점에 유입(엣지는 impact.band만 read, 불변식①). CONFIRMED_ON→페널티0. UNKNOWN∧expected=on→상한있는 confidence-margin 페널티 1회(band 단독상승·라우팅 없음, PS-7 자해DoS 방지). CONFIRMED_OFF∧expected=on→command threat 결정론 상승 허용(실 posture 회귀 HIGH). 5762 우회: CONFIRMED_ON이라도 uav5762 미인증 → 그 vantage command 관측 시 latch 독립 command threat. 현재 `world.signing` 소비처는 legality 단독(compute_trust 미참조)이라 델타 스코어링은 P3 수집기 착수 후 배선.
+**전이 소비(P4 forward 계약, 본 P2 미배선).** expected↔observed 델타는 **수치로만** 결정론 채점에 유입(엣지는 impact.band만 read, 불변식①). CONFIRMED_ON→페널티0. UNKNOWN∧expected=on→상한있는 confidence-margin 페널티 1회(band 단독상승·라우팅 없음, PS-7 자해DoS 방지). CONFIRMED_OFF∧expected=on→command threat 결정론 상승 허용(실 posture 회귀 HIGH). 현재 `world.signing` 소비처는 legality 단독(compute_trust 미참조)이라 델타 스코어링은 P3 수집기 착수 후 배선.
 
 **불변식.** signing 델타는 수치로만·엣지 미참조(①). recon out-of-graph·로그테일은 collector(②). 비판단원칙(expected≠observed·uav_proxy만 권위) 준수. secret-free(enum, 키물질 미반입 PS-3). ①② PASS.
 
@@ -694,22 +694,21 @@ tests/                      # verify_* 게이트(pytest)
 4. **비밀위생(PS-3).** 로그행은 cipher peer 튜플·counter만 보유(라이브 확인, 키물질 0). 수집기는 `SensorEv`에 **파생 enum/수치만** 투영(`{event: "signing_confirmed_on"|"sig_drop", cumulative:int}`), raw 로그행·peer 원문 미반입. HMAC 봉투(PS-2) + sense 드레인시점 검증.
 
 **구현 계약.**
-- **미래 `mdg/collector/uav_signing.py`(미생성)** — `docker logs -f uav_proxy` 테일(sock-proxy logs), ansi_strip 선적용, 배너→CONFIRMED_ON/OFF, 드롭카운터→활동 SensorEv(파생수치만). bounded collect·inert 가드·HMAC 봉투(6+1 collector 계약).
+- **미래 `mdg/collector/uav_signing.py`(미생성)** — `docker logs -f uav_proxy` 테일(sock-proxy logs), ansi_strip 선적용, 배너→CONFIRMED_ON/OFF, 드롭카운터→활동 SensorEv(파생수치만). bounded collect·inert 가드·HMAC 봉투(5+1 collector 계약).
 - 검증: `verify_parsers`(uav_proxy fixture: ANSI+이모지 배너/드롭행 → 정규식 매치·secret-free 투영), `verify_ingest_hmac`(봉투).
 
 **불변식.** read-only logs(P1-Q1, 상태변경 0). 배너 권위·침묵≠OFF(P2-Q2 비대칭관측 준수). 파생수치만 투영(PS-3 secret-free·PS-7 인젝션게이트). ①② PASS.
 
-## P3-Q3 — 서명 expected↔observed 델타 = 수치 결정론 채점(엣지 미참조), 5762 우회 독립 latch [P2-Q2 forward]
+## P3-Q3 — 서명 expected↔observed 델타 = 수치 결정론 채점(엣지 미참조) [P2-Q2 forward]
 
 **결정.** P2-Q2 forward 계약을 수치 스코어링으로 배선(수집기 P3-Q2 착수 근거).
 - `CONFIRMED_ON` → command 서명 페널티 0.
 - `UNKNOWN ∧ spec.signing_expected=on` → confidence-margin 페널티 **1회·상한**(band 단독 1단 상향·라우팅 미유발, PS-7 자해DoS 방지). UNKNOWN은 posture 미확정이므로 threat 상승 금지(보수적).
 - `CONFIRMED_OFF ∧ expected=on` → command threat **결정론 상승 허용**(실 posture 회귀 HIGH).
-- **5762 우회 독립 latch.** CONFIRMED_ON이라도 uav5762 백도어 vantage에서 무인증 명령 관측 시(P2-Q2·A-1), 서명 posture와 **무관하게** 독립 command threat latch. 서명 ON이 5762 직결경로를 커버 못 함.
 - 델타는 **수치로만** orient/decide/엣지에 유입(불변식①, 엣지는 impact.band·chosen_action_risk만 read).
 
 **구현 계약.**
-- `mdg/core/nodes/compute_trust.py`/`compute_impact.py` — signing 델타 수치화(현행 legality 단독소비 → trust 입력 확장). `mdg/core/nodes/correlate.py` — 5762 vantage command 관측 독립 latch.
+- `mdg/core/nodes/compute_trust.py`/`compute_impact.py` — signing 델타 수치화(현행 legality 단독소비 → trust 입력 확장).
 - 검증: `verify_injection_gate`(위조 signing 신호가 act 미도달), 단조성(델타는 impact 상향만).
 
 **불변식.** 델타 수치·엣지 미참조(①). 서명 posture 은폐 불가·상향만(PS-7). ①② PASS.
@@ -721,7 +720,7 @@ tests/                      # verify_* 게이트(pytest)
 - `identity_access` `[[71,45]]` — **유지.** subscriber-DB(mongo) 침해는 integrity/recon(직접 flight actuation 아님) → Yellow floor 45가 정합(Red 과대평가 회피).
 - `communication`/`mission` `[]` — **유지**(가용성 신호·rollup, 독립 floor 없음).
 
-**추가 락(floor가 아니라 distrust 입력 계약).** command 도메인 distrust는 **무인증 명령의 실 actuation 관측**(5762 직결·CONFIRMED_OFF 하 미서명 명령 SITL 도달, P3-Q3)을 **결정론적으로 distrust≥71로 매핑**해야 floor 71이 발동. 이는 floor 표 변경이 아니라 compute_trust 입력 시맨틱(P3-Q3 latch와 동일 앵커). 서명검증 실패 드롭(누적 N)은 **차단성공=방어 정상**이므로 distrust 가산 금지(드롭=uav_proxy가 막았다는 양성증거).
+**추가 락(floor가 아니라 distrust 입력 계약).** command 도메인 distrust는 **무인증 명령의 실 actuation 관측**(CONFIRMED_OFF 하 미서명 명령 SITL 도달, P3-Q3)을 **결정론적으로 distrust≥71로 매핑**해야 floor 71이 발동. 이는 floor 표 변경이 아니라 compute_trust 입력 시맨틱(P3-Q3 latch와 동일 앵커). 서명검증 실패 드롭(누적 N)은 **차단성공=방어 정상**이므로 distrust 가산 금지(드롭=uav_proxy가 막았다는 양성증거).
 
 **구현 계약.**
 - `mdg/config/mission_profile.yaml` `criticality_floor` — 71/45 유지, NOTE를 "network-vuln-detector 패널 검증완료(P3-Q4)"로 갱신(회귀 방지 라벨).
@@ -858,7 +857,7 @@ tests/                      # verify_* 게이트(pytest)
 **결정.** 71/45를 "발명 시드"에서 **밴드컷 파생 락 상수**로 재정초하여 유지. **값 변경 0·config-only 가변 보존.** 핵심은 값이 아니라 (a) 근거를 impact_bands 컷에 고정하고 (b) floor를 실제 발동시키는 compute_trust distrust 입력 계약을 못박는 것.
 1. **floor = impact_bands 컷 파생(발명 제거).** 상위 floor 71 ≡ `impact_bands.Red[0]`(71), 하위 floor 45 ∈ Yellow 내부[31,70]. 두 값은 자유상수가 아니라 이미 락된 밴드 경계의 함수 → "패널 미검증 시드" 반론이 새 실측 없이 소거(밴드컷 자체가 정본). `command`/`session_network` `[[71,71],[40,45]]`, `identity_access` `[[71,45]]`(integrity/recon→Yellow), `communication`/`mission` `[]` — **전부 유지**.
 2. **계약 불변(코드 변경 0으로 값 교체 보존).** `scoring.py::crit_floor/overall_impact`는 table을 인자로 받는 순수·단조·weight독립 함수 유지(floor는 mission_weight 독립, `test_floor_fires_at_zero_weight` 락). 재튜닝 시 config 리터럴만 → 코드 diff 0.
-3. **★ 하중부 — floor를 발동시키는 distrust 입력 시맨틱(진짜 레버).** command distrust는 **무인증 명령의 실 actuation 관측**(5762 직결 / CONFIRMED_OFF 하 미서명 명령 SITL 도달, P3-Q3 latch 앵커)일 때에만 결정론적으로 **≥71**로 매핑. 단순 의심/signing=UNKNOWN은 40-70 구간(floor 45=mid-Yellow)에 머물러 보상평균 희석은 막되 Red 자동확정은 금지(PS-7 자해 auto-격리 방지). 서명검증 실패 드롭('⛔ 서명검증 실패 → SITL 차단 (누적 N)')은 **차단성공=방어정상** → distrust 가산 0(P3-Q2 활동메트릭, posture 아님; 드롭카운터 단독 floor 발동 금지).
+3. **★ 하중부 — floor를 발동시키는 distrust 입력 시맨틱(진짜 레버).** command distrust는 **무인증 명령의 실 actuation 관측**(CONFIRMED_OFF 하 미서명 명령 SITL 도달, P3-Q3 latch 앵커)일 때에만 결정론적으로 **≥71**로 매핑. 단순 의심/signing=UNKNOWN은 40-70 구간(floor 45=mid-Yellow)에 머물러 보상평균 희석은 막되 Red 자동확정은 금지(PS-7 자해 auto-격리 방지). 서명검증 실패 드롭('⛔ 서명검증 실패 → SITL 차단 (누적 N)')은 **차단성공=방어정상** → distrust 가산 0(P3-Q2 활동메트릭, posture 아님; 드롭카운터 단독 floor 발동 금지).
 4. **회귀 방지 라벨(적용됨).** `mission_profile.yaml`·`defaults.py`의 NOTE "invented design seeds pending … validation" → "band-cut 파생 락 상수, network-vuln-detector 패널 검증완료(P3-Q4)"로 갱신. `compute_trust.py` docstring에 distrust 입력 계약(무인증-actuation→≥71, 서명드롭→가산0, 소스 uav_signing collector는 D-2 미배선 operator-go) 명문화(behavior 변경 0·문서 계약).
 
 **코드 영향(적용됨).**
@@ -868,7 +867,7 @@ tests/                      # verify_* 게이트(pytest)
 
 **불변식.** crit_floor/overall_impact 순수·단조 산술(LLM 미참여·엣지는 impact.band만 read=①). 주입 허위신호는 impact 상향만·은폐 불가. floor는 weight 독립(config 변조 무력화 불가, PP-3). 서명드롭 비가산으로 방어성공 오탐 차단. 순수함수라 누수-0(②) 무관. ①② PASS.
 
-**잔여(operator-go 유보).** (a) 구간 [40,71)은 floor 45(Yellow)에 머물러 '확정 미달' 심각 command 침해가 Yellow 하단에 남을 수 있음 — E8 저신뢰 tighten(+1 band)·P3-Q3 latch가 confirmed 전이를 Red로 승격하므로 의도된 보수성. (b) floor 71의 실효는 compute_trust '무인증 실 actuation→≥71' 매핑 정확도에 의존 → 소스(uav_signing collector / 5762 vantage)는 D-2 미배선. 그 매핑 실효력(GATE2 가역·E2E 무인증 명령 SITL 도달)은 라이브 상태변경 요 → 코드+dry/read-only까지만, 실집행 operator-go. 값 자체는 config hot-reload로 무코드 조정 가능(후속 uav 패널이 identity_access를 safety-relevant로 재분류 시 회귀비용 낮음).
+**잔여(operator-go 유보).** (a) 구간 [40,71)은 floor 45(Yellow)에 머물러 '확정 미달' 심각 command 침해가 Yellow 하단에 남을 수 있음 — E8 저신뢰 tighten(+1 band)·P3-Q3 latch가 confirmed 전이를 Red로 승격하므로 의도된 보수성. (b) floor 71의 실효는 compute_trust '무인증 실 actuation→≥71' 매핑 정확도에 의존 → 소스(uav_signing collector)는 D-2 미배선. 그 매핑 실효력(GATE2 가역·E2E 무인증 명령 SITL 도달)은 라이브 상태변경 요 → 코드+dry/read-only까지만, 실집행 operator-go. 값 자체는 config hot-reload로 무코드 조정 가능(후속 uav 패널이 identity_access를 safety-relevant로 재분류 시 회귀비용 낮음).
 
 ---
 
@@ -923,32 +922,31 @@ tests/                      # verify_* 게이트(pytest)
 
 ---
 
-# 섹션 ④ E2E 캠페인 P6 (P6-1 ~ P6-3) — 6공격 로스터·위상 단일소스·보고서 crosswalk
+# 섹션 ④ E2E 캠페인 P6 (P6-1 ~ P6-3) — 5공격 로스터·위상 단일소스·보고서 crosswalk
 
 > 3검증자 패널(P6) 합의를 코드로 확정. 노이즈 verdict(TEST/test)는 기각. 라이브 상태변경 0(DRY·operator-go), 2대 불변식 우선.
 
-## P6-1 — 6공격 로스터·evidence band 계약 (LOCK, 코드 정합 실증)
+## P6-1 — 5공격 로스터·evidence band 계약 (LOCK, 코드 정합 실증)
 
-**결정.** 정본에 6공격 로스터·band 목표값의 축자 명세가 없어 METRICS/CORRELATION_RULES/criticality_floor + §P/A/B 실측신호에서 도출한 값을 아래 계약으로 **락**한다(이미 코드에 박혀 있고 전 테스트 통과 → 재구현 아님, 계약 고정). 라이브 실측 재확인: A1 Red(71)·A2 Red(71,verified)·A3 Yellow(45)·A4 Yellow(45)·A5 Green(4)·A6 Yellow(E8 저신뢰 1단 상향).
+**결정.** 정본에 5공격 로스터·band 목표값의 축자 명세가 없어 METRICS/CORRELATION_RULES/criticality_floor + §P/A/B 실측신호에서 도출한 값을 아래 계약으로 **락**한다(이미 코드에 박혀 있고 전 테스트 통과 → 재구현 아님, 계약 고정). 라이브 실측 재확인: A1 Red(71)·A2 Red(71,verified)·A3 Yellow(45)·A5 Green(4)·A6 Yellow(E8 저신뢰 1단 상향).
 
-【로스터 6종 · verified/미검증 · band】
-- A1 command_hijack_cr01 — CR01(PFCP삭제+무인증명령+5762 ESTAB 시간창 상관). verified=False, **Red**. command distrust≥71 → criticality_floor 71 → Red.
+【로스터 5종 · verified/미검증 · band】
+- A1 command_hijack_cr01 — CR01(PFCP삭제+무인증명령 시간창 상관). verified=False, **Red**. command distrust≥71 → criticality_floor 71 → Red.
 - A2 pfcp_teardown — s5c_rx_deletesession 단조 카운터 diff. verified=**True(B-1)**, **Red**. session_network floor 71.
 - A3 unauth_command(14556) — verified=False, **Yellow**. **실측 score=45 = floor 45**(weighted_mean<45로 floor가 드라이버). 단순 무인증/의심(signing=UNKNOWN)은 Red 자동확정 금지(P3-Q4). ⚠ 패널 소수의견 "driver=weighted mean 33"은 **실측 반증**(score 정확히 45=floor) → 기존 docstring 정정 불요.
-- A4 5762_backdoor — verified=False, **Yellow**. ESTAB 소켓상태만 관측(actuation blind) → floor 45.
 - A5 mongo_dbaccess — verified=False, **Green**(탐지는 됨). identity_access w=10·conf 0.60 → weighted-mean 희석(MISSION_WEIGHTED_DILUTION 공시 한계, 미스 아님).
 - A6 telemetry_silence — verified=**True(D-1)**, impact Green(communication floor 없음)이나 conf<0.5 E8 1단 상향으로 agent band=Yellow; 독립 Verifier는 SILENCE_TICKS로 TELEMETRY_SILENCE 판정 → **agent≠truth 발산**.
 
-⇒ **verified detection = 정확히 2**(A2 PFCP/B-1, A6 telemetry/D-1), 미검증 4. `honest.banner` verified_detections=2·total_attacks=6와 정합.
+⇒ **verified detection = 정확히 2**(A2 PFCP/B-1, A6 telemetry/D-1), 미검증 3. `honest.banner` verified_detections=2·total_attacks=5와 정합.
 
 **band 결정 원리(2계층).** (1) 신호 evidence band = METRICS 임계표 → E7 SEVERITY_FACTOR·BAND_MAP dev로 도메인 distrust 기여. (2) mission impact band(Green0-30/Yellow31-70/Red71-100) = `overall_impact = max(weighted_mean, criticality_floor)`, 이후 E8 저신뢰(conf<0.5) 1단 보수 상향. crit_floor가 두 계층 하중지지 브리지: command·session_network=[[71,71],[40,45]], identity_access=[[71,45]]. 71≡Red 하한컷, 45∈Yellow[31,70] — 밴드컷 파생 LOCK 상수(IMPACT_BANDS 이동 시 `test_floors_are_band_cut_derived` loud fail).
 
-**P3-Q4 정합 핵심.** "5762+무인증→Red vs 단순의심→Yellow"는 correlation으로 구현: 5762 ESTAB이 무인증명령·PFCP와 시간창 상관(CR01)으로 확정 actuation일 때만 command distrust≥71→Red(A1). 단일신호(A3 명령만/A4 5762만)는 floor 45→Yellow. Red는 "safety-critical 도메인 확정 침해"에만 예약, 의심은 Yellow 고정(주입 doubt로 아군 self-DoS 방지, PS-7).
+**P3-Q4 정합 핵심.** "PFCP삭제+무인증→Red vs 단순의심→Yellow"는 correlation으로 구현: 무인증명령이 PFCP 세션삭제와 시간창 상관(CR01)으로 확정 actuation일 때만 command distrust≥71→Red(A1). 단일신호(A3 명령만)는 floor 45→Yellow. Red는 "safety-critical 도메인 확정 침해"에만 예약, 의심은 Yellow 고정(주입 doubt로 아군 self-DoS 방지, PS-7).
 
-**verified/미검증 분류 기준(발명의 핵심).** verified_detection = "라이브 read-only로 지상진실이 실측된 관측"만: (1) uav_ue lo:14550 평문 HEARTBEAT 실캡처(D-1), (2) SMF s5c_rx_deletesession 단조 카운터 diff(B-1). 나머지 4는 관측점 실재하나 탐지정확성을 unit-test로 못 닫거나(14556 idle baseline=0, B-3)·서명성공 per-packet 로그 부재(A-2)로 지상진실 미확보 → 미검증. 이 분류는 "탐지관측 ≠ 대응효력"과 직교(honest.py 분리): 대응효력은 6공격 중 4공격 미측정(C-1, nsenter DROP/pause 효력 GATE2 operator-go).
+**verified/미검증 분류 기준(발명의 핵심).** verified_detection = "라이브 read-only로 지상진실이 실측된 관측"만: (1) uav_ue lo:14550 평문 HEARTBEAT 실캡처(D-1), (2) SMF s5c_rx_deletesession 단조 카운터 diff(B-1). 나머지 3은 관측점 실재하나 탐지정확성을 unit-test로 못 닫거나(14556 idle baseline=0, B-3)·서명성공 per-packet 로그 부재(A-2)로 지상진실 미확보 → 미검증. 이 분류는 "탐지관측 ≠ 대응효력"과 직교(honest.py 분리): 대응효력은 5공격 중 3공격 미측정(C-1, nsenter DROP/pause 효력 GATE2 operator-go).
 
 **구현 계약(이미 적용·본 P6서 재검증).**
-- `mdg/campaign/e2e.py::ATTACKS`(6 시나리오·verified 플래그), `mdg/config/defaults.py`(METRICS·criticality_floor·mission_weight), `mdg/core/scoring.py::overall_impact/crit_floor`(순수함수 수치 결정론).
+- `mdg/campaign/e2e.py::ATTACKS`(5 시나리오·verified 플래그), `mdg/config/defaults.py`(METRICS·criticality_floor·mission_weight), `mdg/core/scoring.py::overall_impact/crit_floor`(순수함수 수치 결정론).
 - `mdg/campaign/honest.py`(MISSION_WEIGHTED_DILUTION·UNVERIFIED_RESPONSE_EFFICACY 공시, banner verified=2).
 - 검증: `tests/test_impact_floor.py`(밴드컷 파생·zero-weight·monotone 12/12) + `tests/test_p6_campaign.py`(A1=Red·A2=Red+verified·verified_count==2·A5 Green·A6 divergence 8/8). 실측: A3 score=45=floor(패널 소수의견 반증).
 
@@ -993,7 +991,7 @@ tests/                      # verify_* 게이트(pytest)
 - `mdg/tests/test_p6_campaign.py::test_report_six_chapters_and_honesty` — report_role.standalone/chapters/artifact/folds_into assert 추가(8/8 PASS).
 - honest.py 章 매핑(report_chapter∈{4,5,6})·banner(verified=2·live_state_changes=0) 불변 유지.
 
-**근거.** 탐지/대응/독립검증 분리는 라이브 실측(verified 2/6)에 정직한 유일 레이아웃. 6장 명칭 충돌은 crosswalk 필드로 해소(章 재구조화 아님). report-generator는 report_role.folds_into로 접어 넣고 정직성 배너 보존.
+**근거.** 탐지/대응/독립검증 분리는 라이브 실측(verified 2/5)에 정직한 유일 레이아웃. 6장 명칭 충돌은 crosswalk 필드로 해소(章 재구조화 아님). report-generator는 report_role.folds_into로 접어 넣고 정직성 배너 보존.
 
 **불변식.** artifacts.py는 core·langgraph 미import(보고 측, run.jsonl 소비). report_role은 노드명/章명 데이터라 신규 비밀표면 0(PS-3 무영향). 라이브 상태변경 0. ①② PASS.
 

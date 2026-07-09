@@ -74,10 +74,9 @@ tool_wrap(Backend.run)**.
    `enforce_pid`는 chokepoint netns(inspect .State.Pid, read-only), `attacker_src_ip`는 stage-2
    tun-scan로 확정된 UE-pool IP. 둘은 반드시 distinct.
 5. **effect_confirm.** act 직후 관측 델타(ss/pcap/:9090 s5c_rx_deletesession diff / 14560 HB /
-   uav_ue lo:14550 교차탭 / **5762 백도어 소켓 상태**) 재관측 → `applied[rule].confirmed`. 실행
-   게이트 아님(이미 실행됨, D-3). A4 응답의 경우 `ss -tnp state established '( dport = :5762 or
-   sport = :5762 )'`(또는 `docker exec web_backend ss`)로 5762 ESTAB 세션이 pause 후 사라졌는지
-   read-only 확인.
+   uav_ue lo:14550 교차탭) 재관측 → `applied[rule].confirmed`. 실행 게이트 아님(이미 실행됨, D-3).
+   예: nsenter DROP 응답은 `iptables -S INPUT`에 `-s <attacker>` 규칙 설치 + 공격자 트래픽(주입/PFCP
+   카운터 증가) 정지를 read-only 확인.
 6. **독립 검증.** `run.jsonl`을 별 프로세스 Verifier로 접어 truth 산출:
    `python -m mdg.verifier.verifier <run.jsonl> --out truth.jsonl`. agent≠truth 발산 여부 확인(H-K).
 
@@ -101,14 +100,9 @@ tool_wrap(Backend.run)**.
 2. **수동 전체 복원.** operator가 `intent_ledger.jsonl`을 역순 순회하며 각 `revert_cmd`를
    `Backend.run(ExecRequest(reversible=True))`로 집행. docker pause는 unpause, DROP은 -D.
 3. **검증.** 복원 후 read-only로 상태 확인: `iptables -S`(체인 비움), `docker ps`(paused 0),
-   :9090 카운터 정상화, lo:14550 HEARTBEAT 재개, **5762 백도어 소켓 clean**. 5762 clean 명시 앵커
-   (A4_5762_backdoor 잔존 세션 0 확인, read-only):
-   ```
-   ss -tnp state established '( dport = :5762 or sport = :5762 )'   # 잔존 ESTAB 0 이어야 함
-   #  또는 컨테이너 내부: docker exec web_backend ss -tnp state established '( sport = :5762 )'
-   ```
-   docker_pause(web_backend) OPER tier 복원(unpause) 후 위 ss 출력이 공집합이어야 A4 백도어
-   ESTAB 세션 잔존 0. 비공집합이면 §5 ABORT — 백도어 소켓이 재복원되었음을 의미.
+   :9090 카운터 정상화, lo:14550 HEARTBEAT 재개. docker_pause(OPER tier)를 집행했으면 unpause 후
+   해당 컨테이너가 `docker ps` running 으로 복귀했는지 read-only 확인. 잔존 DROP 규칙/paused
+   컨테이너가 있으면 §5 ABORT.
 4. **비가역 잔여.** 서명명령/flight-mode는 자동 revert 불가 — operator가 지상국에서 LAND/RTL 수동
    지시. FLIGHT_ACTION_AUTO_REVERT=False(설계 고정).
 
