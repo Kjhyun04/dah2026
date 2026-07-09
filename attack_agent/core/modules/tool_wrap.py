@@ -1,11 +1,11 @@
 """core.modules.tool_wrap — 이질 내부함수(safe-exec 러너)를 통일 tool로 (06 §6 · REF §1).
 
-아카이브 crs/common/utils.py `tool_wrap` 규격 계승:
+아카이브 crs/common/utils.py tool_wrap 규격 계승:
   Callable[P, Coro[Result[R]]]  ->  ToolT[P, R]
   Ok  -> ToolSuccess / Err·CRSError -> ToolError.
   pre_hooks(실행 전 차단, 11 §2 Legality 하드게이트) · post_hooks(결과 가공, F5 redact).
 
-self-contained: 아카이브의 `result` 패키지 대신 최소 Ok/Err 구현(의존 최소화).
+self-contained: 아카이브의 result 패키지 대신 최소 Ok/Err 구현(의존 최소화).
 작성 2026-07-05.
 """
 
@@ -103,7 +103,7 @@ def tool_wrap[T](
     pre_hooks: Sequence[PreHook] = (),
     post_hooks: Sequence[PostHook] = (),
 ) -> Callable[..., Coro[ToolResult[T]]]:
-    """Result 코루틴 함수를 tool로 래핑 (utils.py `tool_wrap` 미러).
+    """Result 코루틴 함수를 tool로 래핑 (utils.py tool_wrap 미러).
 
     Ok->ToolSuccess / Err·CRSError->ToolError. pre_hooks(차단)·post_hooks(가공) 적용.
     """

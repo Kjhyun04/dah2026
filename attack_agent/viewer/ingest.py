@@ -2,7 +2,7 @@
 
 이 모듈은 dict 만 다룬다. pydantic 모델·registry·get_spec 을 참조하지 않는다.
 표시용 상수(_LAYER/INJECT_TOOL_IDS 등)는 core.modules.registry §7 표와
-core.common.results 계약에서 **offline baked** 한 분류표일 뿐 — 행동공간 확장이 아니다.
+core.common.results 계약에서 offline baked 한 분류표일 뿐 — 행동공간 확장이 아니다.
 
 데이터 계약(정확 일치):
   action step   : core.driver.campaign_to_jsonl -> {"type":"step", **StepRecord}
@@ -248,7 +248,7 @@ def load_comms_stream(path: "str | Path | None") -> list[dict]:
 def frames_from_evaluation(ev: dict) -> list[dict]:
     """스트림 부재 시 재구성: ground_truth.mode_timeline->down, uplink_cmds->up, t 정렬.
 
-    ※ evaluation 의 t 는 감독 캡처 상대시각. down=autopilot HEARTBEAT(관측 mode),
+    evaluation 의 t 는 감독 캡처 상대시각. down=autopilot HEARTBEAT(관측 mode),
       up=업링크 DO_SET_MODE(target mode). signed 는 프레임별 미기록 -> None(정직).
       signing_observed(링크 전역)은 별도 감독패널에 표기.
     """
@@ -284,7 +284,7 @@ def frames_from_evaluation(ev: dict) -> list[dict]:
 def inject_rows_from_action(steps: list[dict]) -> list[dict]:
     """tool_id∈INJECT_TOOL_IDS 스텝 -> 주입로그 레인 rows(source='attacker-inject').
 
-    ※ StepRecord 엔 timestamp 없음 -> step 인덱스 순서만. 감독 wire 시각(t)과 절대정렬 불가.
+    StepRecord 엔 timestamp 없음 -> step 인덱스 순서만. 감독 wire 시각(t)과 절대정렬 불가.
       'accepted' 는 공격 agent 자기-ACK(verdict==OK)일 뿐 ground-truth 아님(감독패널 참조).
     """
     rows: list[dict] = []
@@ -381,7 +381,7 @@ def build_snapshot(
 
 
 def tail_lines(path: "str | Path", offset: int) -> "tuple[list[str], int]":
-    """오프셋(바이트) 이후 **완결된** JSONL 줄만 반환, (new_lines, new_offset).
+    """오프셋(바이트) 이후 완결된 JSONL 줄만 반환, (new_lines, new_offset).
 
     파일 truncate/rotate(size<offset) -> 오프셋 0 리셋 재동기. 미완결 마지막 줄은
     다음 폴링까지 보류(offset 을 그 앞으로 되돌림) -> 부분줄 파싱실패 레이스 제거.

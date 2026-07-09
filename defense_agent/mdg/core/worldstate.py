@@ -1,8 +1,8 @@
-"""WorldState — closed 술어 / artifact (H-E). ``sense`` 가 매 틱 병합하는
+"""WorldState — closed 술어 / artifact (H-E). sense 가 매 틱 병합하는
 단일 권위 객체. closed 어휘만; free-form 상태 없음.
 
 DESIGN_DECISIONS PA-3 이 WorldState 를 필수 모델로 지명; 여기 존재하며
-``state.py`` 에서 re-export 되어 ``mdg.core.state.WorldState`` 가 해석된다.
+state.py 에서 re-export 되어 mdg.core.state.WorldState 가 해석된다.
 """
 from __future__ import annotations
 
@@ -31,8 +31,8 @@ class SigningObs(str, Enum):
     PS-7 self-DoS).
 
     전이 권한 (locked): enforcement 는 P3+ 에서 수집된 uav_proxy 권위
-    신호에만 변경됨 (drop-log 라인 ``서명검증 실패 -> SITL 차단 (누적 N)`` 또는
-    ``서명 강제 ON`` boot banner / ``/api/signing`` enforced). gcs_proxy env, uav env,
+    신호에만 변경됨 (drop-log 라인 서명검증 실패 -> SITL 차단 (누적 N) 또는
+    서명 강제 ON boot banner / /api/signing enforced). gcs_proxy env, uav env,
     docker inspect, drop 의 부재는 절대 전이시키지 않음 (MEMORY 오판 가드 코드화).
     """
     UNKNOWN = "unknown"            # boot 기본값; off 아님 — 아직 권위 신호 없음
@@ -67,14 +67,14 @@ class RoleBinding(BaseModel):
     """recon boot 에서 해석된 role -> container -> IP (H-I). tun IP 는 exec-scan 으로 (A-1).
 
     두 개의 서로 다른 술어 (finding P2-1, GATE2 resolve+verify):
-      - ``verified``  = RESOLUTION/PRESENCE: 컨테이너가 존재 (inspect .State.Pid) 하고,
-        UE-pool role 의 경우 live tun IP 가 ``ue_pool_cidr`` 안에 있음. 이는 토폴로지
+      - verified  = RESOLUTION/PRESENCE: 컨테이너가 존재 (inspect .State.Pid) 하고,
+        UE-pool role 의 경우 live tun IP 가 ue_pool_cidr 안에 있음. 이는 토폴로지
         체크 — role 이 정상 동작함을 증명하지 않음. 적법성 (role_verified) 이 이를 읽음.
-      - ``behaviorally_verified`` = live behavioural anchor (``RoleSpec.verify_anchor``) 가
+      - behaviorally_verified = live behavioural anchor (RoleSpec.verify_anchor) 가
         관측됨 (예: uav_ue lo:14550 의 HEARTBEAT sysid=1; signing
-        drop-log). live collector 증거로부터 ``targets/behavioral.apply_behavioral_verification`` 가
+        drop-log). live collector 증거로부터 targets/behavioral.apply_behavioral_verification 가
         설정. 존재하지만 anchor 를 방출하지 않거나 불리한 컨테이너는
-        ``verified=True, behaviorally_verified=False`` — presence 를 behavioural
+        verified=True, behaviorally_verified=False — presence 를 behavioural
         verify 로 과장하지 않음. boot 기본값 False (live 관측은 operator-go)."""
     role: str
     container: str = ""

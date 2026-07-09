@@ -1,13 +1,13 @@
 """artifacts.py (P6) — 캠페인 산출물 + CampaignResult -> 6장 보고서 매핑.
 
-기록된 ``run.jsonl``(이식성 기둥, H-J)과 독립 Verifier 진실을 소비해 공격마다 리뷰어 대상
+기록된 run.jsonl(이식성 기둥, H-J)과 독립 Verifier 진실을 소비해 공격마다 리뷰어 대상
 산출물 3종을 만든다:
 
-  * timeline       — 틱별 노드 경로 + 근거 + impact band + decision (replay.play)
-  * decisions      — agent 결정 채널 (무엇을 선택했는지, tier, DRY/operator-go)
-  * verifier_truth — OUT-OF-GRAPH Verifier의 틱별 판정 + agent≠truth (verifier.py)
+  timeline       — 틱별 노드 경로 + 근거 + impact band + decision (replay.play)
+  decisions      — agent 결정 채널 (무엇을 선택했는지, tier, DRY/operator-go)
+  verifier_truth — OUT-OF-GRAPH Verifier의 틱별 판정 + agent≠truth (verifier.py)
 
-그리고 모든 공격의 결과를 ``CampaignResult``로 접어 보고서의 6개 장(``to_report``)에
+그리고 모든 공격의 결과를 CampaignResult로 접어 보고서의 6개 장(to_report)에
 매핑한다:
 
   1. 개요·범위      범위·2대 불변식·운영제약·DRY posture
@@ -351,7 +351,7 @@ def to_report(campaign: CampaignResult) -> dict:
 
 
 def write_report_json(campaign: CampaignResult, path: str) -> str:
-    """6장 보고서를 ``path``에 직렬화한다 (결정론적, 구조상 비밀 없음).
+    """6장 보고서를 path에 직렬화한다 (결정론적, 구조상 비밀 없음).
 
     보고서는 CampaignResult + run.jsonl 산출물만으로 만들어지며 둘 다 이미 기록 시점에
     편집(redact)되어 있어(PS-3) 직렬화할 비밀 필드가 존재하지 않는다."""

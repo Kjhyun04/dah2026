@@ -352,7 +352,7 @@ def _write_lines(path, lines):
 
 
 def test_recovery_panel_lifecycle_and_flight():
-    """Phase 7: load_panels 는 `recovery` 패널을 방출 — 사건별 lifecycle
+    """Phase 7: load_panels 는 recovery 패널을 방출 — 사건별 lifecycle
     (탐지 -> 대응 -> 집행 -> 확인 -> 회복)을 ledger/worldstate.applied/view_band + rel_alt/flight_mode
     flight 시리즈로부터. S2 형태 run: attack(Red, alt 12) -> operator-auto enforce -> confirm/recover
     (Green, alt 30)."""
@@ -416,7 +416,7 @@ def test_recovery_panel_lifecycle_and_flight():
 def test_recovery_panel_signed_mechanism_annotations():
     """Item C: send_signed_mode (S2 물리 복귀) recovery 이벤트는 그 메커니즘을 렌더 —
     대응(operator-select) -> 집행(gcs_c2 위임) -> 확인(rel_alt 30m) — per-step 노트로, 그리고
-    이벤트는 ``signed`` 로 플래그되어 카드가 S2 물리 복귀 맥락을 보여줌. 기본 라벨
+    이벤트는 signed 로 플래그되어 카드가 S2 물리 복귀 맥락을 보여줌. 기본 라벨
     (탐지/대응/집행/확인/회복)은 불변 (표현 전용 보강)."""
     with tempfile.TemporaryDirectory() as d:
         p = os.path.join(d, "run.jsonl")
@@ -449,8 +449,8 @@ def test_recovery_panel_signed_mechanism_annotations():
 
 
 def test_recovery_band_prefers_engine_impact_over_view_band():
-    """단위: `_recovery_band` 는 존재 시 엔진의 권위 있는 per-tick impact_band (Green/Yellow/Red)를
-    사용하고, 부재 시 incident 존재 (`_detect_band`, standing 시그널 포함)로 폴백 —
+    """단위: _recovery_band 는 존재 시 엔진의 권위 있는 per-tick impact_band (Green/Yellow/Red)를
+    사용하고, 부재 시 incident 존재 (_detect_band, standing 시그널 포함)로 폴백 —
     standing 필터된 view_band 는 절대 아님."""
     # engine impact_band 존재 -> 그대로 사용 (view_band 가 불일치하더라도)
     assert viewer._recovery_band({"impact_band": "Red", "signals": []}) == "Red"

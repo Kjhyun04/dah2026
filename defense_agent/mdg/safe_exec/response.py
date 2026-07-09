@@ -1,4 +1,4 @@
-"""response.py — Response Controller: ``act`` 그래프 노드와 safe-exec 백엔드 사이의
+"""response.py — Response Controller: act 그래프 노드와 safe-exec 백엔드 사이의
 dispatch 계층.
 
 선택된 Intent 에 대해 순서대로 적용:
@@ -6,11 +6,11 @@ dispatch 계층.
   2. 2-tier gate (core.gate): AUTO 도구 -> live 작동 계획; OPER 도구 (flight / docker
      pause / net-disconnect) -> operator_required (작동 없음; act 는 signer_shim 이 바인딩한
      operator-gate Intent 를 기록, side-effect 0).
-  3. AUTO 도구 (``nsenter_input_drop``)에 대해 act_host 를 통해 netns-DROP ExecRequest 를 만든다.
+  3. AUTO 도구 (nsenter_input_drop)에 대해 act_host 를 통해 netns-DROP ExecRequest 를 만든다.
 
-유일한 subprocess 경로는 ``Backend.run`` 으로 유지된다 (불변식2.) — 이 컨트롤러는 argv 만 조립하여
+유일한 subprocess 경로는 Backend.run 으로 유지된다 (불변식2.) — 이 컨트롤러는 argv 만 조립하여
 넘긴다. Live 작동은 operator-go 유보 (Backend.allow_live=False -> DRY-RUN)이므로,
-``dispatch`` 는 operator 가 플래그를 뒤집기 전까지 테스트베드에서 아무것도 바꾸지 않는다. 컨트롤러는
+dispatch 는 operator 가 플래그를 뒤집기 전까지 테스트베드에서 아무것도 바꾸지 않는다. 컨트롤러는
 docker sdk import 도, sock 리터럴도 보유하지 않는다 (act_host 가 docker 백엔드를 duck-type).
 """
 from __future__ import annotations
@@ -58,7 +58,7 @@ class ResponseController:
         # (docker_pause / flight recovery) OPER 회복 경로가 위임 대신 실행되게 한다.
         # 결정론적 (env bool), 투명성은 GateDecision.registry_tier 로 보존 (불변식1.).
         self.operator_auto = bool(operator_auto)
-        # LIVE SMF 세션 테이블 (SmfSessionTable, ``imsi_for_ip(ip)->imsi|None``) — 선택적. 배선되면
+        # LIVE SMF 세션 테이블 (SmfSessionTable, imsi_for_ip(ip)->imsi|None) — 선택적. 배선되면
         # (그래프 밖 collector 가 소유), ip-kind 소스 selector 가 live IMSI<->tun-IP 바인딩과
         # 교차 확인되어, 탐지와 강제 사이에 재할당된 UE-pool IP 가
         # 거부된다 (P4 stale-binding, 재할당 IP self-DoS 차단). 부재 -> best-effort recon 전용 확인.
@@ -101,7 +101,7 @@ class ResponseController:
 
     @staticmethod
     def _verified_container_for_ip(ip: str, world: WorldState) -> str:
-        """최신 recon 바인딩 (world.roles tun-scan, ip_map 역방향)에서 현재 ``ip`` 를 소유하는
+        """최신 recon 바인딩 (world.roles tun-scan, ip_map 역방향)에서 현재 ip 를 소유하는
         recon 귀속 엔티티 (검증된 RoleBinding 컨테이너), 없으면 "".
 
         이는 P4 stale-binding 교차 확인을 위한 "원래 귀속 엔티티" ground truth 이다: UE-pool
@@ -117,15 +117,15 @@ class ResponseController:
         return (world.ip_map or {}).get(ip, "") or ""
 
     def _source_ip_still_attributed(self, ip: str, world: WorldState) -> bool:
-        """ip-kind raw 소스를 위한 P4 stale-binding 가드: ``ip`` 가 recon 이 검증한 것과 여전히
+        """ip-kind raw 소스를 위한 P4 stale-binding 가드: ip 가 recon 이 검증한 것과 여전히
         같은 엔티티에 귀속되는가? UE-pool IP 는 attach 마다 순환하므로, 탐지 시점에 포착된
         공격자 IP 가 강제 시점에는 무고한 UE 의 것일 수 있음 -> 그것을 drop 하면 피해자를 self-DoS 한다.
 
         독립적인 두 교차 확인, 둘 다 fail-closed:
           (a) 최신 recon 바인딩 (world.roles/ip_map): IP 는 여전히 검증된 귀속
               컨테이너로 해석되어야 한다. 사라짐/미검증 -> stale -> False.
-          (b) LIVE SMF 세션 테이블 (``self.smf_table``, 선택적): 배선되면 IP 는 여전히
-              live-bound (``imsi_for_ip`` non-None)이어야 AND — 정적 IMSI->container 맵이
+          (b) LIVE SMF 세션 테이블 (self.smf_table, 선택적): 배선되면 IP 는 여전히
+              live-bound (imsi_for_ip non-None)이어야 AND — 정적 IMSI->container 맵이
               알려져 있을 때 (world.imsi_container) — (a)와 같은 컨테이너로 해석되어야 한다. 해제된 IP
               (unbound)나 다른 컨테이너로 재할당된 IP 는 stale -> False. 테이블 부재
               -> best-effort (a) 전용 (smf_table 은 아직 live act 경로에 연결되지 않음).
@@ -153,19 +153,19 @@ class ResponseController:
         """선택된 Intent 를 두 개의 독립적 검증 조회로 (enforce_pid, drop_src_ip)로 해석한다
         — 정합적 two-endpoint 봉쇄 (finding P4-2).
 
-        이전에는 단일 불투명 selector 가 nsenter netns pid 와 iptables ``-s`` 소스 양쪽으로
+        이전에는 단일 불투명 selector 가 nsenter netns pid 와 iptables -s 소스 양쪽으로
         붕괴되어, 자연스러운 봉쇄 케이스 (selector = 공격자)에서 DROP 이
         공격자 자신의 netns 에 진입해 공격자 자신의 ip 로부터의 INBOUND 패킷을 drop 했다 —
         공격자의 악성 OUTBOUND (PFCP-delete / 무단 명령)를 결코 멈추지 못하는 near no-op. 효과적
         봉쇄는 공격자 SOURCE 를 별개의 chokepoint/피해자 netns 에서 필터링하므로, 두 KEY 로
         두 endpoint 를 해석한다:
-          - ENFORCEMENT: ``enforce_at`` CONTAINER KEY -> netns pid (INPUT 이 필터링하는
+          - ENFORCEMENT: enforce_at CONTAINER KEY -> netns pid (INPUT 이 필터링하는
             chokepoint). keyspace 는 CONTAINER 이름 (pid/role_verified 는 container-keyed,
-            예: "gcs_proxy" 가 command-plane netns 소유) — role alias 가 아니다. ``rb.role`` 을 통해
-            ``_binding_verified`` 를 통과하는 role-alias 키는 아래 container-keyed pid 맵을
-            놓치고 (``pid_map.get`` -> None) inert DRY 로 유지된다 (fail-closed).
-          - SOURCE:      ``target``/``target_kind`` (drop_src) -> ``-s`` 용 공격자 UE-pool ip.
-        둘 다 독립적으로 ``_binding_verified`` 를 통과하고 별개 엔티티로 해석되어야 하며, 아니면
+            예: "gcs_proxy" 가 command-plane netns 소유) — role alias 가 아니다. rb.role 을 통해
+            _binding_verified 를 통과하는 role-alias 키는 아래 container-keyed pid 맵을
+            놓치고 (pid_map.get -> None) inert DRY 로 유지된다 (fail-closed).
+          - SOURCE:      target/target_kind (drop_src) -> -s 용 공격자 UE-pool ip.
+        둘 다 독립적으로 _binding_verified 를 통과하고 별개 엔티티로 해석되어야 하며, 아니면
         (None, "") -> act_host 가 inert DRY 결과를 낸다 (오조준 / self-DoS DROP 없음; 누수-0
         정합, PS-7). 신뢰되지 않은 어떤 selector 도 결코 raw arg 가 아니다 — 각각은 오직
         검증된 WorldState 바인딩 맵으로의 KEY 이다. live 강제-지점 라우팅은 GATE2/operator-go
@@ -191,7 +191,7 @@ class ResponseController:
         # enforce_sel 은 여기서 놓침 -> None -> inert DRY. 이것이 _binding_verified 범위와 무관하게
         # enforce_at keyspace 를 CONTAINER 로 고정하는 load-bearing gate 이다.
         enforce_pid = pid_map.get(enforce_sel)
-        # SOURCE ip — 리터럴 ip-kind selector 가 ``-s`` 로 허용되는 것은 오직 검증 gate 가
+        # SOURCE ip — 리터럴 ip-kind selector 가 -s 로 허용되는 것은 오직 검증 gate 가
         # 그것을 검증된 UE-pool 바인딩에 매치했기 때문; 그 외에는 검증 맵으로의 KEY 조회.
         drop_src_ip = src_sel if src_kind == "ip" else ip_map.get(src_sel, "")
         if not enforce_pid or not drop_src_ip:
@@ -235,8 +235,8 @@ class ResponseController:
         #
         # 축소는 inert-DRY 경로로 제한된다 (여기 argv 빌더가 없는, operator_auto 로 확장된 OPER
         # 도구 — docker_pause / flight; side-effect 0). LIVE netns-삽입
-        # 도구 ``nsenter_input_drop`` 은 제외되며 전체 physical_action_min hold 를 유지한다: 그
-        # actuator (act_host.drop_argv)는 비멱등 iptables ``-I`` 를 사용하고 (``-C`` 사전 확인 없음),
+        # 도구 nsenter_input_drop 은 제외되며 전체 physical_action_min hold 를 유지한다: 그
+        # actuator (act_host.drop_argv)는 비멱등 iptables -I 를 사용하고 (-C 사전 확인 없음),
         # live observe=None (Phase 4 미배선)에서는 effect_confirm 이 확인하지 않음 -> already_applied
         # 가 항상 False -> debounce 가 유일한 재작동 throttle. 거기서 축소하면
         # 동일한 '-I ... -s <attacker> -j DROP' 를 매 demo tick 마다 재삽입하여 (1-tick 에서 3배), 단일
@@ -275,7 +275,7 @@ class ResponseController:
 
         # 3a) operator_auto 로 auto 확장된 docker_pause -> act_host (duck-typed docker 백엔드)를 통해
         # 컨테이너 pause 를 DISPATCH. 이는 backdoor_pause 가 선택+기록되었으나 결코 작동되지 않아
-        # ``inspect_paused`` 가 True 에 도달할 수 없고
+        # inspect_paused 가 True 에 도달할 수 없고
         # S1 회복-완료 신호에 도달할 수 없던 Phase 4 갭을 메운다. enforce_at 컨테이너 KEY 는 dispatch
         # 전에 검증됨 (fail-closed); pause 는 가역적이며 (docker unpause), 여기의 모든 작동과 마찬가지로
         # operator 가 docker 백엔드의 allow_live 를 뒤집기 전까지 DRY 로 유지된다 (누수-0 정합, 2.).

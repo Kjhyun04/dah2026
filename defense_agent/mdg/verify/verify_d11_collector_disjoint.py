@@ -1,11 +1,11 @@
 """verify_d11_collector_disjoint — GATE1/GATE2 정적 self-DoS 가드(불변식2. E9/X1/G4/D11).
 
-response 계층은 ``sense`` 를 먹여주는 바로 그 collector 를 절대 끊어서는 안 된다. 두 개의 독립된
+response 계층은 sense 를 먹여주는 바로 그 collector 를 절대 끊어서는 안 된다. 두 개의 독립된
 절단 메커니즘이 존재하며, 각각 여기서 non-self-DoS 로 증명된다(정적 — 라이브 testbed 변경 없음):
 
   A. CONTAINER-LIFECYCLE 절단(docker pause / net-disconnect = collector 를 호스팅하는
      컨테이너의 완전 절단). 보장: 어떤 auto 경로도 이를 할 수 없다. effect 가
-     ``container_pause`` / ``container_net_disconnect`` 인 모든 registry 도구는 tier OPER 이고(명시적
+     container_pause / container_net_disconnect 인 모든 registry 도구는 tier OPER 이고(명시적
      self-impact 확인으로 operator-gate 됨), 유일한 tier-AUTO response 는 netns DROP 이다. 따라서
      collector 를 호스팅하는 컨테이너의 pause/disconnect 는 operator 확인 아래에서만 발생할 수 있고,
      결코 자율적으로 발생하지 않는다. (disjointness 요건 중 "collector 호스팅 컨테이너의 pause 는
@@ -14,8 +14,8 @@ response 계층은 ``sense`` 를 먹여주는 바로 그 collector 를 절대 �
   B. NETNS-DROP 절단(유일한 AUTO response). 보장: DROP 의 match 집합은, DROP 이
      collector 를 호스팅하는 chokepoint netns 내부에서 강제되더라도, collector 의 :50051 ingest
      5-tuple / MDG mgmt CIDR 과 절대 교차할 수 없다. 구조적으로 증명됨: DROP 은 항상
-     ``INPUT -s <UE-pool src> -j DROP`` — 체인은 INPUT 뿐(절대 OUTPUT/FORWARD 아님), 포트 match 없음
-     (절대 :50051 / --dport / --sport 아님), 그리고 ``-s`` 소스는 검증된
+     INPUT -s <UE-pool src> -j DROP — 체인은 INPUT 뿐(절대 OUTPUT/FORWARD 아님), 포트 match 없음
+     (절대 :50051 / --dport / --sport 아님), 그리고 -s 소스는 검증된
      UE-pool ip map(10.45.0.0/16)에서만 해석되는데, 이는 loopback/mgmt ingest 주소와 disjoint 한 CIDR 이다.
      따라서 UE-pool 소스에 대한 INPUT 필터는 collector 의 :50051 로 향하는 OUTBOUND egress 도,
      mgmt 출처 반환 트래픽도 match 할 수 없다. 추가로 DROP 은 강제 netns 와 drop 소스가
@@ -153,7 +153,7 @@ def _check_drop_argv_runtime(rep: Report) -> None:
 
 
 def _check_response_drop_src_is_verified_ue_pool(rep: Report) -> None:
-    """dispatch 계층은 drop ``-s`` 를 오직 검증된 UE-pool 바인딩에서만 해석하고
+    """dispatch 계층은 drop -s 를 오직 검증된 UE-pool 바인딩에서만 해석하고
     서로 다른(DISTINCT) 두 검증 endpoint 에 대해서만 DROP 을 빌드해야 한다 — mgmt/ingest 셀렉터는 무동작."""
     from mdg.core.state import Intent
     from mdg.core.worldstate import RoleBinding, WorldState

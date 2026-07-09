@@ -49,8 +49,8 @@ DECISION_MODULES = ("gate.py", "legality.py", "rank_recovery.py", "select_policy
 
 
 def _condition_subtrees(tree: ast.AST):
-    """모든 제어-흐름 CONDITION 표현식을 yield: if/while/ternary 의 ``test`` 및 comprehension
-    가드 절(``for ... if <cond>``). 이들이 키가 어느 분기를 실행할지 영향을 주는 유일한
+    """모든 제어-흐름 CONDITION 표현식을 yield: if/while/ternary 의 test 및 comprehension
+    가드 절(for ... if <cond>). 이들이 키가 어느 분기를 실행할지 영향을 주는 유일한
     위치다(불변식1. 결정론적 제어 흐름). 할당, dict 값, 호출 인자, return 페이로드, for-loop
     iterable 은 의도적으로 제외 — 노드는 금지 셀렉터를 steer 하지 않고 데이터로 운반 가능."""
     for node in ast.walk(tree):

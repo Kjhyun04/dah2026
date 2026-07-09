@@ -47,7 +47,7 @@ def _as_bool(v: object) -> bool:
 
 
 def sanitize(features: dict, schema: dict[str, object]) -> dict:
-    """``features`` 를 ``schema`` 에 투영한다(닫힌 화이트리스트). 화이트리스트 키만
+    """features 를 schema 에 투영한다(닫힌 화이트리스트). 화이트리스트 키만
     살아남고; 모든 값은 타입/열거 검사된다. 누락이거나 부적합 -> LLMUnavailable."""
     out: dict = {}
     for key, rule in schema.items():

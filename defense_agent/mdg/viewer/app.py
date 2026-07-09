@@ -4,7 +4,7 @@
   - 동작 (action)       : 에이전트의 결정 타임라인, run.jsonl 에서(decisions 채널)
   - 통신 (communication): 14560 downlink 텔레메트리 + uav_ue lo:14550 크로스탭 하트비트
   - 검증 (verification) : 독립(INDEPENDENT) Verifier 의 per-tick 진실을, 에이전트의 결정과
-                          나란히 배치 — *에이전트 ≠ 진실* 비교 (H-K)
+                          나란히 배치 — 에이전트 ≠ 진실 비교 (H-K)
 
 UI (2026-07): 경보성 상단 배너는 제거됨. 에이전트≠진실 의미는 콤팩트한 헤더 stat 칩으로 존치
 (신뢰근원 trust_root + 불일치 count) — Verifier(별도 신뢰근원)가 붉은 경고 바 없이도 링크 헬스의
@@ -13,19 +13,19 @@ UI (2026-07): 경보성 상단 배너는 제거됨. 에이전트≠진실 의미
 에이전트≠진실 불일치는 붉게 표시)되어 한눈에 트리아지 가능.
 
 보안 태세 (고정):
-  * Verifier(별도 신뢰근원)가 링크 헬스의 권위이다; 헤더는 그 trust_root 와 에이전트≠진실 불일치 수를
+  - Verifier(별도 신뢰근원)가 링크 헬스의 권위이다; 헤더는 그 trust_root 와 에이전트≠진실 불일치 수를
     stat 칩으로 표시한다(경보 배너 없음).
-  * record-time redact 전용(PS-3): Viewer 는 display-time redaction 을 전혀 하지 않는다. 대신
+  - record-time redact 전용(PS-3): Viewer 는 display-time redaction 을 전혀 하지 않는다. 대신
     load-time 시크릿 스캔을 돌려 fail-closed 한다(오염된 파일 서빙 거부) —
     "record-time redact, viewer display-time redact 폐기" 를 지키면서 안전 유지.
-  * read-only: 모든 route 는 GET; 상태나 테스트베드를 변경하는 endpoint 는 없다.
-  * bearer-token 인증(PS-8): constant-time 비교; 토큰 없으면 모든 data route 가 401.
-  * loopback / management bind(PS-8): ``serve()`` 는 0.0.0.0 을 거부(공격자 UE 10.45.x
+  - read-only: 모든 route 는 GET; 상태나 테스트베드를 변경하는 endpoint 는 없다.
+  - bearer-token 인증(PS-8): constant-time 비교; 토큰 없으면 모든 data route 가 401.
+  - loopback / management bind(PS-8): serve() 는 0.0.0.0 을 거부(공격자 UE 10.45.x
     가 관리 평면에 절대 도달하지 못하도록).
 
 FastAPI/uvicorn 은 lazy import(core.graph 가 langgraph 를 import 하듯) — 그래서 이 모듈과
 그 순수 빌더(load_panels / scan_secrets)는 web 의존성 없이 import·테스트된다.
-이 모듈은 mdg.core 를 import 하지 **않는다**(replay.play + 독립 Verifier 로 JSONL 소비),
+이 모듈은 mdg.core 를 import 하지 않는다(replay.play + 독립 Verifier 로 JSONL 소비),
 관리 평면을 결정 경로 밖에 유지한다.
 """
 from __future__ import annotations
@@ -55,7 +55,7 @@ class SecretLeakError(RuntimeError):
 
 
 def scan_secrets(text: str) -> list[str]:
-    """``text`` 에서 발견된 시크릿 패턴을 반환(빈 값 => 깨끗함). load time 에 fail-closed
+    """text 에서 발견된 시크릿 패턴을 반환(빈 값 => 깨끗함). load time 에 fail-closed
     하려고 사용; Viewer 는 display time 에 절대 redact 하지 않는다(PS-3 계약)."""
     hits: list[str] = []
     for pat in _SECRET_PATTERNS:
@@ -95,8 +95,8 @@ def _classify_view(signals: list[str]) -> tuple[list[str], str]:
 
 
 def _detect_band(signals: list[str]) -> str:
-    """복구(recovery) lifecycle 전용 '탐지 밴드'. `_classify_view`(로그용)와 달리 상시(구조적)
-    시그니처를 제외하지 **않는다**.
+    """복구(recovery) lifecycle 전용 '탐지 밴드'. _classify_view(로그용)와 달리 상시(구조적)
+    시그니처를 제외하지 않는다.
 
     이유: command-hijack 의 실제 공격 서명은 config 지표(Unauthorized_Command)이며 이는
     STANDING_SIGNALS 에 속한다. view_band 는 이들을 걷어내 Green 으로
@@ -111,8 +111,8 @@ def _detect_band(signals: list[str]) -> str:
 
 
 def _recovery_band(row: dict) -> str:
-    """복구 lifecycle 밴드: 엔진의 권위있는 per-tick `impact_band`(Green/Yellow/Red)를 우선 사용하고,
-    미기록/비정상 값이면 상시 시그니처를 포함한 `_detect_band`(사건 존재 기반)로 폴백한다.
+    """복구 lifecycle 밴드: 엔진의 권위있는 per-tick impact_band(Green/Yellow/Red)를 우선 사용하고,
+    미기록/비정상 값이면 상시 시그니처를 포함한 _detect_band(사건 존재 기반)로 폴백한다.
     view_band(상시 제외, 로그 전용)는 여기서 쓰지 않는다."""
     ib = row.get("impact_band")
     if ib in ("Red", "Yellow", "Green"):
@@ -183,10 +183,10 @@ def _flight_series(comm_panel: list[dict]) -> list[dict]:
 
 def _recovery_events(ticks: list, band_by_tick: dict, flight: list[dict]) -> list[dict]:
     """ledger(Intent) + worldstate.applied[rule].confirmed + 탐지밴드 전이를 사건별 복구
-    lifecycle 로 묶는다: 탐지 -> 대응 -> 집행 -> 확인 -> 회복. 복구 ``rule`` 당 이벤트 1개.
+    lifecycle 로 묶는다: 탐지 -> 대응 -> 집행 -> 확인 -> 회복. 복구 rule 당 이벤트 1개.
 
-    여기서 ``band_by_tick`` 은 복구 탐지밴드(엔진 impact_band / 사건 존재, ``_recovery_band`` 가
-    구성)이며, 상시조건을 걷어낸 view_band 가 **아니다** — 그래서 사건 멤버가 상시(STANDING) config
+    여기서 band_by_tick 은 복구 탐지밴드(엔진 impact_band / 사건 존재, _recovery_band 가
+    구성)이며, 상시조건을 걷어낸 view_band 가 아니다 — 그래서 사건 멤버가 상시(STANDING) config
     지표인 command-hijack 도 여전히 공격밴드를 보인다.
 
     detect = 첫 non-Green 틱(공격 가시화); respond = 해당 rule 의 첫 ledger Intent;
@@ -312,7 +312,7 @@ def _recovery_events(ticks: list, band_by_tick: dict, flight: list[dict]) -> lis
 
 
 def load_panels(run_path: str) -> dict:
-    """``run.jsonl`` (+ 독립 Verifier 진실)에서 전체 3패널 뷰 모델을 구성한다.
+    """run.jsonl (+ 독립 Verifier 진실)에서 전체 3패널 뷰 모델을 구성한다.
 
     잔여 시크릿이 있으면 fail-closed(record-time redact 계약). 순수: web 의존성 없음,
     테스트베드 없음, 결정론적 — 이식성 기둥(H-J)."""
@@ -718,10 +718,10 @@ load(); setInterval(load, 3000);   // ★ 3초마다 실시간 자동 갱신 (ru
 # FastAPI 앱(lazy import) — read-only, bearer-auth, loopback bind
 # --------------------------------------------------------------------------- #
 def create_app(run_path: str, *, token: Optional[str] = None):
-    """read-only FastAPI 앱을 구성한다. data route 에는 ``token``(bearer)이 필요하다;
-    None 이면 env ``MDG_VIEWER_TOKEN`` 에서 토큰을 읽는다(토큰 없으면 모든 data route 401).
+    """read-only FastAPI 앱을 구성한다. data route 에는 token(bearer)이 필요하다;
+    None 이면 env MDG_VIEWER_TOKEN 에서 토큰을 읽는다(토큰 없으면 모든 data route 401).
 
-    패널은 요청마다 ``run_path`` 에서 재계산된다(오프라인, 결정론적). fastapi 가 필요하다
+    패널은 요청마다 run_path 에서 재계산된다(오프라인, 결정론적). fastapi 가 필요하다
     (python:3.12-slim 이미지). 없으면 ImportError; 순수 빌더
     (load_panels / scan_secrets)는 그것 없이도 동작한다."""
     try:

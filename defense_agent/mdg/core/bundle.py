@@ -2,18 +2,18 @@
 de-escalation (결정론, secret-free — 불변식1.).
 
 강제된 응답은 ATOMIC BUNDLE(recovery op + 선택적 attack-path block, X4/X6)이다:
-번들 수준 risk = max(atomic risk), reversible = all(atomic reversible) — ``rank_recovery`` 가
+번들 수준 risk = max(atomic risk), reversible = all(atomic reversible) — rank_recovery 가
 routing 필드로 승격시키는 바로 그 집계(PA-4). 이 모듈은 act 노드와 driver 의 de-escalation sweep 이
 WorldState + 틱 카운터 에서만 읽는 세 가지 구동-규율 술어를 추가한다(in-graph clock 없음, LLM 없음,
 subprocess 없음):
 
   1. 멱등 skip        — 이미 적용되고 effect-confirm 된(그리고 revert 되지 않은) 규칙은
-                         no-op; 재적용은 중복 부작용이 된다. ``act`` 가 건너뛴다.
-  2. N-tick debounce   — 마지막 적용으로부터 ``min_ticks`` 이내에 재선택된 물리 규칙은
-                         보류된다(X5), flap 방지. ``AppliedRule.applied_tick`` 사용.
-  3. de-escalation     — 적용+confirm 되고 ``quiet_s`` 동안 조용한 규칙은 revert
+                         no-op; 재적용은 중복 부작용이 된다. act 가 건너뛴다.
+  2. N-tick debounce   — 마지막 적용으로부터 min_ticks 이내에 재선택된 물리 규칙은
+                         보류된다(X5), flap 방지. AppliedRule.applied_tick 사용.
+  3. de-escalation     — 적용+confirm 되고 quiet_s 동안 조용한 규칙은 revert
                          후보가 된다(X5/E15). driver 가 대역외(out-of-band)로 revert 한다(live 는
-                         operator-go). ``FLIGHT_ACTION_AUTO_REVERT`` 는 False 유지(flight 는 절대 자동 revert 안 함).
+                         operator-go). FLIGHT_ACTION_AUTO_REVERT 는 False 유지(flight 는 절대 자동 revert 안 함).
 
 모든 함수는 순수하다: 동일 (world, tick) -> 동일 verdict, 따라서 replay 는 byte-stable 하다.
 """
@@ -48,7 +48,7 @@ class Bundle:
 
 def build_bundle(intent: Intent, extra_ops: list[Action] | None = None) -> Bundle:
     """선택된 Intent 에 대한 원자적 번들을 조립한다(단일 recovery op + 선택적
-    attack-path-block op). risk/reversible 은 ``Bundle`` 프로퍼티(max/all)로 집계된다 —
+    attack-path-block op). risk/reversible 은 Bundle 프로퍼티(max/all)로 집계된다 —
     routing 필드가 지니는 것과 동일한 보수적 집계(PA-4)."""
     primary = Action(
         tool_id=intent.tool_id,
@@ -61,7 +61,7 @@ def build_bundle(intent: Intent, extra_ops: list[Action] | None = None) -> Bundl
 
 
 def _live_applied(world: WorldState, rule: str) -> AppliedRule | None:
-    """``rule`` 이 현재 유효(revert 되지 않음)하면 그 AppliedRule 을 반환한다."""
+    """rule 이 현재 유효(revert 되지 않음)하면 그 AppliedRule 을 반환한다."""
     ap = (world.applied or {}).get(rule)
     if ap is None or getattr(ap, "reverted", False):
         return None
@@ -78,9 +78,9 @@ def already_applied(world: WorldState, rule: str) -> bool:
 
 def debounce_blocked(world: WorldState, rule: str, now_tick: int,
                      min_ticks: int | None = None) -> bool:
-    """N-tick debounce (X5): 규칙이 ``min_ticks`` 틱 미만 이전에 적용됐을 때만 True.
+    """N-tick debounce (X5): 규칙이 min_ticks 틱 미만 이전에 적용됐을 때만 True.
 
-    ``AppliedRule.applied_tick`` 을 읽는다(State-carried -> replay-safe). 한 번도 적용되지 않은
+    AppliedRule.applied_tick 을 읽는다(State-carried -> replay-safe). 한 번도 적용되지 않은
     규칙(부재)은 차단되지 않는다. min_ticks 기본값은 DEBOUNCE_PHYSICAL_MIN_TICKS.
     """
     m = D.DEBOUNCE_PHYSICAL_MIN_TICKS if min_ticks is None else int(min_ticks)

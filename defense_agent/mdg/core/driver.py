@@ -8,7 +8,7 @@ update 는 기록되고(PS-3 redact), 그 결과 틱 상태는 graph.get_state(c
 
 틱 연속성(수정됨 — S-2 라이브 발견): 모든 틱의 그래프는 END 에서 종료된다
 (위상상 모든 loop-back -> END). LangGraph 에서 END 에 도달한 스레드는 대기 작업이 없으므로
-그 위에서 ``graph.stream(None, cfg)`` 는 update 0 개를 내고 재실행하지 않는다 — 앞선
+그 위에서 graph.stream(None, cfg) 는 update 0 개를 내고 재실행하지 않는다 — 앞선
 "fixed thread_id + stream(None)" 방식은 tick 0 이후 조용히 멈췄다
 (tick_i 가 전진하지 않음 -> break 조건 미충족 -> 무한 no-op 루프). 따라서 연속성은
 RE-SEEDING 으로 이어진다: 각 틱은 FRESH per-tick thread_id 에서 FULL 그래프 실행을 돌리고,
@@ -125,7 +125,7 @@ def _prune_thread(graph, thread_id: str) -> None:
     checkpoint 하위 패키지를 고정하지 않으므로, 더 오래된 해석 빌드에는 이 메서드가 없을 수 있다. 기능 탐지 후
     없으면 no-op — fail-safe: >=2.0.25 에서는 메모리가 유계, 더 오래된 빌드에서도 루프는 여전히
     올바르게 동작한다(단지 이전처럼 pruning 안 됨). 컴파일된 그래프는 saver 를
-    공개 ``.checkpointer`` 속성으로 노출한다(Pregel 필드; 없이 컴파일되면 None, 예:
+    공개 .checkpointer 속성으로 노출한다(Pregel 필드; 없이 컴파일되면 None, 예:
     테스트). 모든 pruning 오류는 삼켜진다: pruning 은 best-effort 이며 틱을 절대 크래시시키면 안 된다.
     leak-0 은 불변(subprocess 없음; delete_thread 는 순수 in-memory dict 삭제)."""
     saver = getattr(graph, "checkpointer", None)
@@ -142,7 +142,7 @@ def _prune_thread(graph, thread_id: str) -> None:
 
 def _tick(graph, inp: Any, invoke_cfg: dict, jsonl_path: str,
           seq_start: int = 0) -> tuple[MDGState, int]:
-    """정확히 ONE graph 실행(1 tick)을 돌린다; ``(final_state, next_seq)`` 를 반환한다.
+    """정확히 ONE graph 실행(1 tick)을 돌린다; (final_state, next_seq) 를 반환한다.
 
     단일 graph.stream() 패스가 곧 실행이다(불변식2.: act 부작용은 틱당 한 번 실행,
     절대 두 번 아님). 기록은 replay.record.record_update 로 위임된다 —

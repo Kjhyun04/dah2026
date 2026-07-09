@@ -1,31 +1,31 @@
 """core.modules.safeexec — P1 누수방지 배선 + runner_factory 실배선 (09·13·14 §계약).
 
-orchestrator 의 RunnerFactory 심(seam, 현 `_unwired_runner`)을 채우는 실행엔진 배선.
+orchestrator 의 RunnerFactory 심(seam, 현 _unwired_runner)을 채우는 실행엔진 배선.
 ExecBinding(sidecar/script/args_template/secret_params) -> backend.run 구조화 호출로 변환.
 
-단일 진실(single source of truth): 실행 계약/백엔드 구현은 **core.modules.backends** 정본이다.
+단일 진실(single source of truth): 실행 계약/백엔드 구현은 core.modules.backends 정본이다.
   Backend·ExecRequest·ExecOutput·MockBackend·LocalBackend·SshBackend 및 종료 프리미티브
   (finalize/scoped_pipe/scoped_tempfile)는 backends/ 에서 import 하며, 여기서 재정의하지 않는다.
-  (이전엔 safeexec 가 이들을 중복 정의했고, 그 LocalBackend 는 JOB 마커를 `docker exec -e`
-   환경변수로 넣어 cmdline 매칭이 못 잡는 **R1 reap 버그**가 있었다. 현재 backends/local.py 의
-   per-job teardown 은 **컨테이너-스코프 kill-all-but-pid1(+리퍼 자기트리) 스윕**(TERM->grace->
-   KILL, `_reap_all_script`)이다 — busybox `timeout` 이 마커/PGID 를 잃고 탈출해도 SIGKILL 로
+  (이전엔 safeexec 가 이들을 중복 정의했고, 그 LocalBackend 는 JOB 마커를 docker exec -e
+   환경변수로 넣어 cmdline 매칭이 못 잡는 R1 reap 버그가 있었다. 현재 backends/local.py 의
+   per-job teardown 은 컨테이너-스코프 kill-all-but-pid1(+리퍼 자기트리) 스윕(TERM->grace->
+   KILL, _reap_all_script)이다 — busybox timeout 이 마커/PGID 를 잃고 탈출해도 SIGKILL 로
    확실 회수한다. PID 네임스페이스 private 가드(pid1=sleep 확인)로 fail-closed. 이제 그 정본만 쓴다.)
 
-이 모듈의 **고유 로직**만 유지한다:
+이 모듈의 고유 로직만 유지한다:
   · Vault·render_argv·_argv_leak_guard(R6)   비밀 vault->stdin, argv 누수 0
   · make_runner / make_runner_factory          orchestrator RunnerFactory 정본(+R3 preflight 게이트)
   · parse_output                               kind -> 공격자-가시 payload(+exec_meta)
   · reap_labeled / install_signal_reap         R2 라벨 reap(우리 라벨만·dah_safeexec)
 
 누수-안전 불변식(코드로 구현·backends 정본에 배선됨):
-  R1  컨테이너 내부 `timeout -k`(상한 확정종료·PRIMARY) + `setsid` 새 프로세스그룹 + JOB 마커
-        **cmdline** 상주. per-job reap = 마커로 PGID 조회->`kill -TERM/-KILL -<PGID>`(그룹 kill·
-        우리 uuid 만). 넓은 `pkill -f`/`kill` 금지. (backends/local.py `_wrap_in_container`·
-        `_reap_pgid_script` 가 배선. `pkill -f` 는 sh 만 죽고 자식이 생존해 폐기.)
-  R2  라벨(LABEL_KEY=LABEL_VALUE) teardown/부팅 reap. **우리 라벨만** 회수(reap_labeled).
+  R1  컨테이너 내부 timeout -k(상한 확정종료·PRIMARY) + setsid 새 프로세스그룹 + JOB 마커
+        cmdline 상주. per-job reap = 마커로 PGID 조회->kill -TERM/-KILL -<PGID>(그룹 kill·
+        우리 uuid 만). 넓은 pkill -f/kill 금지. (backends/local.py _wrap_in_container·
+        _reap_pgid_script 가 배선. pkill -f 는 sh 만 죽고 자식이 생존해 폐기.)
+  R2  라벨(LABEL_KEY=LABEL_VALUE) teardown/부팅 reap. 우리 라벨만 회수(reap_labeled).
   R3  preflight 게이트 — Backend.preflight() 로 위임, 팩토리 스코프 1회 캐시.
-  R6  비밀은 vault->**stdin** 라우팅(argv/평문 env 금지). render_argv/leak-guard 가 강제.
+  R6  비밀은 vault->stdin 라우팅(argv/평문 env 금지). render_argv/leak-guard 가 강제.
 
 이 워크플로우는 완전 오프라인 — Backend.run 은 로컬 검증용 MockBackend 로만 구동.
   LocalBackend(docker exec)는 배포 정본 코드이나 이 단계에선 실행되지 않는다(테스트베드 무접속).
@@ -87,13 +87,13 @@ _BLOCKED_VALS = frozenset({"signing", "auth", "no_effect", "timestamp", "baselin
 
 
 class Vault:
-    """secret_params(sign_key/aria_key/ciphertext) -> **stdin** 라우팅.
+    """secret_params(sign_key/aria_key/ciphertext) -> stdin 라우팅.
 
     값 출처(우선순위):
       1. params[name]      — 런타임 수집물(예: ciphertext, KB->호출자 전달). secret_params 라
                              args_template 미등장(render_argv reject) -> argv 노출 0.
       2. values[name]      — 직접 주입 값(테스트/replay).
-      3. name_to_env[name] — env var **이름** -> config.resolve_secret 로 값 조회(하드코딩 0).
+      3. name_to_env[name] — env var 이름 -> config.resolve_secret 로 값 조회(하드코딩 0).
     비밀은 로그·에러·argv·평문 env 에 절대 미포함(redact).
     """
 
@@ -135,7 +135,7 @@ class Vault:
         return {n: self.get(n, params) for n in binding.secret_params}
 
 
-# stdin 프로토콜 정본(gap 해소): baked 스크립트는 stdin 을 `name=value\n` 라인들로 읽는다.
+# stdin 프로토콜 정본(gap 해소): baked 스크립트는 stdin 을 name=value\n 라인들로 읽는다.
 #   단일/복수 비밀 모두 키드(keyed). 값에 개행 없음 가정(암호문은 hex/base64 계열).
 def _encode_stdin(secrets: Mapping[str, str]) -> Optional[bytes]:
     if not secrets:
@@ -174,7 +174,7 @@ class _StrMap(dict):
 def render_argv(binding: ExecBinding, params: Mapping[str, Any]) -> Result[tuple[str, ...]]:
     """args_template '{param}' 치환 -> shell 미경유 argv 벡터.
 
-    R6 게이트: secret_params 이름이 args_template 에 **원문 등장 시 Err**(누수 차단).
+    R6 게이트: secret_params 이름이 args_template 에 원문 등장 시 Err(누수 차단).
     argv[0] = binding.script(이미지 baked 경로). 누락 param -> Err.
     """
     tmpl = binding.args_template or ""
@@ -208,7 +208,7 @@ def render_argv(binding: ExecBinding, params: Mapping[str, Any]) -> Result[tuple
 def _argv_leak_guard(
     argv: tuple[str, ...], binding: ExecBinding, params: Mapping[str, Any], vault: Vault
 ) -> Optional[CRSError]:
-    """산출 argv 에 비밀 **값**이 나타나면 CRSError(2차 방어, R6). 없으면 None."""
+    """산출 argv 에 비밀 값이 나타나면 CRSError(2차 방어, R6). 없으면 None."""
     for name in binding.secret_params:
         try:
             val = vault.get(name, params)
@@ -325,7 +325,7 @@ def _docker_bin() -> str:
 
 
 def reap_labeled(sync: bool = True) -> None:
-    """R2 부팅/종료 reap: **우리 라벨(LABEL_KEY=LABEL_VALUE) 컨테이너만** `rm -f`.
+    """R2 부팅/종료 reap: 우리 라벨(LABEL_KEY=LABEL_VALUE) 컨테이너만 rm -f.
 
     넓은 회수 금지 — label 필터로 우리 것만 조준한다(다른 소유 컨테이너 불가침).
       부팅 reap 대상도 오직 이 라벨(dah_safeexec=attack_agent)뿐이다(재확인).
@@ -515,7 +515,7 @@ def make_runner_factory(
     preflight: bool = True,
     resolver: Optional[TargetResolver] = None,
 ) -> RunnerFactory:
-    """orchestrator.RunnerFactory 정본(현 `_unwired_runner` 대체).
+    """orchestrator.RunnerFactory 정본(현 _unwired_runner 대체).
 
     __call__(spec) -> make_runner 클로저. R3 preflight 는 팩토리 스코프에서 1회 실행 후
       결과 캐시(모든 tool 공유) — backend.preflight() 로 위임(mock=통과, local=실측).

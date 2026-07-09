@@ -3,20 +3,20 @@
 심사원이 "무엇을 입력하면 되는지"를 완전히 명시(doc10). 두 파일 + env + 실행인자:
   1. config.yaml -> InputSpec (환경·타깃·실행제어).  load_config(path) -> InputSpec
   2. goal.yaml   -> Goal      (선언적 목표).           load_goal(path)  -> kb.Goal
-  3. env vars    -> 비밀(값)  . config 엔 env var **이름**만 저장(resolve_secret 로 조회).
+  3. env vars    -> 비밀(값). config 엔 env var 이름만 저장(resolve_secret 로 조회).
 
 원칙(doc10 §3, D3 계승):
   - 하드코딩 0 : 코드에 IP/키/경로/컨테이너명 0개 — 전부 InputSpec 입력.
-  - 비밀 = env var **이름** 참조 : llm.api_key_env·supervisor.aria_key_env 는 이름만.
+  - 비밀 = env var 이름 참조 : llm.api_key_env·supervisor.aria_key_env 는 이름만.
   - 필수 누락 -> 즉시 ValidationError : 완전명시 강제(doc15 §3-A). 기본값 금지 필드 존재.
   - 닫힌 어휘 : exec.mode·goal.{defense,success}·llm.mode 는 Literal 로 오타/열린값 거부.
 
 설계 결정(gap 해소):
-  - G34(exec 스키마 상반): doc10 §2-A 표(정본)의 `exec.vantage.{ue,sgi,core}`(구조형)를
-    정본으로 채택. §5 예시의 `exec.sidecar`(단수)는 sgi/core 를 표현 못해 폐기.
+  - G34(exec 스키마 상반): doc10 §2-A 표(정본)의 exec.vantage.{ue,sgi,core}(구조형)를
+    정본으로 채택. §5 예시의 exec.sidecar(단수)는 sgi/core 를 표현 못해 폐기.
   - targets 스키마(doc10 §2-B): 고정 role 키 10종(TgtSpec)으로 닫음(extra=forbid, 오타 검출).
-    값은 컨테이너 **이름** 권장 — IP 는 런타임 docker inspect 해석(P3 스코프 밖).
-  - 필드 그룹핑(doc10 §2-F): viewer.port·supervisor.* 는 **최상위**(doc10 정본 그룹핑).
+    값은 컨테이너 이름 권장 — IP 는 런타임 docker inspect 해석(P3 스코프 밖).
+  - 필드 그룹핑(doc10 §2-F): viewer.port·supervisor.* 는 최상위(doc10 정본 그룹핑).
   - termination_timeout : '30s'(문자열)·30(정수) 모두 수용(_parse_duration).
   - goal.target : 'mode=4'(문자열) · {mode: 4}(매핑) 둘 다 수용(parse_goal_target, G27).
 
@@ -150,7 +150,7 @@ class TgtSpec(BaseModel):
 
 
 class SupervisorSpec(BaseModel):
-    """2-B/2-F 감독. tap_container=복호 tap netns, aria_key_env=ARIA 키 env **이름**."""
+    """2-B/2-F 감독. tap_container=복호 tap netns, aria_key_env=ARIA 키 env 이름."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -185,7 +185,7 @@ class EvidenceSpec(BaseModel):
 
 
 class LlmSpec(BaseModel):
-    """2-D LLM. 3필드 필수. api_key_env 는 env var **이름**(값은 config 미기재)."""
+    """2-D LLM. 3필드 필수. api_key_env 는 env var 이름(값은 config 미기재)."""
 
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
@@ -431,7 +431,7 @@ def footholds_to_facts(
 
 
 def resolve_secret(env_name: str, env: Optional[Mapping[str, str]] = None) -> str:
-    """env var **이름** 참조 규칙(doc10 §3·4). 부트스트랩 시점에 값 조회.
+    """env var 이름 참조 규칙(doc10 §3·4). 부트스트랩 시점에 값 조회.
 
     env 미지정 시 os.environ 사용. 이름 비었거나 미설정/빈값 -> 명시적 에러.
     """

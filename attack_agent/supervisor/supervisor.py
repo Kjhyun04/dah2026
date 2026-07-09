@@ -1,8 +1,8 @@
 """supervisor — Independent Verifier(감독): 14555 ARIA 복호 tap -> ground-truth 독립 판정.
 
-doc17 정합. **완전 수동**(패킷 송신 0)·**소유자 특권**(키=env). gcs_proxy netns 공유 사이드카에서
-`--cap-add NET_RAW`로 14555 UDP를 raw 캡처(AF_PACKET·무의존, PoC 검증) -> C2Cipher 복호 ->
-pymavlink 파싱 -> 판정. **완전분리(grep0):** 이 패키지를 공격 agent(core)가 절대 import/read 안 함.
+doc17 정합. 완전 수동(패킷 송신 0)·소유자 특권(키=env). gcs_proxy netns 공유 사이드카에서
+--cap-add NET_RAW 로 14555 UDP를 raw 캡처(AF_PACKET·무의존, PoC 검증) -> C2Cipher 복호 ->
+pymavlink 파싱 -> 판정. 완전분리(grep0): 이 패키지를 공격 agent(core)가 절대 import/read 안 함.
 산출(evaluation.json·supervisor.jsonl)은 사용자/viewer 전용 — agent out.log 와 별개 sink.
 
 파이프라인(단일 프로세스):
@@ -52,7 +52,7 @@ _RCVBUF_CAP = 4 * 1024 * 1024  # 수신버퍼 상한(커널메모리 footprint �
 def _attach_bpf(s: socket.socket):
     """SO_ATTACH_FILTER(가능 시). 실패해도 유저스페이스 포트필터가 방어(defense-in-depth).
 
-    반환한 buffer 는 **호출자가 소켓 수명 동안 참조 유지**해야 한다(GC 시 필터 무효화 방지).
+    반환한 buffer 는 호출자가 소켓 수명 동안 참조 유지해야 한다(GC 시 필터 무효화 방지).
     """
     import ctypes
     prog = b"".join(struct.pack("HBBI", *ins) for ins in _BPF_UDP14555)
@@ -212,7 +212,7 @@ class Judge:
             self.gt.uplink_cmds.append((ev.t, ev.target_mode))
 
     def goal_truth(self, goal: dict) -> dict:
-        """goal.type 별 ground-truth 도달(§2). target=최종상태 아니라 **도달여부**(transient 포함).
+        """goal.type 별 ground-truth 도달(§2). target=최종상태 아니라 도달여부(transient 포함).
 
         정직 스코프: mode 관측은 다운링크 HEARTBEAT(~1Hz) 표본이라 하트비트 간격 내 도달·원복
           (주입 transient)을 놓칠 수 있음(sampling 필드로 명시). signing_bypass 는 '링크에
@@ -304,9 +304,9 @@ def build_evaluation(judge: Judge, goal: dict, agent_claim: Optional[dict]) -> d
 
 
 def emit(evaluation: dict, *, eval_path: str, agent_out_log: Optional[str]) -> None:
-    """evaluation.json 기록. agent out.log 와 **다른 경로** 강제(완전분리·sink 분리).
+    """evaluation.json 기록. agent out.log 와 다른 경로 강제(완전분리·sink 분리).
 
-    무조건 raise(assert 아님) — `python -O`/PYTHONOPTIMIZE 에서도 가드 유효. agent_out_log 미지정 시엔
+    무조건 raise(assert 아님) — python -O/PYTHONOPTIMIZE 에서도 가드 유효. agent_out_log 미지정 시엔
     비교 대상이 없으므로, 호출자(runner)가 항상 agent out.log 를 넘겨 이 가드가 스킵되지 않게 한다.
     """
     p = Path(eval_path).resolve()

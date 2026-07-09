@@ -4,7 +4,7 @@
 서명, ingest 소비 게이트 (PS-2 HMAC/seq/ts drop), gRPC envelope 코덱 +
 enqueue servicer, watchdog liveness + sensor_loss, ledger boot recovery.
 
-실행: ``python mdg/tests/test_p1_engine.py`` (pytest / langgraph / grpcio 불필요).
+실행: python mdg/tests/test_p1_engine.py (pytest / langgraph / grpcio 불필요).
 """
 from __future__ import annotations
 
@@ -163,7 +163,7 @@ def _mav_v2_frame(msgid: int, payload: bytes, crc_extra: int, seq: int = 0) -> b
 
 
 def _tcpdump_hex(frames: bytes, leading_junk: bytes = b"") -> str:
-    """바이트를 ``tcpdump -x`` 캡처로 렌더 (요약 줄 + hex-dump 줄). ``leading_junk`` 은
+    """바이트를 tcpdump -x 캡처로 렌더 (요약 줄 + hex-dump 줄). leading_junk 은
     스캐너가 sync 를 넘겨야 하는 IP/UDP 헤더를 대신한다."""
     raw = leading_junk + frames
     out = ["12:00:00.1 IP 10.45.0.4.14550 > 10.45.0.2.14560: UDP, length %d" % len(frames)]

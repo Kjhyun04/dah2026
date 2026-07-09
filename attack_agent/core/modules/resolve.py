@@ -1,7 +1,7 @@
 """core.modules.resolve — 타깃 해석·IP 추출·역할 확정 (문서 13 §5 · 14).
 
-P2 정찰의 '타깃해석' 절반. recon(reach/unauth/signing/seid)이 **무엇에 닿나**를
-채운다면, 이 모듈은 **어디에 닿나**(role->컨테이너->IP:port)를 런타임에 해석한다.
+P2 정찰의 '타깃해석' 절반. recon(reach/unauth/signing/seid)이 무엇에 닿나를
+채운다면, 이 모듈은 어디에 닿나(role->컨테이너->IP:port)를 런타임에 해석한다.
 
 2단계 원칙(14 §0):
   1. 해석(init)     : owner-side. role->컨테이너->IP·port (docker inspect / docker exec).
@@ -9,16 +9,16 @@ P2 정찰의 '타깃해석' 절반. recon(reach/unauth/signing/seid)이 **무엇
                         (sysid==1 ∧ type==QUADROTOR) -> prov=verified. 실패 시 미바인딩.
 
 동적 IP 대응(13 §0·§5):
-  - config 는 **컨테이너 이름**(하드코딩 0) + 논리 포트. IP 는 런타임 해석.
-  - bridge net IP = `docker inspect <name>` (.NetworkSettings.Networks).
-  - UE풀 tun IP(10.45.x)는 srsue 가 만들어 inspect 에 안 보임 -> `docker exec <name>
-    ip -br addr show tun_srsue` 로 추출.
+  - config 는 컨테이너 이름(하드코딩 0) + 논리 포트. IP 는 런타임 해석.
+  - bridge net IP = docker inspect <name> (.NetworkSettings.Networks).
+  - UE풀 tun IP(10.45.x)는 srsue 가 만들어 inspect 에 안 보임 -> docker exec <name>
+    ip -br addr show tun_srsue 로 추출.
   - route_net(vantage, role): 벤티지가 라우팅되는 net 선택(14 §3 표) -> 어느 소스 IP 를 쓸지.
 
-실행은 **backend.run 경유만** — 직접 docker/ssh subprocess 호출 코드 없음(종료계약·R6
+실행은 backend.run 경유만 — 직접 docker/ssh subprocess 호출 코드 없음(종료계약·R6
   일관). ExecRequest(sidecar='host', on_host=True) 로 호스트 CLI(docker inspect/exec)를,
   sidecar='ue' 로 tools_ue 의 식별 프로브를 태운다.
-이 워크플로우는 **완전 오프라인** — 아래 async 메서드는 테스트베드에 실행되지 않는다.
+이 워크플로우는 완전 오프라인 — 아래 async 메서드는 테스트베드에 실행되지 않는다.
   코드+결정론 파서만 제공하며, 실제 inspect/probe 는 런북(배포 게이트1)으로 위임한다.
 하드코딩 0: 컨테이너 이름·net 이름·포트·iface 는 전부 주입(InputSpec.tgt/exec.vantage).
 grep0: 감독/ground-truth 미참조 — 공격자-관측(inspect 권한 + 5762 백도어)만.
@@ -64,7 +64,7 @@ type Vantage = Literal["ue", "core", "sgi", "host"]
 class Net(str, Enum):
     """도달 net 부류 (13 §0 실측). route_net 이 벤티지->net 을 고른다.
 
-    값 = docker network **논리 이름의 기본값**(inspect Networks 키와 매칭). 인스턴스별
+    값 = docker network 논리 이름의 기본값(inspect Networks 키와 매칭). 인스턴스별
     실제 net 이름이 다르면 TargetResolver(net_names=...) 로 재매핑(하드코딩 0).
     """
 
@@ -164,7 +164,7 @@ def target_ip_fields(args_template: str) -> tuple[str, ...]:
 
 
 def parse_inspect_networks(stdout: str) -> dict[str, str]:
-    """`docker inspect -f '{{json .NetworkSettings.Networks}}'` -> {net_name: ip}.
+    """docker inspect -f '{{json .NetworkSettings.Networks}}' -> {net_name: ip}.
 
     입력 JSON: {"net_cellular": {"IPAddress": "10.44.0.31", ...}, ...}.
     빈 IPAddress(연결됐지만 미할당)는 제외(보수: 확실한 것만). 파싱 실패 -> {}.
@@ -189,10 +189,10 @@ def parse_inspect_networks(stdout: str) -> dict[str, str]:
 
 
 def parse_br_addr(stdout: str, iface: str = _DEFAULT_TUN_IFACE) -> Optional[str]:
-    """`ip -br addr show <iface>` -> 첫 IPv4 주소(프리픽스 제거). 없으면 None.
+    """ip -br addr show <iface> -> 첫 IPv4 주소(프리픽스 제거). 없으면 None.
 
-    출력 예: `tun_srsue  UNKNOWN  10.45.0.3/16` -> '10.45.0.3'. iface 토큰 유무 무관하게
-    라인에서 dotted-quad/CIDR 토큰을 결정론 추출(브리핑 포맷 `-br`).
+    출력 예: tun_srsue  UNKNOWN  10.45.0.3/16 -> '10.45.0.3'. iface 토큰 유무 무관하게
+    라인에서 dotted-quad/CIDR 토큰을 결정론 추출(브리핑 포맷 -br).
     """
     if not stdout:
         return None
@@ -295,7 +295,7 @@ class ResolvedTarget:
 class TargetResolver:
     """컨테이너 이름 기반 타깃맵을 런타임에 해석(동적 UE풀 IP 흡수).
 
-    tgt          : role -> 컨테이너 **이름**(config.InputSpec.tgt. IP 아님·하드코딩 0).
+    tgt          : role -> 컨테이너 이름(config.InputSpec.tgt. IP 아님·하드코딩 0).
     ports        : role -> 논리 포트(config). 미지정 role 은 uav_port 등 기본 사용.
     net_names    : Net -> 실제 docker network 이름 재매핑(기본=Net.value). 인스턴스 흡수.
     backend      : 실행 경유(host inspect/exec · ue 식별 프로브). 직접 docker 호출 금지.
@@ -351,7 +351,7 @@ class TargetResolver:
 
     # ── 커맨드 조립(전부 ExecRequest — backend.run 경유) ──────────────────
     def _inspect_req(self, name: str) -> ExecRequest:
-        """호스트 `docker inspect -f '{{json .NetworkSettings.Networks}}' <name>`."""
+        """호스트 docker inspect -f '{{json .NetworkSettings.Networks}}' <name>."""
         argv = (
             self._docker,
             "inspect",
@@ -362,7 +362,7 @@ class TargetResolver:
         return ExecRequest(sidecar="host", argv=argv, on_host=True, tool_id="resolve:inspect")
 
     def _tun_req(self, name: str) -> ExecRequest:
-        """호스트 `docker exec <name> ip -br addr show <tun_iface>` (UE풀 tun 추출)."""
+        """호스트 docker exec <name> ip -br addr show <tun_iface> (UE풀 tun 추출)."""
         argv = (
             self._docker,
             "exec",
@@ -378,7 +378,7 @@ class TargetResolver:
     def _identify_req(self, ip: str, port: int) -> ExecRequest:
         """tools_ue 식별 프로브: 5762 HEARTBEAT 1개 읽어 {sysid,type} JSON(RO, 14 §2).
 
-        argv[0]=baked 식별 스크립트, argv[1]=`tcp:<ip>:<port>`(pymavlink 연결 문자열).
+        argv[0]=baked 식별 스크립트, argv[1]=tcp:<ip>:<port>(pymavlink 연결 문자열).
         비밀 없음(secret_params 무관). ue 벤티지(netns=attacker_ue) 로 실행.
         """
         argv = (self._identify_script, f"tcp:{ip}:{port}")

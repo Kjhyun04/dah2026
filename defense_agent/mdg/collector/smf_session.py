@@ -1,19 +1,19 @@
 """SmfSessionTable — SMF 로그 tail을 통한 IMSI <-> 동적 tun-IP 세션 테이블 (P4-1/P4-4).
 
 FEASIBILITY §2 ("IMSI join 불가 -> time-window만")는 여기서 정정된다: Open5GS SMF
-로그는 실제로 세션 create/delete 시 IMSI<->할당 IP 바인딩을 방출하므로, ``docker logs
-epc_smf`` stdout의 라이브 tail은 양방향 세션 테이블을 만든다. 그 테이블은 세 가지에
+로그는 실제로 세션 create/delete 시 IMSI<->할당 IP 바인딩을 방출하므로, docker logs
+epc_smf stdout의 라이브 tail은 양방향 세션 테이블을 만든다. 그 테이블은 세 가지에
 대한 유일한 join key다(P4-1):
 
   1. command_source 관점 귀속(어떤 IMSI가 UE-pool source IP를 소유하는가),
-  2. ``docker pause`` 타깃 해석 — PRIMARY layer-1 경로(P2-Q1): UE-pool source IP
-     -> IMSI(이 테이블) -> container(정적 ``spec.imsi_container_map`` boot 상수),
+  2. docker pause 타깃 해석 — PRIMARY layer-1 경로(P2-Q1): UE-pool source IP
+     -> IMSI(이 테이블) -> container(정적 spec.imsi_container_map boot 상수),
      이는 exec/nsenter가 필요 없다. 라이브 tun-scan 역맵은 SECONDARY ground-
      truth 교차확인(C-3 / resolve.reverse_container_for_ip layer 2)이지 primary가 아니다.
   3. cross-plane 상관 join(메트릭 delete diff + 로그 delete 이벤트, P4-4).
 
-소스(A-1): mongo ``subscribers`` 는 IMSI만 담는다(동적 IP 없음); tun_srsue IP는
-``docker inspect`` 에 없다. SMF 로그가 이 바인딩의 유일한 소스다.
+소스(A-1): mongo subscribers 는 IMSI만 담는다(동적 IP 없음); tun_srsue IP는
+docker inspect 에 없다. SMF 로그가 이 바인딩의 유일한 소스다.
 
 파싱 원칙: ANSI-strip FIRST (P4-5) — 라이브 라인은 색 escape가 붙어 있어, strip을
 건너뛰면 모든 regex가 miss한다. 순수 관측, 상태 변화 zero.
@@ -31,7 +31,7 @@ from .base import BaseCollector
 from .log_common import ansi_strip, parse_epc_ts
 
 # 이식성(GATE2, finding P2-3): regex는 임의의 IPv4를 캡처하고 pool 멤버십은
-# ``spec.ue_pool_cidr`` 에 대해 CIDR로 검사한다 — 중복된 "10.45" 리터럴이 아님.
+# spec.ue_pool_cidr 에 대해 CIDR로 검사한다 — 중복된 "10.45" 리터럴이 아님.
 # UE pool이 다른 인스턴스에서 파서는 조용히 매칭을 멈추는 대신 config를 따른다. 기본값은
 # config.INPUT_SPEC(10.45.0.0/16)를 미러링하여 lock된 live-wire 동작이 바뀌지 않게 한다.
 _DEFAULT_POOL_CIDR: str = str(defaults.INPUT_SPEC.get("ue_pool_cidr") or "10.45.0.0/16")
@@ -65,11 +65,11 @@ def parse_smf_line(raw: str, pool_cidr: str = _DEFAULT_POOL_CIDR) -> Optional[Se
 
     delete를 create보다 먼저 검사하는데, delete 라인은 create regex에 매칭되지 않지만,
     순서를 명시적으로 두어 두 개의 구별되는 wire 포맷을 문서화한다
-    (create는 ``IMSI[..] IPv4[..]`` vs remove는 ``UE IMSI:[imsi-..] IPv4:[..]``).
+    (create는 IMSI[..] IPv4[..] vs remove는 UE IMSI:[imsi-..] IPv4:[..]).
 
-    Null-safe: None/"" raw -> None (``re.search(None)`` crash 없음). 이식성: IPv4가
-    ``pool_cidr``(config ``ue_pool_cidr``) 안에 드는 세션만 추적하므로, non-pool 라인은
-    과거의 하드코딩된 ``10.45`` prefix와 동일하게 무시된다 — 단 이제는 중복 리터럴이
+    Null-safe: None/"" raw -> None (re.search(None) crash 없음). 이식성: IPv4가
+    pool_cidr(config ue_pool_cidr) 안에 드는 세션만 추적하므로, non-pool 라인은
+    과거의 하드코딩된 10.45 prefix와 동일하게 무시된다 — 단 이제는 중복 리터럴이
     아니라 config를 따른다(finding P2-3).
     """
     line = ansi_strip(raw)
@@ -88,8 +88,8 @@ def parse_smf_line(raw: str, pool_cidr: str = _DEFAULT_POOL_CIDR) -> Optional[Se
 class SmfSessionTable:
     """SMF 로그 이벤트로 채워지는 스레드 안전 양방향 IMSI<->tun-IP 맵.
 
-    collector daemon이 다른 스레드에서 라인을 채우는 동안 ``sense``/``correlate`` 가
-    스냅샷을 읽으므로, 모든 mutation/lookup은 lock으로 보호된다. ``recent`` 는 P4-4
+    collector daemon이 다른 스레드에서 라인을 채우는 동안 sense/correlate 가
+    스냅샷을 읽으므로, 모든 mutation/lookup은 lock으로 보호된다. recent 는 P4-4
     time-window join을 위해 최신 delete 이벤트의 유계 ring을 유지한다.
     """
 
@@ -152,8 +152,8 @@ class SmfSessionTable:
     def recent_removes(self, pool_cidr: str = "") -> list[SessionEvent]:
         """P4-4 귀속 join(메트릭 diff + 로그 delete)을 위한 delete 이벤트.
 
-        Pool 멤버십은 하드코딩된 ``10.45`` prefix가 아니라 ``pool_cidr``(기본 ``self.pool_cidr``,
-        config ``ue_pool_cidr``)에 대해 CIDR로 검사된다(finding P2-3)."""
+        Pool 멤버십은 하드코딩된 10.45 prefix가 아니라 pool_cidr(기본 self.pool_cidr,
+        config ue_pool_cidr)에 대해 CIDR로 검사된다(finding P2-3)."""
         cidr = pool_cidr or self.pool_cidr
         with self._lock:
             return [e for e in self.recent if e.op == "remove" and _ip_in_pool(e.ip, cidr)]
@@ -166,11 +166,11 @@ def _docker_logs_argv(container: str, since_s: int) -> list[str]:
 
 
 class SmfSessionCollector(BaseCollector):
-    """Out-of-graph daemon: ``docker logs epc_smf`` 를 tail하며 공유 SmfSessionTable을
+    """Out-of-graph daemon: docker logs epc_smf 를 tail하며 공유 SmfSessionTable을
     유지하고, 세션 add/remove를 P4-4 join의 증거로 방출한다.
 
-    ``build_epc_collectors`` 를 통해 opt-in으로 배선된다(기본 6-collector 세트에는 미포함);
-    유지하는 테이블은 ``correlate``(join) 및 타깃 ``resolve``(pause 역맵)와 공유된다.
+    build_epc_collectors 를 통해 opt-in으로 배선된다(기본 6-collector 세트에는 미포함);
+    유지하는 테이블은 correlate(join) 및 타깃 resolve(pause 역맵)와 공유된다.
     subprocess(docker logs)는 safe-exec Backend를 통해서만 간다(불변식2.); dry/mock
     backend는 라이브 라인을 내지 않는다(테이블은 그냥 비어 있음).
     """

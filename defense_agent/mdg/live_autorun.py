@@ -8,23 +8,23 @@ scratchpad 임시 스크립트를 관측자 lifecycle 을 소유하는 실제 �
       -> run_driver               (그래프 밖 tick 루프; tick 별 run.jsonl)
 
 그리고 종료 경로에서 관측자를 항상 회수하는 try/finally(audit P2: 종료 시 관측자 미회수).
-``_shutdown`` 은 모든 collector 를 stop 하고 join(유계)한 다음 ``Backend.teardown()`` 을 호출해
+_shutdown 은 모든 collector 를 stop 하고 join(유계)한 다음 Backend.teardown() 을 호출해
 labelled crash-orphan subprocess 를 reap 한다(R4). 각 단계는 개별적으로 guard 되어 한 실패가
 나머지를 좌초시킬 수 없다 -> shutdown 누수-0(불변식2.).
 
 불변식 규율:
-  - 불변식2. (누수-0): 유일한 subprocess 경로는 주입된 ``Backend``(safe-exec R1~R6)다.
-    이 모듈은 직접 아무것도 spawn 하지 않는다 — netns PID 를 해석하는 boot ``docker inspect`` 조차
-    ``Backend.run``(``_SafeExecDocker``)을 경유하므로 spawn 지점은 정확히 하나다. 종료 시
-    ``_shutdown`` 은 collector 가 stop/join 되고 labelled orphan 이 reap 됨을 보장한다.
-  - operator-go (allow_live 기본 False): ``allow_live`` 는 ``MDG_ALLOW_LIVE`` 에서 오며 기본
+  - 불변식2. (누수-0): 유일한 subprocess 경로는 주입된 Backend(safe-exec R1~R6)다.
+    이 모듈은 직접 아무것도 spawn 하지 않는다 — netns PID 를 해석하는 boot docker inspect 조차
+    Backend.run(_SafeExecDocker)을 경유하므로 spawn 지점은 정확히 하나다. 종료 시
+    _shutdown 은 collector 가 stop/join 되고 labelled orphan 이 reap 됨을 보장한다.
+  - operator-go (allow_live 기본 False): allow_live 는 MDG_ALLOW_LIVE 에서 오며 기본
     False(운영 제약 유보)다. non-allow_live Backend 는 모든 상태변경 actuation 을 DRY 로 유지한다;
-    ``docker inspect``(read-only fast-path 아님) 역시 DRY 로 남아, 해석된 PID 가 필요한 netns tap 은
+    docker inspect(read-only fast-path 아님) 역시 DRY 로 남아, 해석된 PID 가 필요한 netns tap 은
     operator 가 플래그를 뒤집기 전까지 inert 로 동작한다. netns 무관 collector(NetworkMetric :9090
-    httpx / Mongo ``docker logs`` / Mission)는 allow_live=False 에서도 여전히 관측한다.
+    httpx / Mongo docker logs / Mission)는 allow_live=False 에서도 여전히 관측한다.
 
-진입점: ``python -m mdg.live_autorun --out <dir> --run-id <id> [--max-iters N]``.
-langgraph 는 LAZY 하게 import 되므로(``build_graph`` 와 saver factory 내부) 이 모듈 —
+진입점: python -m mdg.live_autorun --out <dir> --run-id <id> [--max-iters N].
+langgraph 는 LAZY 하게 import 되므로(build_graph 와 saver factory 내부) 이 모듈 —
 그리고 그 단위 테스트 — 은 langgraph 없이 import 된다.
 """
 from __future__ import annotations
@@ -80,7 +80,7 @@ def parse_operator_pick(env) -> str:
 
 
 def _make_keyring(run_id: str) -> tuple[Keyring, str]:
-    """run 별 임시 HMAC keyring. collector 가 서명하고 ``verify`` 가 동일 프로세스에서 검증하므로,
+    """run 별 임시 HMAC keyring. collector 가 서명하고 verify 가 동일 프로세스에서 검증하므로,
     새 랜덤 키는 영속화가 필요 없고 source 나 State 를 절대 건드리지 않는다(PS-3: 키는 Keyring 에만
     존재). 하드코딩된 키는 커밋된 secret 이 될 것이다."""
     kid = f"live-{run_id}"
@@ -88,7 +88,7 @@ def _make_keyring(run_id: str) -> tuple[Keyring, str]:
 
 
 def _make_verify(keyring: Keyring, seqwm: SeqWatermark) -> Callable[[Any], tuple[bool, str, Any]]:
-    """``sense`` 가 drain 시 호출하는 ``verify(env) -> (ok, reason, SensorEv)`` 클로저 생성:
+    """sense 가 drain 시 호출하는 verify(env) -> (ok, reason, SensorEv) 클로저 생성:
     HMAC+seq 검사(ingest.verify_envelope) 후 SensorEv 로 투영(tamper=not ok)."""
     def verify(env):
         ok, reason = verify_envelope(env, keyring, seqwm)
@@ -97,17 +97,17 @@ def _make_verify(keyring: Keyring, seqwm: SeqWatermark) -> Callable[[Any], tuple
 
 
 class _SafeExecDocker:
-    """duck-typed ``docker`` backend(``inspect_pid`` / ``inspect_networks``)으로, 이 런처가 직접
-    subprocess 지점을 0 으로 유지하도록 safe-exec ``Backend`` 를 경유한다(불변식2.).
+    """duck-typed docker backend(inspect_pid / inspect_networks)으로, 이 런처가 직접
+    subprocess 지점을 0 으로 유지하도록 safe-exec Backend 를 경유한다(불변식2.).
 
-    ``docker inspect`` 는 READ-ONLY docker-daemon 메타데이터 읽기다(resolve.py stage-1: 컨테이너
-    존재 + ``.State.Pid`` + cellular IP — netns 진입 아님, 상태변경 아님). 따라서 ``read_only=True``
+    docker inspect 는 READ-ONLY docker-daemon 메타데이터 읽기다(resolve.py stage-1: 컨테이너
+    존재 + .State.Pid + cellular IP — netns 진입 아님, 상태변경 아님). 따라서 read_only=True
     로 전송되고 allow_live=False 에서 실행된다(recon 이 pid 를 해석 -> netns collector 가 관측 =
     operator-go 없이 read-only 탐지 동작). 이는 ss/tcpdump collector(역시 read-only)를 반영한다.
-    stage-2 tun-scan(nsenter 경유 ``ip -4 addr show``)은 operator-go 로 남으므로(whitelist 아님)
-    UE-pool role_verified — 따라서 DROP 결정 — 은 여전히 allow_live 창을 요구한다. 단일 ``Backend._spawn``
-    지점을 통해 spawn 한다(R1~R6 teardown). ``.State.Pid`` / ``.NetworkSettings.Networks[*].IPAddress``
-    만 파싱한다(PS-3: 절대 ``.Config.Env`` 아님).
+    stage-2 tun-scan(nsenter 경유 ip -4 addr show)은 operator-go 로 남으므로(whitelist 아님)
+    UE-pool role_verified — 따라서 DROP 결정 — 은 여전히 allow_live 창을 요구한다. 단일 Backend._spawn
+    지점을 통해 spawn 한다(R1~R6 teardown). .State.Pid / .NetworkSettings.Networks[*].IPAddress
+    만 파싱한다(PS-3: 절대 .Config.Env 아님).
     """
 
     def __init__(self, backend: Backend):
@@ -137,25 +137,25 @@ class _SafeExecDocker:
         return {t.split("=", 1)[0]: t.split("=", 1)[1] for t in out.split() if "=" in t}
 
     def pause(self, container: str) -> ExecResult:
-        """Phase 4 S1 actuator: 공격자 컨테이너를 freeze(``docker pause``). 이는 상태변경
+        """Phase 4 S1 actuator: 공격자 컨테이너를 freeze(docker pause). 이는 상태변경
         (read_only=False)이므로 backend 에서 allow_live 가 뒤집힐 때까지 operator-go DRY 로 남는다 —
-        netns DROP 과 동일한 actuation 게이트. ``docker unpause`` 로 가역(revert_cmd 로 기록).
+        netns DROP 과 동일한 actuation 게이트. docker unpause 로 가역(revert_cmd 로 기록).
         단일 Backend._spawn 지점을 경유한다(불변식2.)."""
         return self.backend.run(ExecRequest(
             argv=["docker", "pause", container], timeout_s=8.0, reversible=True,
             revert_cmd=f"docker unpause {container}"))
 
     def unpause(self, container: str) -> ExecResult:
-        """``pause`` 의 revert(de-escalation / recover-on-boot). 상태변경 -> allow_live 게이트."""
+        """pause 의 revert(de-escalation / recover-on-boot). 상태변경 -> allow_live 게이트."""
         return self.backend.run(ExecRequest(
             argv=["docker", "unpause", container], timeout_s=8.0, reversible=True))
 
     def inspect_paused(self, container: str) -> Optional[bool]:
-        """Phase 4 effect-confirm probe: 컨테이너의 ``.State.Paused``(read-only inspect).
+        """Phase 4 effect-confirm probe: 컨테이너의 .State.Paused(read-only inspect).
 
         메타데이터 읽기가 성공하면 True/False 를, DRY/실패/미해석 시 None 을 반환하여 observer 가
         불확정 읽기를 UNCONFIRMED 로 취급하게 한다(가짜 recovery-confirm 절대 없음). pid/network
-        해석과 동일한 single-spawn, read-only ``inspect`` 경로(불변식2.)."""
+        해석과 동일한 single-spawn, read-only inspect 경로(불변식2.)."""
         out = self._inspect(container, "{{.State.Paused}}")
         if out is None:
             return None
@@ -216,7 +216,7 @@ def run(out_dir: str, run_id: str, *, allow_live: bool = False, operator_auto: b
         saver_factory: Callable = _default_saver,
         source_domains_fn: Callable = build_source_domains) -> Any:
     """Boot -> collectors(start) -> graph -> driver, 관측자를 항상 회수하는 try/finally 와 함께(P2).
-    driver 의 최종 state 를 반환한다. ``*_builder``/``*_fn``/factory seam 은 실제 함수를 기본값으로
+    driver 의 최종 state 를 반환한다. *_builder / *_fn / factory seam 은 실제 함수를 기본값으로
     가지며, lifecycle(shutdown 경로 포함)이 langgraph 나 live 스레드 없이 단위 테스트 가능하도록
     존재한다."""
     run_out = os.path.join(out_dir, run_id)
@@ -235,7 +235,7 @@ def run(out_dir: str, run_id: str, *, allow_live: bool = False, operator_auto: b
 
     # -- boot (그래프 밖): 역할/IP 해석(read-only) + seq/ledger 복구(PS-6/G3) -- #
     state0 = recon_boot(cfg=None, seqwm=seqwm, ledger=ledger, docker=docker, backend=backend)
-    # Phase 1 env->STATE 배선: route_after_decide(edges.py)는 OPER 경로를 자동승인하려 ``operator_auto``
+    # Phase 1 env->STATE 배선: route_after_decide(edges.py)는 OPER 경로를 자동승인하려 operator_auto
     # STATE 채널을 읽지만, recon_boot/initial_state 는 이를 절대 설정하지 않고 어떤 노드도 반환하지 않는다
     # — deps 는 이를 ACT 노드 kwarg 로만 바인드한다(노드 kwarg 는 state 채널이 아니다).
     # 조건부 edge 가 실제로 읽을 수 있도록 여기서 state0 에 시드한다. LastValue 채널이며 driver 가 매 tick
@@ -272,7 +272,7 @@ def run(out_dir: str, run_id: str, *, allow_live: bool = False, operator_auto: b
     # (불변식2.). 이전엔 None 이었음(effect_confirm 이 항상 confirmed=False -> 회복 신호 없음).
     # Phase 5: AirTelemetryTap(14560/14550 디코드)의 live 비행상태 snapshot 을 observer 에 배선하여
     # send_signed_mode(S2 signed_guided 30m 복귀)가 실제로 CONFIRM 할 수 있게 한다.
-    # ``snapshot`` 으로 duck-typed 되므로 커스텀/부재 collector_builder 는 단순히 telemetry 를
+    # snapshot 으로 duck-typed 되므로 커스텀/부재 collector_builder 는 단순히 telemetry 를
     # None 으로 둔다(signed 경로는 UNCONFIRMED 로 남음, 안전 — Phase 4 자세 무변경). Read-only snapshot.
     telemetry_fn = None
     for c in collectors:
@@ -287,7 +287,7 @@ def run(out_dir: str, run_id: str, *, allow_live: bool = False, operator_auto: b
         "ledger": ledger, "observe": observe, "gate": None,
         # Phase 4: duck-typed docker backend, operator_auto docker_pause 가 act_host.pause 를 통해
         # 집행되도록(S1 회복). None -> operator-go DRY(fail-safe). effect-observer 가 쓰는 것과 동일한
-        # read-only inspect backend; ``pause`` 는 상태변경 -> allow_live 게이트(2.).
+        # read-only inspect backend; pause 는 상태변경 -> allow_live 게이트(2.).
         "docker": docker,
         # Phase 0: sandbox OPER 자동승인 플래그 -> build_graph 가 gate/edge 로 넘길 배선(실사용 Phase 1).
         # 기본 False 유지 시 기존 escalate 경로 무변경(회귀 0). 결정론(불변식1.): env 입력만으로 결정.

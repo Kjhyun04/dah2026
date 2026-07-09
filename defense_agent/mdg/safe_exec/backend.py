@@ -1,17 +1,17 @@
 """Backend.run(ExecRequest) — 유일한 subprocess 경로(불변식2., Robo Duck R1~R6).
 
 Graph node와 collector는 절대 프로세스를 spawn하지 않는다; ExecRequest를
-``subprocess``의 유일한 소유자인 Backend.run에 넘긴다. Backend가 spawn을 수행하고
-(비밀은 stdin으로, R5) R1/R2/R3/R4/R6 teardown 규율을 ``safeexec``에 위임한다
+subprocess의 유일한 소유자인 Backend.run에 넘긴다. Backend가 spawn을 수행하고
+(비밀은 stdin으로, R5) R1/R2/R3/R4/R6 teardown 규율을 safeexec에 위임한다
 (setsid 프로세스 그룹, 라벨된 container-scope reap).
 PrioritySemaphore(1)이 nsenter 자원 단일화를 제공한다.
 
 모드:
-  - ``mock``  : 절대 spawn하지 않음; 합성 출력을 반환(단위 테스트 / 오프라인).
-  - ``local`` : ``allow_live``가 True일 때만, subprocess.Popen을 통한 실제 subprocess.
+  - mock  : 절대 spawn하지 않음; 합성 출력을 반환(단위 테스트 / 오프라인).
+  - local : allow_live가 True일 때만, subprocess.Popen을 통한 실제 subprocess.
 
-Live 상태 변경은 operator-go 유보다(운영 제약): ``allow_live``는 기본 False이므로,
-``local`` backend라도 운영자가 명시적으로 뒤집기 전까지 DRY-RUN 결과를 반환한다.
+Live 상태 변경은 operator-go 유보다(운영 제약): allow_live는 기본 False이므로,
+local backend라도 운영자가 명시적으로 뒤집기 전까지 DRY-RUN 결과를 반환한다.
 이것이 테스트베드 무집행 제약 뒤의 코드 수준 가드다.
 """
 from __future__ import annotations
@@ -25,19 +25,19 @@ from . import safeexec
 
 
 # -- read_only trust-boundary 허용목록 (보안 관련, 권고 아님) ------- #
-#   ``read_only``는 Backend.run에서 두 가지 권한을 통제한다: read_only fast-path는 (a)
+#   read_only는 Backend.run에서 두 가지 권한을 통제한다: read_only fast-path는 (a)
 #   allow_live=False일 때도 spawn하며(관측은 자유롭게 허용) (b) pool=1 자원-단일화
 #   세마포어를 건너뛴다. 따라서 호출자가 주장한 boolean은 실제 argv에 대해
 #   검증되어야 하며, 그렇지 않으면 변경 명령이 두 가드를 몰래 통과할 수 있다. tcpdump
-#   ``-w <file>``은 캡처 파일을 쓰고 ``-z <cmd>``/``-G``는 postrotate 명령을 실행한다
+#   -w <file>은 캡처 파일을 쓰고 -z <cmd>/-G는 postrotate 명령을 실행한다
 #   — 진짜 상태 변경 — 그리고 nsenter/docker는 임의 바이너리를 감쌀 수 있다.
 #   post-nsenter 바이너리를 알려진 비변경 관측기로 고정하고 fast-path를 허용하기 전에
 #   모든 write/exec/rotate 플래그를 거부한다.
 _READONLY_OBSERVERS = frozenset({"tcpdump", "ss", "docker", "iptables"})
 #   -w/-W/-G/-z: tcpdump 파일쓰기, 파일개수, rotate 초, postrotate 실행.
 _READONLY_BANNED_FLAGS = ("-w", "-W", "-G", "-z")
-#   NOTE (live finding, 2026-07-08): ``ip``는 의도적으로 여기 없다. recon tun-scan
-#   (``nsenter ... ip -4 addr show <iface>``)은 netns-entry 표면을 최소화하기 위해 설계상
+#   NOTE (live finding, 2026-07-08): ip는 의도적으로 여기 없다. recon tun-scan
+#   (nsenter ... ip -4 addr show <iface>)은 netns-entry 표면을 최소화하기 위해 설계상
 #   OPERATOR-GO 유보다(resolve.py docstring + test_p2_recon.test_resolve_tun_scan_is_operator_go_dry_run)
 #   — 그래서 UE-pool role_verified는 allow_live를 요구한다. 결과: 검증된
 #   결정 경로(legality-pass -> DROP plan)는 allow_live=False에서 관측되지 않는다; 그것은
@@ -46,8 +46,8 @@ _READONLY_BANNED_FLAGS = ("-w", "-W", "-G", "-z")
 
 
 def _strip_nsenter_prefix(argv: list[str]) -> list[str]:
-    """canonical ``nsenter ... -- <binary> ...`` 접두 뒤의 감싼 명령을 반환한다.
-    맨(비-nsenter) argv는 그대로 반환된다; ``--`` 종결자가 없는 잘못된 nsenter는
+    """canonical nsenter ... -- <binary> ... 접두 뒤의 감싼 명령을 반환한다.
+    맨(비-nsenter) argv는 그대로 반환된다; -- 종결자가 없는 잘못된 nsenter는
     []를 낸다(argv[0]을 잘못 읽는 대신 아래 허용목록을 실패시킴)."""
     if argv and argv[0] == "nsenter":
         if "--" in argv:
@@ -57,9 +57,9 @@ def _strip_nsenter_prefix(argv: list[str]) -> list[str]:
 
 
 def is_read_only_argv(argv: list[str]) -> bool:
-    """``argv``가 인식된 비변경 관측 형태일 때만 True. post-nsenter
+    """argv가 인식된 비변경 관측 형태일 때만 True. post-nsenter
     바이너리는 허용목록의 관측기여야 하고, write/exec/rotate 플래그가 나타나선 안 되며,
-    ``docker``는 read-only ``logs`` 하위 명령으로 좁혀진다. 이것이 ``read_only`` fast-path
+    docker는 read-only logs 하위 명령으로 좁혀진다. 이것이 read_only fast-path
     뒤의 검증이다; 여기서 실패하는 주장은 read_only가 아닌 것으로 취급된다."""
     body = _strip_nsenter_prefix(argv)
     if not body:
@@ -70,14 +70,14 @@ def is_read_only_argv(argv: list[str]) -> bool:
     for a in rest:
         if any(a == bad or a.startswith(bad) for bad in _READONLY_BANNED_FLAGS):
             return False
-    if binary == "docker":                    # read-only 하위 명령만: `logs` + `inspect`
+    if binary == "docker":                    # read-only 하위 명령만: logs + inspect
         # resolve.py stage-1은 "inspect, read-only"다(container 존재 + .State.Pid + cellular
         # IP) — 상태 변경이 아닌 메타데이터 읽기 — 그래서 recon은 allow_live=False에서 pid를 해결할 수 있다
         # (탐지 경로). 변경성 docker 동사(run/rm/exec/pause/stop)는 차단된 채로 유지된다.
         if not rest or rest[0] not in ("logs", "inspect"):
             return False
     if binary == "iptables":                  # read-only 나열만(-L/-S/-C); 변경 없음
-        # effect-confirm 의 INPUT DROP 규칙 존재 읽기(`iptables -w -S INPUT`). 모든
+        # effect-confirm 의 INPUT DROP 규칙 존재 읽기(iptables -w -S INPUT). 모든
         # 변경성 동사를 거부한다 — long form 또는 command 문자를 포함한 short cluster
         # (A/I/D/R/F/X/N/P/Z/E, -Z counter-zero 포함) — 그래서 이 read-only fast-path는 결코
         # 규칙을 설치/flush/zero할 수 없다; 그리고 최소 하나의 나열 동사(-L/-S/-C)를 요구한다.

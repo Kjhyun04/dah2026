@@ -139,8 +139,8 @@ def recovery_score(succ: float, trust_rec: float, mission_rec: float,
 # weighted mean 으로 Green 까지 희석되면 안 됨 — floor 가 이를 Red 로 고정한다.
 # --------------------------------------------------------------------------- #
 def crit_floor(domain: str, distrust: float, table: dict) -> float:
-    """한 도메인에 대한 weight-독립 criticality floor. ``table[domain]`` 은
-    ``[distrust_threshold, floor]`` 쌍의 리스트로 high->low 평가; 첫 일치가 승리, 없으면 0.
+    """한 도메인에 대한 weight-독립 criticality floor. table[domain] 은
+    [distrust_threshold, floor] 쌍의 리스트로 high->low 평가; 첫 일치가 승리, 없으면 0.
     mission_weight[domain]==0 일 때도 발화하므로, config 변조 (weight->0) 로도
     safety 도메인을 무력화할 수 없다 (P0 panel-3 계약 #2)."""
     rules = table.get(domain, []) or []
@@ -151,8 +151,8 @@ def crit_floor(domain: str, distrust: float, table: dict) -> float:
 
 
 def overall_impact(distrust_by_domain: dict, weights: dict, floor_table: dict) -> tuple[int, float]:
-    """Cross-domain 집계 (P0 panel-3). ``distrust_by_domain = {domain: 100-trust}`` 를
-    PRESENT (non-stale) 도메인 집합 D 에 대해서만. ``(overall 0-100 int, raw float)`` 반환.
+    """Cross-domain 집계 (P0 panel-3). distrust_by_domain = {domain: 100-trust} 를
+    PRESENT (non-stale) 도메인 집합 D 에 대해서만. (overall 0-100 int, raw float) 반환.
 
     - weighted_mean 은 D 상의 Σw 로 정규화 (Σw>0 가드). 부재/stale 도메인은 caller 가
       제외 — distrust 0 으로 기본값 처리하지 않음, 그러면 fail-open 되어

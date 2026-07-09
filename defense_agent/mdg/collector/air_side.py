@@ -1,8 +1,8 @@
 """Air 측 collector 2종 — netns-사이드카 MAVLink 탭 (B-3/B-4, D-1).
 
 둘 다 타깃 컨테이너의 네트워크 네임스페이스에 합류하고(recon 주입
-``nsenter --target <pid> --net --`` prefix 경유; None => inert) safe-exec Backend를 통해
-``tcpdump``를 실행한다(불변식2.). testbed가 노출하는 평문 MAVLink 평면을 관측한다:
+nsenter --target <pid> --net -- prefix 경유; None => inert) safe-exec Backend를 통해
+tcpdump를 실행한다(불변식2.). testbed가 노출하는 평문 MAVLink 평면을 관측한다:
 
   AirCommandTap   — gcs_proxy eth0 UDP:14556의 업링크 명령 진입 (B-3). idle
                     baseline은 0이므로(공격 시에만 트래픽), 어떤 패킷이든
@@ -26,9 +26,9 @@ from .base import BaseCollector
 def _tcpdump_argv(netns_prefix: list[str], iface: str, port: int, count: int,
                   hexdump: bool = False) -> list[str]:
     # -l line-buffered, -n no-resolve, -c bounded count (tcpdump 자기종료용),
-    # -q quiet. UDP 필터는 command/telemetry 포트에 고정. ``hexdump``는 -x를 추가해
+    # -q quiet. UDP 필터는 command/telemetry 포트에 고정. hexdump는 -x를 추가해
     # MAVLink payload를 hex로 덤프한다(telemetry 탭 전용) flight-state 디코드용(Phase 5);
-    # 한 줄 패킷 요약은 여전히 출력되므로 ``_count_packets``는 영향받지 않는다.
+    # 한 줄 패킷 요약은 여전히 출력되므로 _count_packets는 영향받지 않는다.
     flags = ["tcpdump", "-l", "-n", "-q", "-c", str(count), "-i", iface]
     if hexdump:
         flags.append("-x")
@@ -80,7 +80,7 @@ def _mode_string(mav_type: int, custom_mode: int) -> str:
 
 
 def _x25_crc(data: bytes, crc_extra: int) -> int:
-    """``data`` 위에 MAVLink CRC-16/MCRF4XX 계산 후 메시지 ``crc_extra`` 시드 바이트."""
+    """data 위에 MAVLink CRC-16/MCRF4XX 계산 후 메시지 crc_extra 시드 바이트."""
     crc = 0xFFFF
     for b in bytes(data) + bytes([crc_extra & 0xFF]):
         tmp = (b ^ crc) & 0xFF
@@ -90,9 +90,9 @@ def _x25_crc(data: bytes, crc_extra: int) -> int:
 
 
 def _hex_bytes(stdout: str) -> bytes:
-    """``tcpdump -x`` hex-dump 라인에서 원시 패킷 바이트를 재구성한다.
+    """tcpdump -x hex-dump 라인에서 원시 패킷 바이트를 재구성한다.
 
-    hex 라인은 ``\t0x0010:  4500 0043 8a3c ...`` 형태다; 한 줄 패킷 요약과 기타 텍스트는
+    hex 라인은 \t0x0010:  4500 0043 8a3c ... 형태다; 한 줄 패킷 요약과 기타 텍스트는
     건너뛴다. 모든 hex word를 하나의 버퍼로 이어붙여 프레임 스캐너가 동기화하게 한다 —
     CRC 검증으로 패킷 간 거짓 프레임은 문제되지 않는다."""
     out = bytearray()
@@ -113,7 +113,7 @@ def _hex_bytes(stdout: str) -> bytes:
 
 def _iter_mav_frames(data: bytes):
     """매직 바이트 동기화로 찾은 CRC-유효 MAVLink v1/v2 HEARTBEAT/GLOBAL_POSITION_INT
-    프레임에 대해 ``(msgid, sysid, compid, payload)``를 yield한다. sysid/compid를 노출해
+    프레임에 대해 (msgid, sysid, compid, payload)를 yield한다. sysid/compid를 노출해
     디코더가 기체 autopilot으로 필터할 수 있게 한다(공존 GCS heartbeat가 flight_mode를
     덮어써선 안 됨). 알려진 두 message id만 검증/yield하고; 나머지는 모두 한 바이트씩
     전진한다(헤더 바이트가 스캔을 결코 desync하지 않도록)."""
@@ -159,10 +159,10 @@ _COMP_AUTOPILOT = 1
 
 
 def _decode_flight_state(stdout: str, expect_sys: int = 1) -> dict:
-    """``tcpdump -x`` telemetry 캡처로부터 best-effort {rel_alt(m), flight_mode(str)}.
+    """tcpdump -x telemetry 캡처로부터 best-effort {rel_alt(m), flight_mode(str)}.
 
     기체 AUTOPILOT의 프레임만 신뢰한다: compid == MAV_COMP_ID_AUTOPILOT1이고,
-    ``expect_sys``가 truthy이면 sysid == expect_sys(``expect_sys=0`` => 임의 sysid 허용).
+    expect_sys가 truthy이면 sysid == expect_sys(expect_sys=0 => 임의 sysid 허용).
     이는 그렇지 않으면 flight_mode를 "MODE_0"으로 latest-wins 깜빡이게 할 공존 GCS
     HEARTBEAT(sysid=255/compid=190/MAV_TYPE_GCS)를 거부한다.
 
@@ -253,14 +253,14 @@ class AirTelemetryTap(BaseCollector):
         self.netns_prefix = netns_prefix          # None => inert (ip-netns-exec 폴백 없음)
         # Phase 5: 최신 디코드된 비행 스냅샷 {rel_alt, flight_mode}, 사이클에 걸쳐 누적됨
         # (각 필드는 가장 최근 읽은 값을 보유). 그래프 스레드에서 effect observer의 signed_*
-        # 경로가 ``snapshot()`` 경유로 읽고; 여기 collector 스레드에서 쓴다. dict 전체 참조
+        # 경로가 snapshot() 경유로 읽고; 여기 collector 스레드에서 쓴다. dict 전체 참조
         # 교체뿐이라 읽기/쓰기가 GIL 하에서 atomic이다 — 락 없음.
         self._latest: dict = {}
 
     def snapshot(self) -> dict:
         """최신 {rel_alt, flight_mode} 비행 스냅샷의 스레드-안전 복사본 (Phase 5).
 
-        ``make_effect_observer(telemetry=...)``에 주입되어 signed_guided(S2 30m 복귀)가
+        make_effect_observer(telemetry=...)에 주입되어 signed_guided(S2 30m 복귀)가
         CONFIRM할 수 있게 한다. 첫 HEARTBEAT/GLOBAL_POSITION_INT가 디코드될 때까지 {} —
         observer는 이를 UNCONFIRMED(안전)로 읽는다."""
         return dict(self._latest)
@@ -306,7 +306,7 @@ class AirTelemetryTap(BaseCollector):
         if flight:
             # 최신 알려진 필드를 누적한다(각 사이클은 둘 중 하나만 디코드할 수 있음) effect
             # observer의 signed_* 경로가 rel_alt와 flight_mode를 모두 보도록. 참조 교체 =
-            # GIL 하에서 atomic; ``snapshot()``은 dict 전체를 읽는다.
+            # GIL 하에서 atomic; snapshot()은 dict 전체를 읽는다.
             merged = dict(self._latest)
             merged.update(flight)
             self._latest = merged

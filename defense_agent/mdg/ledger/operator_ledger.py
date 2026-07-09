@@ -3,13 +3,13 @@
 결정(P4-Q3, 잠금): 서명된 승인 TOKEN(HMAC 출력)은 절대 영속화하지 않는다(NOT-PERSIST). bearer
 자격증명을 영속화하면 at-rest 캡처 표면만 넓히고 replay 방어는 전혀 얻지 못한다(replay 는 token 을
 보관해서가 아니라 single-use nonce + 짧은 TTL 로 차단된다). 크래시를 살아남아야 하는 것은
-CONSUMED-NONCE 집합이다: ``OperatorGate._seen_nonces`` 는 in-memory 집합이라, 영속성이 없으면 재부팅이
+CONSUMED-NONCE 집합이다: OperatorGate._seen_nonces 는 in-memory 집합이라, 영속성이 없으면 재부팅이
 캡처되었으나 아직 만료되지 않은 token 에 대해 replay window 를 재개방한다(PS-6 가 seq high-watermark
 에서 고친 것과 동일한 결함).
 
-그래서 이 ledger 는 secret-free ``OperatorApprovalReceipt``(명령 바인딩 메타데이터 + lifecycle
+그래서 이 ledger 는 secret-free OperatorApprovalReceipt(명령 바인딩 메타데이터 + lifecycle
 verdict)를 저장하고 boot 복구를 위해 consumed-nonce 집합을 노출한다. token / hmac / key 필드를
-전혀 보유하지 않는다 — 구조적으로 secret-free(PS-3)이므로 ``verify_replay_leak0`` 이 구성상 통과한다.
+전혀 보유하지 않는다 — 구조적으로 secret-free(PS-3)이므로 verify_replay_leak0 이 구성상 통과한다.
 이는 intent ledger(집행/G3)와 별개의 durable ledger 다; 둘 다 0600, owner-only, 비공유 볼륨이며
 checkpointer 와 구별된다(FRAMEWORK §2.2, PS-9 #3).
 """
@@ -38,15 +38,15 @@ class OperatorApprovalReceipt:
     kid: str = ""
     issued_ts: float = 0.0
     consumed_ts: Optional[float] = None
-    # NOTE: 설계상 ``token`` / ``hmac`` / ``key`` 필드는 여기 존재하지 않는다(PS-3, 구조적).
+    # NOTE: 설계상 token / hmac / key 필드는 여기 존재하지 않는다(PS-3, 구조적).
 
 
 class OperatorLedger:
     """OperatorApprovalReceipt 의 Append-only JSONL (0600, owner-only, 비공유 볼륨).
 
-    durable single-use 재전송 방지를 구동한다: ``consumed_nonces()`` 는 소비 verdict 에 도달한 모든
-    nonce 를 반환하고, ``recover_on_boot()`` 는 그 집합을 재로드해 첫 verify 가 accept 되기 전에
-    게이트가 ``_seen_nonces`` 를 재시드하게 한다(SeqWatermark 처럼 순서 fence).
+    durable single-use 재전송 방지를 구동한다: consumed_nonces() 는 소비 verdict 에 도달한 모든
+    nonce 를 반환하고, recover_on_boot() 는 그 집합을 재로드해 첫 verify 가 accept 되기 전에
+    게이트가 _seen_nonces 를 재시드하게 한다(SeqWatermark 처럼 순서 fence).
     """
 
     _CONSUMED = frozenset({"GRANTED", "EXPIRED", "REPLAY_REJECTED"})
@@ -94,6 +94,6 @@ class OperatorLedger:
         return {r.nonce for r in self.scan() if r.verdict in self._CONSUMED and r.nonce}
 
     def recover_on_boot(self) -> set[str]:
-        """consumed-nonce 집합 재로드(게이트가 어떤 verify 든 accept 하기 전에 호출). ``OperatorGate
-        (ledger=...)`` 가 생성 시 ``_seen_nonces`` 를 시드할 수 있도록 그 집합을 반환한다."""
+        """consumed-nonce 집합 재로드(게이트가 어떤 verify 든 accept 하기 전에 호출). OperatorGate(ledger=...)
+        가 생성 시 _seen_nonces 를 시드할 수 있도록 그 집합을 반환한다."""
         return self.consumed_nonces()

@@ -90,7 +90,7 @@ agents:
 
       6. 출력 형식 (예시는 형식·추론 스타일만 규정 — 내용·순서·조합 처방 아님)
 
-      ★ 아래 예시는 출력 형식과 추론 스타일만 보여준다. 어떤 tool을 어떤 순서로 쓸지는 처방하지
+      아래 예시는 출력 형식과 추론 스타일만 보여준다. 어떤 tool을 어떤 순서로 쓸지는 처방하지
         않는다. 실제 선택은 오직 이번 턴의 missing·effect_eval에서 도출하라.
 
       [형식 골격 — 단일 행동 1건 (체인 아님)]
@@ -314,7 +314,7 @@ agents:
         summary: |
           주입/물리(HITL 필수). requires: (reach(gcs14556) ∨ reach(web8080)) ∧ in_flight.
           consumes: 없음. produces: 없음. effect: mode:=LAND(9) — 물리적 착륙을 강제.
-          risk HIGH → HITL 승인 없이는 실행 불가(◐ 재이륙으로 가역). 물리효과이므로 신중히 선택.
+          risk HIGH → HITL 승인 없이는 실행 불가(재이륙으로 가역). 물리효과이므로 신중히 선택.
         params: {}
 
       naive:

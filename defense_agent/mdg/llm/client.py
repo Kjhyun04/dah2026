@@ -1,19 +1,19 @@
 """litellm 구조화 컴플리션 래퍼 (FRAMEWORK_STACK §0/§6 · PA-5 · P3-Q6).
 
 litellm 위의 단일 좁은 표면. 강제 불변식:
-  * 샘플링을 수용하는 모델 계열에는 temperature = 0 (config 를 신뢰하지 않고 여기서
+  - 샘플링을 수용하는 모델 계열에는 temperature = 0 (config 를 신뢰하지 않고 여기서
     강제) — 리플레이 결정론. reject-sampling 계열(Opus 4.8/4.7, Sonnet 5, Fable/
-    Mythos)은 어떤 `temperature` 에도 400 을 낸다; 그런 계열에는 이 필드를 생략한다(고정 디코딩이
-    이미 결정론을 만족). `_emit_temperature` 참조. `drop_params=True` 는 이 게이트가
+    Mythos)은 어떤 temperature 에도 400 을 낸다; 그런 계열에는 이 필드를 생략한다(고정 디코딩이
+    이미 결정론을 만족). _emit_temperature 참조. drop_params=True 는 이 게이트가
     오분류하는 모든 모델에 대한 2차 안전망이다(P3-Q6 ADD-3/FIX-4).
-  * `num_retries=0` — 그러지 않으면 litellm 이 내부적으로 재시도할 수 있는데, 이는 (a) 5s 벽을 넘겨
-    `timeout_s` 가 진짜 데드라인이 아니게 만들고 (b) 비결정적 다중호출
-    동작을 주입한다. 손수 짠 `for model in models` 루프가 유일한 폴백 메커니즘이다.
-  * 시도마다 timeout(models.yaml timeout_s, 기본 5s); 타임아웃/에러 시 호출자가
+  - num_retries=0 — 그러지 않으면 litellm 이 내부적으로 재시도할 수 있는데, 이는 (a) 5s 벽을 넘겨
+    timeout_s 가 진짜 데드라인이 아니게 만들고 (b) 비결정적 다중호출
+    동작을 주입한다. 손수 짠 for model in models 루프가 유일한 폴백 메커니즘이다.
+  - 시도마다 timeout(models.yaml timeout_s, 기본 5s); 타임아웃/에러 시 호출자가
     raise -> 노드 결정론 폴백(G6/E13).
-  * 구조화 출력: response_format=json_schema (anthropic provider 상의 best-effort provider
+  - 구조화 출력: response_format=json_schema (anthropic provider 상의 best-effort provider
     제약; 맨 json_object 는 약하게만 흉내낸다). authoritative 게이트는 엄격한 경계 하의
-    로컬 `model_cls.model_validate_json` 이다(extra='forbid' + constr/
+    로컬 model_cls.model_validate_json 이다(extra='forbid' + constr/
     Literal, PA-5). raw-byte 상한이 파싱 전에 돌아 parse-side DoS 를 제한한다. provider 측
     강제는 결코 보안 통제가 아니다 — 파싱 실패 -> LLMUnavailable.
 
@@ -30,12 +30,12 @@ from pydantic import BaseModel
 from ..config import loader
 from .render import LLMUnavailable
 
-# HTTP 400 으로 `temperature`/샘플링 파라미터를 거부(REJECT)하는 Anthropic 계열(현세대:
+# HTTP 400 으로 temperature/샘플링 파라미터를 거부(REJECT)하는 Anthropic 계열(현세대:
 # Opus 4.8/4.7, Sonnet 5, Fable/Mythos). 이들에 temperature=0 을 보내는 것은 조용한
 # kill-switch -> 영구 G6 폴백이다. litellm 모델 id 에 부분문자열 매칭한다.
 _REJECT_SAMPLING = ("opus-4-8", "opus-4-7", "sonnet-5", "fable", "mythos")
 
-# `temperature` 를 수용(ACCEPT)한다고 알려진 Anthropic 계열(구형 샘플링 디코더). 두 목록 어디에도
+# temperature 를 수용(ACCEPT)한다고 알려진 Anthropic 계열(구형 샘플링 디코더). 두 목록 어디에도
 # 없는 Anthropic 모델은 reject-sampling 으로 취급한다(FAIL-SAFE): 최신 세대는 샘플링을
 # 거부하므로, 목록에 없는 미래(FUTURE) Anthropic 모델에는 temperature 를 보내면 안 된다 —
 # 400 이 조용히 영구적으로 폴백시킬 것이다. 생략은 determinism=0 넛지를 포기할 뿐이다.
@@ -61,8 +61,8 @@ _DEFAULT_API_KEY_ENV = "ANTHROPIC_API_KEY"
 
 def has_api_key(api_key_env: str | None = None) -> bool:
     """LLM 크리덴셜 존재 여부. provider 를 하드코딩하지 않는다 — models.yaml 의 최상위
-    ``api_key_env`` (없으면 _DEFAULT_API_KEY_ENV) 가 가리키는 환경변수를 확인한다. OpenRouter 경유
-    운영 시 운영자는 models.yaml 에 ``api_key_env: OPENROUTER_API_KEY`` 를 두면 된다."""
+    api_key_env (없으면 _DEFAULT_API_KEY_ENV) 가 가리키는 환경변수를 확인한다. OpenRouter 경유
+    운영 시 운영자는 models.yaml 에 api_key_env: OPENROUTER_API_KEY 를 두면 된다."""
     return bool(os.environ.get(api_key_env or _DEFAULT_API_KEY_ENV))
 
 
@@ -76,7 +76,7 @@ def resolve_api_key(models_cfg: dict | None = None) -> str | None:
 
 
 def _emit_temperature(model: str) -> bool:
-    """`model` 에 `temperature=0` 을 보내야 하면(iff) True.
+    """model 에 temperature=0 을 보내야 하면(iff) True.
 
     reject-sampling Anthropic 계열 -> False(생략; 아니면 HTTP 400). 샘플링을 수용한다고
     알려진 Anthropic 계열 -> True(결정론 위해 0 방출). 알 수 없는(UNKNOWN) Anthropic 모델
@@ -135,7 +135,7 @@ def _schema_response_format(model_cls: Type[BaseModel]) -> dict:
 def complete_structured(role_cfg: dict, system: str, user: str,
                         model_cls: Type[BaseModel], timeout_s: float = 5.0,
                         api_key: str | None = None) -> BaseModel:
-    """role 의 모델 체인으로 litellm 을 호출해 ``model_cls`` 로 파싱한다.
+    """role 의 모델 체인으로 litellm 을 호출해 model_cls 로 파싱한다.
 
     litellm 이 없거나, 설정된 모델이 없거나, 체인의 모든 모델이 에러/타임아웃 /
     파싱불가·초과크기 출력을 반환하면 LLMUnavailable 를 raise 한다. orient/decide

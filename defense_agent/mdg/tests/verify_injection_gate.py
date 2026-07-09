@@ -6,8 +6,8 @@ injection-gate 검증기다. 위조된(bad HMAC -> verified=False / tamper) 고-
 SensorEv 를 실제 노드 체인
     sense -> correlate -> compute_trust -> compute_impact -> orient
           -> select_policy -> rank_recovery -> decide -> route_after_decide
-에 통과시켜 체인 불변식을 증명한다: ``chosen_action is None`` 이며 decide-edge 가
-END 로 라우팅되어 ``act`` 에 절대 도달하지 않고 부작용 0 을 낸다. 또한 카나리
+에 통과시켜 체인 불변식을 증명한다: chosen_action is None 이며 decide-edge 가
+END 로 라우팅되어 act 에 절대 도달하지 않고 부작용 0 을 낸다. 또한 카나리
 STATUSTEXT / 주입된 자유 텍스트 페이로드가 어떤 응답 채널로도 누출되지 않음을 증명한다.
 
 체인은 (컴파일된 LangGraph 대신) 노드별로 구동되는데, 이는 로컬 호스트에 langgraph 가
@@ -17,9 +17,9 @@ STATUSTEXT / 주입된 자유 텍스트 페이로드가 어떤 응답 채널로�
 
 비공허성(non-vacuity)은 세 가지로 보장:
   * POSITIVE 대조군이 동일 페이로드를 인증된(valid HMAC) 상태로 공급해 실제로
-    조치 가능한 인시던트가 되어 ``act`` 까지 라우팅됨을 보인다 — 따라서 negative
+    조치 가능한 인시던트가 되어 act 까지 라우팅됨을 보인다 — 따라서 negative
     assert 가 자명하게 항상-참이 아니다;
-  * value-carry 검사가 인증 시 ``SensorEv.value`` 가 진짜 누출 경로임을 보여,
+  * value-carry 검사가 인증 시 SensorEv.value 가 진짜 누출 경로임을 보여,
     카나리 부재 assert 가 하중을 담당한다(위조 카나리는 오직 provenance gate 가
     엔벨로프를 폐기했기 때문에 부재);
   * hostile-LLM 변형이, 최대로 강화된 orient note(severity_bump=1, 주입이 부풀릴 수
@@ -32,7 +32,7 @@ import os
 import queue
 import sys
 
-# ``python mdg/tests/verify_injection_gate.py`` 가 단독 실행되도록 repo 루트를 sys.path 에
+# python mdg/tests/verify_injection_gate.py 가 단독 실행되도록 repo 루트를 sys.path 에
 # (pytest 는 rootdir 로 추가; 이는 직접 실행 경로도 커버).
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
@@ -54,7 +54,7 @@ from mdg.ingest.verify import IngestVerifier
 from mdg.ledger.intent_ledger import SeqWatermark
 
 # 위조 엔벨로프가 밀반입하는 MAVLink-STATUSTEXT 형태의 injection 카나리. 자유 텍스트
-# ``statustext`` 키와 파생 ``value`` 필드 양쪽에 배치하여, provenance gate 가 fail-open
+# statustext 키와 파생 value 필드 양쪽에 배치하여, provenance gate 가 fail-open
 # 이면 evidence/response 채널에 노출되도록 한다.
 CANARY = "CANARY-STATUSTEXT::LAND_NOW::b7f3-injection"
 
@@ -120,7 +120,7 @@ def _base_state(*, role_verified_target: bool = False) -> dict:
 
 
 def _drive(state: dict, envs, *, orient_llm=None):
-    """``envs``(이미 inbox 순서) 에 대해 sense..decide 를 실행하고
+    """envs(이미 inbox 순서) 에 대해 sense..decide 를 실행하고
     (state, route_after_impact, route_after_decide) 를 반환."""
     keyring, seqwm = _keyring(), SeqWatermark()
     verifier = IngestVerifier(keyring, seqwm)
@@ -240,9 +240,9 @@ def test_canary_statustext_absent_from_every_response_channel():
 
 
 def test_value_field_is_a_real_leak_path_so_canary_check_is_load_bearing():
-    """카나리 부재 assert 가 공허하지 않음을 증명: 진본 엔벨로프의 ``value`` 는
+    """카나리 부재 assert 가 공허하지 않음을 증명: 진본 엔벨로프의 value 는
     SensorEv 로 전달되며(따라서 fail-open gate 라면 카나리를 노출), 반면 자유 텍스트
-    ``statustext`` 키는 envelope_to_ev 가 폐기한다(PS-7 layer 2)."""
+    statustext 키는 envelope_to_ev 가 폐기한다(PS-7 layer 2)."""
     probe = "CANARY-VALUE-CARRY::x9"
     env = _sign(_env("Unauthorized_Command", "col_gcs", domain="command",
                      value=probe, statustext=probe))

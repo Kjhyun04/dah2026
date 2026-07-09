@@ -14,13 +14,13 @@ from .worldstate import WorldState, signing_enforced
 
 
 def _resolve_role_key(action: Action | None, alias: str) -> str:
-    """registry ``role_verified.<alias>`` 술어를 선택된 액션이 실제로 작동하는
+    """registry role_verified.<alias> 술어를 선택된 액션이 실제로 작동하는
     CONTAINER KEY 로 매핑한다 (step 10 — dynamic binding).
 
     registry 는 LITERAL alias('role_verified.target' / '.gcs')를 placeholder 로 고정한다;
-    REAL 셀렉터는 액션의 ``enforce_at`` ENFORCEMENT-container 키 (finding P4-2 —
-    액션이 자세를 바꾸는 netns/entity)이며, ``enforce_at`` 가 없으면 ``target`` 셀렉터로
-    폴백한다. ``role_verified`` 는 CONTAINER-keyed (uav_ue/gcs_proxy/web_backend)이므로,
+    REAL 셀렉터는 액션의 enforce_at ENFORCEMENT-container 키 (finding P4-2 —
+    액션이 자세를 바꾸는 netns/entity)이며, enforce_at 가 없으면 target 셀렉터로
+    폴백한다. role_verified 는 CONTAINER-keyed (uav_ue/gcs_proxy/web_backend)이므로,
     fictional alias 가 아니라 구체적인 params 키가 검증되어야 하는 대상이다.
     Fail-closed: 액션 없음 또는 구체적 container 셀렉터 없음 -> "" -> caller 가 illegal 로 읽는다
     (fictional alias 키가 더 이상 후보를 허용할 수 없다; self-DoS 게이트가 닫힌 채 유지)."""

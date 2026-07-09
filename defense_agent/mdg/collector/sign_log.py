@@ -1,28 +1,28 @@
 """SignLogCollector — uav_proxy docker-logs 서명 drop-line tail (P3-Q2, §9-B).
 
-§9-B MAVLink2 업링크 서명 강제는 ``uav_proxy`` 에 있다. UNSIGNED 명령이 주입되면
+§9-B MAVLink2 업링크 서명 강제는 uav_proxy 에 있다. UNSIGNED 명령이 주입되면
 proxy가 이를 drop하고 stdout에 권위 있는 drop line을 출력한다:
 
     [proxy] 서명검증 실패 -> SITL 차단 (누적 N)
 
 이 line은 서명 강제가 ON임을 나타내는 POSITIVE 증거다(uav_proxy가 실제로 unsigned
-명령을 차단함). 이 collector는 ``docker logs uav_proxy`` 를 read-only로 tail하며(SMF/MME/
-Mongo collector와 동일한 sock-proxy ``GET /containers/{id}/logs`` 경로) 파생된 ``Signing_Drop``
-SensorEv를 방출하고, ``sense`` 가 이를 ``world.signing`` = CONFIRMED_ON 으로 latch한다
+명령을 차단함). 이 collector는 docker logs uav_proxy 를 read-only로 tail하며(SMF/MME/
+Mongo collector와 동일한 sock-proxy GET /containers/{id}/logs 경로) 파생된 Signing_Drop
+SensorEv를 방출하고, sense 가 이를 world.signing = CONFIRMED_ON 으로 latch한다
 (MONOTONIC; drop line 관측이 유일한 승격 트리거 — 침묵은 절대 승격 안 함, banner
 단독으로도 절대 승격 안 함: fail-safe 비대칭, P2-Q2).
 
 원칙(P3-Q2 lock):
-  - band=normal / 메트릭이 ``defaults.METRICS`` 에 없음 => 이 drop은 distrust를 ZERO로
+  - band=normal / 메트릭이 defaults.METRICS 에 없음 => 이 drop은 distrust를 ZERO로
     더한다(P3-Q4: verify-fail DROP은 침해가 아니라 방어 SUCCESS — 절대 crit_floor를
     발화시켜선 안 됨). 누적 카운터는 순수 활동 메트릭으로만 투영된다.
   - secret-free (PS-3): 파생된 누적 정수만 투영한다; 원본 로그 라인, cipher peer 튜플,
     어떤 키 자재도 envelope에 절대 올리지 않는다.
-  - ANSI-strip FIRST (공유 ``log_common.ansi_strip``) 하여 색 escape가 matcher가 기대하는
+  - ANSI-strip FIRST (공유 log_common.ansi_strip) 하여 색 escape가 matcher가 기대하는
     토큰 사이에 절대 끼지 못하게 한다.
 
-경계: subprocess(``docker logs``)는 safe-exec Backend를 통해서만 발행한다(불변식2.);
-docker sdk import 없음, sock/proxy URL 리터럴 없음. Null-safe: ``parse_signing_line(None)`` -> None.
+경계: subprocess(docker logs)는 safe-exec Backend를 통해서만 발행한다(불변식2.);
+docker sdk import 없음, sock/proxy URL 리터럴 없음. Null-safe: parse_signing_line(None) -> None.
 dry/mock Backend는 라인을 내지 않는다(collector는 아무것도 방출하지 않음 — inert).
 """
 from __future__ import annotations
@@ -34,7 +34,7 @@ from .base import BaseCollector
 from .log_common import ansi_strip
 
 # drop line의 안정적 마커(둘 중 어느 substring이든 verify-fail 차단 이벤트를 식별);
-# emoji/화살표는 장식일 뿐 의존하지 않는다. ``누적 N`` 이 누적 카운터를 담는다.
+# emoji/화살표는 장식일 뿐 의존하지 않는다. 누적 N 이 누적 카운터를 담는다.
 _DROP_MARKERS = ("서명검증 실패", "SITL 차단")
 _CUM_RE = re.compile(r"누적\s*(\d+)")
 
@@ -68,7 +68,7 @@ def _docker_logs_argv(container: str, since_s: int) -> list[str]:
 
 
 class SignLogCollector(BaseCollector):
-    """Out-of-graph daemon: ``docker logs uav_proxy`` 를 tail하여 §9-B 서명 drop-line을
+    """Out-of-graph daemon: docker logs uav_proxy 를 tail하여 §9-B 서명 drop-line을
     command 도메인 증거로 방출한다(P3-Q2). 6+1 번째 collector; subprocess는 safe-exec
     Backend를 통해서만 간다(불변식2.). dry/mock backend는 라인을 내지 않는다(inert)."""
     source_id = "uav_signlog"
@@ -79,7 +79,7 @@ class SignLogCollector(BaseCollector):
         super().__init__(*args, **kw)
         self.container = container
         self.since_s = since_s
-        # Coarse-bucket dedupe (MongoLogCollector 선례): 연속으로 겹치는 ``--since`` 윈도우
+        # Coarse-bucket dedupe (MongoLogCollector 선례): 연속으로 겹치는 --since 윈도우
         # 전반에서 관측된 동일 누적 카운터는 한 번만 방출되고, 이후 윈도우는 RE-EMIT한다
         # (latch/활동 신호가 영구히 억제되지 않고, proxy 재시작 후 카운터 reset이 영원히
         # 가려지지 않도록). 주입된 clock을 사용한다.

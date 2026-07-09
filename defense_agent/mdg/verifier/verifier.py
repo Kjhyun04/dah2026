@@ -1,17 +1,17 @@
 """verifier.py (PA-2 · grep0 · FRAMEWORK §2.3) — 그래프 외부의 독립 신뢰 루트.
 
 Verifier 는 자체 로직을 가진 별도 프로세스다. 오직 replay JSONL
-(``run.jsonl``)만 소비한다 — ``mdg.core.*`` 를 절대 import 하지 않고(decider 없음, verdict 채널 없음),
+(run.jsonl)만 소비한다 — mdg.core.* 를 절대 import 하지 않고(decider 없음, verdict 채널 없음),
 testbed 를 건드리지 않으며, 결정론적이다(JSONL 바이트의 순수 함수; time.* 없음,
-무작위성 없음, 네트워크 없음). 이것이 ``verify_grep0`` 경계다: 코어는
+무작위성 없음, 네트워크 없음). 이것이 verify_grep0 경계다: 코어는
 Verifier 의 verdict 를 import 할 수 없고, Verifier 는 코어의 결정 로직을 import 할 수 없다 — 그래서
-Viewer 는 *agent ≠ truth* 를 정직하게 보여줄 수 있다(H-K).
+Viewer 는 agent ≠ truth 를 정직하게 보여줄 수 있다(H-K).
 
 독립 truth 는 에이전트의 결정이 아니라 원(RAW) 기록 evidence + 관측된 worldstate 로부터
 계산된다. 네 가지 신호(라이브 testbed 에 고정, §P / D-1 / B-4):
 
   1. cross-root 링크 헬스 = 독립된 두 PLANE 의 생존성, 논리곱(∧):
-       - comm/drone 루트: 평문 MAVLink tap 상의 ``Link_Heartbeat`` (uav_ue lo:14550, D-1)
+       - comm/drone 루트: 평문 MAVLink tap 상의 Link_Heartbeat (uav_ue lo:14550, D-1)
        - command 루트   : gcs_proxy chokepoint REACHABLE/PRESENT (14556 command-plane)
      진짜-생존은 둘 다 필요. 한쪽만 => cross-root INCONSISTENT.
      ANTI-SPOOF 는 비대칭이다(P5-Q3 lock): anti-MITM 속성은 COMM/drone
@@ -21,16 +21,16 @@ Viewer 는 *agent ≠ truth* 를 정직하게 보여줄 수 있다(H-K).
      gcs_proxy 컨테이너를 present 로 유지하는 MITM 은 그 자체만으로는
      CROSS_ROOT_INCONSISTENT 를 발동시키지 않는다. gcs_proxy_alive=True 를 행위적 command 헬스로 읽지 마라.
   2. telemetry-침묵 검출 = tap 은 돌았으나 heartbeat 를 관측하지 못함, 연속
-     ``SILENCE_TICKS`` 틱 동안 => TELEMETRY_SILENCE(링크/드론 상실).
+     SILENCE_TICKS 틱 동안 => TELEMETRY_SILENCE(링크/드론 상실).
   3. gcs_proxy presence = command-plane chokepoint REACHABLE/PRESENT(role_verified, 라이브
      14556 tap, 또는 양성 행위 anchor) — 거친 presence, spoof 검출기 아님.
   4. agent≠truth 발산 = 에이전트의 결정은 NOMINAL(Continue / Continue+Monitoring)
      인데 독립 truth 는 SILENCE 또는 cross-root INCONSISTENT 라고 말함 —
      Viewer 가 표면화하는 정직-노트로, 에이전트의 태세를 결코 ground truth 로 오인하지 않게 한다.
 
-설계상 self-contained: ``mdg.replay.play`` 나 ``mdg.core`` 를 import 하지 않고
+설계상 self-contained: mdg.replay.play 나 mdg.core 를 import 하지 않고
 작은 JSONL/tick 리더를 재구현한다(여기서는 신뢰-루트 격리 > DRY). 정규(canonical) 레코드 스키마와
-레거시 드라이버 ``{node: patch}`` 스키마를 모두 관용한다.
+레거시 드라이버 {node: patch} 스키마를 모두 관용한다.
 """
 from __future__ import annotations
 
@@ -221,7 +221,7 @@ def _agent_decision(tick: _Tick) -> Optional[str]:
 
 
 def verify_run(path: str) -> list[Truth]:
-    """``run.jsonl`` 을 결정론적으로 독립 Truth verdict 리스트로 접는다.
+    """run.jsonl 을 결정론적으로 독립 Truth verdict 리스트로 접는다.
 
     파일 바이트의 순수 함수(grep0: core import 없음, testbed 없음, 시계 없음)."""
     ticks = _reconstruct(path)

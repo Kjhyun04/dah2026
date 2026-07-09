@@ -103,7 +103,7 @@ def _candidates(state: MDGState) -> list[Action]:
     for inc in incidents:
         doms = None  # lazily computed once per incident
         for rtype in _INCIDENT_RECOVERY.get(inc.kind, []):
-            # flight-actuator 도메인 가드(스킵될 때 `seen` 을 소비하지 마라: 이 tick 의 다른
+            # flight-actuator 도메인 가드(스킵될 때 seen 을 소비하지 마라: 이 tick 의 다른
             # command-domain incident 가 여전히 이 rtype 을 정당하게 방출할 수 있다).
             guard = _RTYPE_DOMAIN_GUARD.get(rtype)
             if guard is not None:

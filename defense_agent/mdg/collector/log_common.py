@@ -27,11 +27,11 @@ def ansi_strip(s: str) -> str:
 
 
 def parse_epc_ts(line: str) -> str:
-    """존재하면 원시 ``MM/DD HH:MM:SS.mmm`` 타임스탬프 토큰을 반환, 없으면 "".
+    """존재하면 원시 MM/DD HH:MM:SS.mmm 타임스탬프 토큰을 반환, 없으면 "".
 
-    Null-safe(verify_parsers 계약): None/"" -> "" (``EPC_TS_RE.search(None)``에서
+    Null-safe(verify_parsers 계약): None/"" -> "" (EPC_TS_RE.search(None)에서
     TypeError 없음), 따라서 SMF/MME 파스 경로는 None/빈값에 대해 전역적(total)이다.
-    ``ansi_strip``은 None을 변경 없이 반환하므로(그 ``if not s`` 가드), None 원시 줄은
+    ansi_strip은 None을 변경 없이 반환하므로(그 if not s 가드), None 원시 줄은
     여기 None으로 도달한다; 여기서 가드하여 EPC-로그 파스 경로 전체를 total로 유지."""
     if not line:
         return ""

@@ -1,29 +1,29 @@
 """resolve — role -> container -> IP 2단계 검증(P2, H-I / A-1 / C-3).
 
 2단계인 이유(A-1): UE-pool IP(10.45.0.x)는 attach 마다 재할당되며 컨테이너의
-``tun_srsue`` 인터페이스에만(ONLY) 존재한다 — ``docker inspect``(정적 cellular-net
+tun_srsue 인터페이스에만(ONLY) 존재한다 — docker inspect(정적 cellular-net
 IP 10.44.0.x 를 보여줌)에는 없다(ABSENT). 따라서 단일 inspect 로는 대상을 해석할 수
 없다; tun iface 의 런타임 스캔이 필요하다.
 
   Stage 1 (inspect, read-only): 컨테이너 존재 + 호스트 PID(.State.Pid) + cellular-net
           IP. provenance="inspect".
   Stage 2 (tun scan, UE-pool 역할 전용): 컨테이너 net 네임스페이스 안에서(INSIDE) 실행되는
-          ``ip -4 addr show <tun_iface>``, 동적 10.45.x IP 를 산출. 스캔된 IP 가
+          ip -4 addr show <tun_iface>, 동적 10.45.x IP 를 산출. 스캔된 IP 가
           UE-pool CIDR 안에 있으면 바인딩이 검증됨. provenance="verified".
 
 메커니즘 정합(locked, P2-Q1): 갭 노트(A-1)는 stage-2 를
-``docker exec ... ip addr`` 로 표현했으나, PS-1 은 docker-socket 프록시에서 ``exec`` 를
+docker exec ... ip addr 로 표현했으나, PS-1 은 docker-socket 프록시에서 exec 를
 명시적으로 거부한다(DENIES). TRANSPORT 만 교체되고 관측 의미는 보존된다.
 승인된 등가물은 모든 air 측 탭을 이미 뒷받침하는 netns 진입이다:
-``nsenter --target <pid> --net -- ip -4 addr show <iface>``(nsenter_helper), safe-exec
+nsenter --target <pid> --net -- ip -4 addr show <iface>(nsenter_helper), safe-exec
 Backend(불변식2., 유일한 subprocess 경로)를 통해 라우팅됨. 이것은 컨테이너의
-NETWORK 네임스페이스에만 진입하고(mount ns 는 mdg 것 유지, 따라서 mdg 의 ``ip`` 바이너리 실행 —
+NETWORK 네임스페이스에만 진입하고(mount ns 는 mdg 것 유지, 따라서 mdg 의 ip 바이너리 실행 —
 B-2 무력화) docker exec 가 필요 없다. 상태변경 0; non-allow_live Backend 는
 DRY-RUN 을 반환하므로 라이브 스캔은 operator-go 유보다(IP 미해석 유지 -> inert).
 
-pause-target 해석은 2계층(P2-Q1, ``reverse_container_for_ip``):
+pause-target 해석은 2계층(P2-Q1, reverse_container_for_ip):
   Layer 1 (PRIMARY, netns 진입 0) — IP -> IMSI [SMF session-table log, P4-1] ->
-    container [ue*.conf 의 static IMSI<->container boot 맵, ``spec.imsi_container_map``].
+    container [ue*.conf 의 static IMSI<->container boot 맵, spec.imsi_container_map].
     화이트리스트 엔드포인트(inspect + logs)만으로 pause-target 을 닫는다; exec 도
     nsenter 도 필요 없다. 이것이 주 경로다(netns 진입 표면 최소화).
   Layer 2 (SECONDARY, ground-truth 교차검증) — 라이브 nsenter tun 스캔으로 만든
@@ -32,7 +32,7 @@ pause-target 해석은 2계층(P2-Q1, ``reverse_container_for_ip``):
     공존한다; layer 1 만으로는 불충분하므로 tun-scan 은 "고유 역방향 맵"에서
     "ground-truth 교차검증"으로 격하됨(제거 아님, DEMOTED).
 
-경계: duck-typed ``docker`` 백엔드(``inspect_pid`` 필수; ``inspect_networks`` 선택);
+경계: duck-typed docker 백엔드(inspect_pid 필수; inspect_networks 선택);
 docker sdk import 없음, 여기 sock/proxy URL 리터럴 없음(verify_grep0).
 Fail-closed: 미해석 단계는 바인딩을 미검증으로 남기고 그 하류 탭 /
 pause-target 을 inert 로 둔다(오조준 작동 없음; 누수-0 정합).
@@ -48,7 +48,7 @@ from ..core.worldstate import RoleBinding
 from ..safe_exec.nsenter_helper import netns_prefix_for
 from .inputspec import DefInputSpec, RoleSpec
 
-# ``inet 10.45.0.2/32 scope global tun_srsue`` -> 10.45.0.2 (ip-addr-show 의 첫 IPv4).
+# inet 10.45.0.2/32 scope global tun_srsue -> 10.45.0.2 (ip-addr-show 의 첫 IPv4).
 _INET_RE = re.compile(r"\binet\s+(\d{1,3}(?:\.\d{1,3}){3})")
 
 
@@ -64,8 +64,8 @@ class ResolveResult:
 
 
 def parse_ip_addr_show(text: str, iface: str = "") -> Optional[str]:
-    """``ip addr show`` 출력의 첫 IPv4, 없으면 None. ``iface`` 는 참고용이며(명령이
-    이미 하나의 iface 를 대상으로 함); 단순히 첫 ``inet`` 주소를 취한다."""
+    """ip addr show 출력의 첫 IPv4, 없으면 None. iface 는 참고용이며(명령이
+    이미 하나의 iface 를 대상으로 함); 단순히 첫 inet 주소를 취한다."""
     if not text:
         return None
     m = _INET_RE.search(text)
@@ -90,18 +90,18 @@ def _inspect_pid(docker, container: str) -> Optional[int]:
 
 
 def _inspect_cellular_ip(docker, container: str, network: Optional[str]) -> Optional[str]:
-    """선택적 duck-typed ``inspect_networks`` 를 통한 best-effort cellular-net IP.
+    """선택적 duck-typed inspect_networks 를 통한 best-effort cellular-net IP.
     메서드 부재 / 미지 네트워크 -> None(stage-1 은 pid-only 존재로 폴백).
 
-    Backend 계약(P2-Q3, LOCK — 향후 ``safe_exec/docker_backend.py`` 가 준수):
-      - SOURCE: 값은 오직(ONLY) ``GET /containers/{id}/json`` 바디 필드
-        ``.NetworkSettings.Networks``(PS-1 화이트리스트)에서 온다. docker
-        ``/networks`` 라우트를 쳐선 안 된다(MUST NOT) — PS-1 은 "networks" 를 거부(DENIES)(메서드명이 misnomer 함정).
-      - SHAPE: ``inspect_networks(container) -> {docker_net_name: IPAddress}`` — FLATTENED,
-        PROJECTED ``dict[str,str]``(raw Gateway/MacAddress/EndpointID 서브객체 절대 아님).
-        네트워크 NAME 으로 키잉됨(``RoleSpec.cellular_network`` 와 일치); 빈 IPAddress 는 생략.
-      - SECRET HYGIENE (load-bearing, PS-3): 백엔드는 오직(ONLY) ``.State.Pid`` 와
-        ``.NetworkSettings.Networks[*].{name,IPAddress}`` 만 파싱하고 ``.Config.Env`` / ``.Mounts``
+    Backend 계약(P2-Q3, LOCK — 향후 safe_exec/docker_backend.py 가 준수):
+      - SOURCE: 값은 오직(ONLY) GET /containers/{id}/json 바디 필드
+        .NetworkSettings.Networks(PS-1 화이트리스트)에서 온다. docker
+        /networks 라우트를 쳐선 안 된다(MUST NOT) — PS-1 은 "networks" 를 거부(DENIES)(메서드명이 misnomer 함정).
+      - SHAPE: inspect_networks(container) -> {docker_net_name: IPAddress} — FLATTENED,
+        PROJECTED dict[str,str](raw Gateway/MacAddress/EndpointID 서브객체 절대 아님).
+        네트워크 NAME 으로 키잉됨(RoleSpec.cellular_network 와 일치); 빈 IPAddress 는 생략.
+      - SECRET HYGIENE (load-bearing, PS-3): 백엔드는 오직(ONLY) .State.Pid 와
+        .NetworkSettings.Networks[*].{name,IPAddress} 만 파싱하고 .Config.Env / .Mounts
         / 라벨을 파싱 시점에(AT PARSE TIME) 버린다 — 형제 inspect 는 정당하게 Env 에 API 키를 담는다.
       - SINGLE-SNAPSHOT: pid 와 networks 는 (container, pass) 당 하나의(ONE) inspect 바디에서 파생.
       - DEGRADE: 메서드 부재 / 4xx / malformed -> None; cellular IP 는 참고용(ADVISORY)(infra
@@ -118,7 +118,7 @@ def _inspect_cellular_ip(docker, container: str, network: Optional[str]) -> Opti
 
 
 def _tun_scan(role: RoleSpec, pid: int, backend) -> Optional[str]:
-    """Stage-2: Backend 를 통한 ``nsenter --target <pid> --net -- ip -4 addr show <tun>``.
+    """Stage-2: Backend 를 통한 nsenter --target <pid> --net -- ip -4 addr show <tun>.
     None 인 경우: 백엔드 없음 / DRY-RUN(operator-go) / non-zero / inet 미파싱."""
     if backend is None:
         return None
@@ -180,14 +180,14 @@ def resolve_targets(spec: DefInputSpec, docker=None, backend=None) -> ResolveRes
 def reverse_container_for_ip(ip: str, result: ResolveResult, smf_table=None) -> Optional[str]:
     """docker pause 대상 해석(C-3): UE-pool 소스 IP -> container. 2계층(P2-Q1).
 
-    Layer 1 (PRIMARY, netns 진입 0): IP -> IMSI [``smf_table.imsi_for_ip``, SMF log
-    P4-1] -> container [static ``result.imsi_container`` boot 맵]. 화이트리스트
+    Layer 1 (PRIMARY, netns 진입 0): IP -> IMSI [smf_table.imsi_for_ip, SMF log
+    P4-1] -> container [static result.imsi_container boot 맵]. 화이트리스트
     엔드포인트(inspect + logs)만으로 대상을 닫으므로 선호됨.
 
     Layer 2 (SECONDARY, ground-truth 교차검증): 라이브 nsenter tun 스캔의 역방향 ip_map
     + 명시적 binding 스캔. SMF 테이블에 아직 바인딩이 없을 때 사용.
 
-    ``smf_table`` 은 ``imsi_for_ip(ip) -> imsi|None`` 을 노출하는 임의 객체(SmfSessionTable);
+    smf_table 은 imsi_for_ip(ip) -> imsi|None 을 노출하는 임의 객체(SmfSessionTable);
     부재 -> layer 1 은 건너뛰고 layer 2 가 권위적. 어느 계층도 해석하지 못하면
     None 반환(fail-closed: pause 대상을 지어내지 않음)."""
     if not ip:

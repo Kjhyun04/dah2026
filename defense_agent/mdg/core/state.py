@@ -1,12 +1,12 @@
 """MDGState 채널 스키마 + 모든 pydantic v2 모델 (DESIGN_DECISIONS PA-3/PA-5).
 
 MDGState 는 LangGraph 채널 reducer 를 가진 TypedDict:
-  - accumulator 채널 (ledger/decisions/incidents) 은 ``operator.add`` 사용
+  - accumulator 채널 (ledger/decisions/incidents) 은 operator.add 사용
   - 그 외 전부 LastValue (replace).
 
 비밀값 (LLM key / operator token / HMAC key) 은 이 스키마에서 구조적으로 부재한다
 (PS-3). verifier verdict 채널은 의도적으로 부재 (PA-2) — core 는 verdict 저장소를
-import 할 수 없다. ``to_record()`` 는 recording hook 이 쓰는 allow-field 투영이다.
+import 할 수 없다. to_record() 는 recording hook 이 쓰는 allow-field 투영이다.
 """
 from __future__ import annotations
 
@@ -113,7 +113,7 @@ class Intent(BaseModel):
     # 기록되지 않음. 기본값이므로, 모든 non-demo Intent 생성은 영향 없음.
     provenance_relaxed: bool = False       # demo record-then-pass 마커 (audit/trace)
     # P4-Q1 — pivot target 은 OPAQUE VALIDATED SELECTOR (라이브 IP 아님). 순수 데이터 운반:
-    # ``target`` 은 UNTRUSTED 값 (telemetry/correlation 출처) 이며 raw ``iptables -s`` 인자로
+    # target 은 UNTRUSTED 값 (telemetry/correlation 출처) 이며 raw iptables -s 인자로
     # 절대 쓰이면 안 된다. 오직 dispatch (response.py) 시 verified WorldState binding 맵에 대해
     # 해석되는 KEY 일 뿐; 위조된 selector (operator IP / out-of-pool / unknown
     # role) 는 verified 게이트에서 실패 -> inert DRY (self-DoS 차단, PS-7). 어떤 조건부 edge 도
@@ -122,12 +122,12 @@ class Intent(BaseModel):
     target_kind: Literal["role", "imsi", "ip", ""] = ""  # selector KEY 를 어떻게 해석할지
     # Two-endpoint containment (finding P4-2): 일관된 netns DROP 은 두 개의 서로 다른 endpoint 필요 —
     # ENFORCEMENT netns (공격자를 INPUT 으로 필터하는 chokepoint/victim) 와 SOURCE
-    # (공격자). 위의 ``target``/``target_kind`` 는 SOURCE selector (drop_src); ``enforce_at`` 은
-    # ENFORCEMENT-netns role KEY. 단일 selector 를 nsenter pid 와 ``-s`` source 양쪽에
+    # (공격자). 위의 target/target_kind 는 SOURCE selector (drop_src); enforce_at 은
+    # ENFORCEMENT-netns role KEY. 단일 selector 를 nsenter pid 와 -s source 양쪽에
     # 접으면 DROP 이 공격자 자신의 netns 에 들어가 자기 inbound ip 를 드롭 — 공격자의 악성
     # OUTBOUND 을 절대 막지 못하는 near no-op 이 된다. dispatch (response.py) 는 이제
     # enforce_at 과 source 가 두 개의 서로 다른 verified binding 으로 해석될 때만 DROP 을 구성, 아니면
-    # inert DRY (self-DoS 차단, PS-7). ``enforce_at`` 도 opaque KEY (untrusted; raw
+    # inert DRY (self-DoS 차단, PS-7). enforce_at 도 opaque KEY (untrusted; raw
     # 인자로 절대 안 씀) 이며 edge-invisible (불변식1. — verify_routing FORBIDDEN_KEYS).
     enforce_at: str = ""                   # enforcement-netns role KEY (chokepoint/victim; ≠ source)
     # PS-9 command-bound OperatorRequest 필드 (NON-secret: binding 이며 HMAC key 나

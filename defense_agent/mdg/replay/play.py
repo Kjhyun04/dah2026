@@ -1,6 +1,6 @@
 """play.py (H-J) — 오프라인 리플레이: run.jsonl 로부터 tick 타임라인을 재구성한다.
 
-이식성 축(V3 §8): 테스트베드가 전혀 없는 리뷰어가 ``run.jsonl`` 만으로 Viewer/Verifier를
+이식성 축(V3 §8): 테스트베드가 전혀 없는 리뷰어가 run.jsonl 만으로 Viewer/Verifier를
 구동한다. 이 모듈은 아무것도 재실행하지 않는다(graph 없음, 테스트베드 없음,
 subprocess 없음) — 기록된 node 업데이트를 tick별 타임라인으로 정규화하는 순수 stdlib 리더다.
 두 가지 on-disk 스키마를 허용한다:
@@ -8,7 +8,7 @@ subprocess 없음) — 기록된 node 업데이트를 tick별 타임라인으로
   - canonical (record.py):  {"seq": n, "node": "sense", "patch": {...}}
   - legacy (core.driver):   {"sense": {...}, ...}   (하나 이상의 node->patch 키)
 
-tick 경계 = ``sense`` node 업데이트(sense가 graph 진입점, PA-1: 1 tick은 sense에서
+tick 경계 = sense node 업데이트(sense가 graph 진입점, PA-1: 1 tick은 sense에서
 시작). 한 tick 내 patch들은 병합되어(채널별 last-writer-wins; accumulator는 연결)
 Viewer/Verifier가 소비하는 read-only TickView가 된다.
 
@@ -109,7 +109,7 @@ def _fold(view: TickView, node: str, patch: dict) -> None:
 
 
 def reconstruct_ticks(records: list[dict]) -> list[TickView]:
-    """canonical record를 tick별 TickView로 묶는다. 각 ``sense`` node 업데이트마다
+    """canonical record를 tick별 TickView로 묶는다. 각 sense node 업데이트마다
     새 tick이 열린다(PA-1 진입). 첫 sense 이전 record(드묾/없음)는 tick 0을 이룬다."""
     ticks: list[TickView] = []
     cur: Optional[TickView] = None

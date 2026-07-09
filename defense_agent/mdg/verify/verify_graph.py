@@ -1,6 +1,6 @@
 """verify_graph — 정적 분석으로 검사하는 LangGraph topology(PA-1/PA-3/PA-8/PA-9)(langgraph 없이).
 
-단일 출처 topology(PA-9): 권위 있는 spec 은 ``core/topology.py``(순수 데이터)다.
+단일 출처 topology(PA-9): 권위 있는 spec 은 core/topology.py(순수 데이터)다.
 이 checker 는 그것을 import 하고(langgraph/pydantic 비의존) 다음을 강제한다:
   - core/nodes 안의 node 파일이 정확히 11개 == topology.NODE_ROSTER
   - 파생 edge: START->sense, act->effect_confirm->END, escalate->END, 두 조건부
@@ -33,7 +33,7 @@ VERIFIER = os.path.join(MDG_ROOT, "verifier")
 
 
 def _assign_str_list(tree: ast.Module, name: str) -> list[str] | None:
-    """모듈 수준 ``name = [ "a", "b", ... ]`` 문자열 상수 리스트를 추출한다(AST 만,
+    """모듈 수준 name = [ "a", "b", ... ] 문자열 상수 리스트를 추출한다(AST 만,
     import 없음) — Verifier 를 import 하지 않고 verifier._NODE_ORDER 를 읽는 데 사용."""
     for node in ast.walk(tree):
         if isinstance(node, ast.Assign):
@@ -77,7 +77,7 @@ def _check() -> Report:
     # 3) topology.END 표기 == edges.END(둘은 손으로 쓴 두 개의 sentinel) -------------
     etree = parse(os.path.join(CORE, "edges.py"))
     edges_end = _assign_str_list(etree, "END")
-    # edges.py 는 `END = "__end__"` 를 선언(리스트가 아닌 스칼라) -> 직접 읽음
+    # edges.py 는 END = "__end__" 를 선언(리스트가 아닌 스칼라) -> 직접 읽음
     edges_end_val = None
     for node in ast.walk(etree):
         if isinstance(node, ast.Assign) and any(

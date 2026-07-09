@@ -16,8 +16,8 @@
     actuation은 미검증 셀렉터에서 결코 발화하지 않는다.
 
 이들은 버그가 아니라 공개다: 아키텍처는 의도적으로 보수적이다
-(inert-DRY, tri-state signing, agent≠truth Verifier). ``banner`` / ``honest_note`` /
-``for_chapter``가 이를 캠페인 결과와 6장 보고서(artifacts.py)에 공급한다.
+(inert-DRY, tri-state signing, agent≠truth Verifier). banner / honest_note /
+for_chapter가 이를 캠페인 결과와 6장 보고서(artifacts.py)에 공급한다.
 
 순수 모듈: I/O 없음, testbed 없음, core import 없음 — 어디서든 안전하게 import 가능.
 """
@@ -170,5 +170,5 @@ def honest_note(key: str) -> dict:
 
 
 def for_chapter(chapter: int) -> list[dict]:
-    """report_chapter == ``chapter``인 모든 공개 한계 (보고서 매핑)."""
+    """report_chapter == chapter인 모든 공개 한계 (보고서 매핑)."""
     return [h.to_dict() for h in HONEST_LIMITATIONS if h.report_chapter == chapter]

@@ -1,26 +1,26 @@
 """record.py (PA-7 · PS-3) — canonical node-I/O JSONL 레코더.
 
-각 LangGraph node 업데이트(``graph.stream(inp, cfg, stream_mode='updates')``)를
+각 LangGraph node 업데이트(graph.stream(inp, cfg, stream_mode='updates'))를
 JSONL 한 줄로 기록한다. 잠긴 네 가지 속성:
 
   1. stream_mode='updates' — stream이 곧 실행이다(1 tick = 1 stream pass); 각
-     yield된 업데이트는 ``{node: partial_state}``로, 실행 순서대로 node별 기록된다.
+     yield된 업데이트는 {node: partial_state}로, 실행 순서대로 node별 기록된다.
   2. Virtual-clock 주입 — 리플레이 결정론은 빌드 시 graph deps에 주입된
-     ``VirtualClock``(core.clock)에서 온다; 이 모듈은 ``ts_stream()`` /
-     ``build_virtual_clock()``을 노출해 기록된 run의 ts 시퀀스가 리플레이 시 그 clock을 구동한다.
+     VirtualClock(core.clock)에서 온다; 이 모듈은 ts_stream() /
+     build_virtual_clock()을 노출해 기록된 run의 ts 시퀀스가 리플레이 시 그 clock을 구동한다.
      여기서 time.*은 절대 호출하지 않는다.
-  3. secret-free — 모든 patch는 직렬화 전에 ``state.to_record``(허용-필드,
-     default-deny)와 ``driver.redact``(잔여 비밀 스크럽)를 거쳐 투영되며,
-     직렬화된 줄 전체를 다시 스크럽해 json ``default=str`` 우회를 봉인한다
+  3. secret-free — 모든 patch는 직렬화 전에 state.to_record(허용-필드,
+     default-deny)와 driver.redact(잔여 비밀 스크럽)를 거쳐 투영되며,
+     직렬화된 줄 전체를 다시 스크럽해 json default=str 우회를 봉인한다
      (PS-3 / verify_leak0). 3개 비밀 클래스는 MDGState에 필드가 없다(구조적).
-  4. byte-identical — 직렬화가 canonical이므로(``sort_keys=True``, compact separators),
-     같은 run을 재기록하면 byte-identical 바이트가 나온다(``canonical_line``은 순수 함수).
+  4. byte-identical — 직렬화가 canonical이므로(sort_keys=True, compact separators),
+     같은 run을 재기록하면 byte-identical 바이트가 나온다(canonical_line은 순수 함수).
 
 Canonical line 스키마(줄당 node 업데이트 하나):
     {"seq": <int>, "node": <str>, "patch": {<투영+편집된 state 델타>}}
 
-레코더는 단일 redact 계약이다: ``driver.redact`` / ``driver._scrub_str``와
-``state.to_record``를 fork하지 않고 재사용한다(DRY). core-side(기록 파이프라인)이므로
+레코더는 단일 redact 계약이다: driver.redact / driver._scrub_str와
+state.to_record를 fork하지 않고 재사용한다(DRY). core-side(기록 파이프라인)이므로
 여기서 core를 import하는 것은 허용된다; Verifier는 방출된 JSONL을 소비하며 아무것도 import하지 않는다.
 """
 from __future__ import annotations
@@ -63,7 +63,7 @@ def canonical_line(seq: int, node: str, patch: Any) -> str:
 
 
 def record_update(fh, seq: int, update: dict) -> int:
-    """하나의 stream된 업데이트 안의 모든 (node, patch) 쌍을 ``fh``에 쓴다. 다음
+    """하나의 stream된 업데이트 안의 모든 (node, patch) 쌍을 fh에 쓴다. 다음
     seq를 반환한다. stream된 업데이트는 보통 single-node다; multi-node 업데이트는
     byte 안정성을 위해 정렬된 node 순서로 기록된다. 기록은 절대 driver로 예외를 전파하지 않는다."""
     for node in sorted(update.keys()):
@@ -78,9 +78,9 @@ def record_update(fh, seq: int, update: dict) -> int:
 
 def record_stream(graph, inp: Any, cfg: dict, path: str, *, seq_start: int = 0) -> int:
     """stream_mode='updates'로 정확히 하나의 graph 실행을 구동하고 각 node
-    업데이트를 ``path``에 기록한다(append). 다음 seq를 반환한다(monotonic 인덱스를
+    업데이트를 path에 기록한다(append). 다음 seq를 반환한다(monotonic 인덱스를
     위해 tick 간 이월). 단일 stream pass가 곧 실행이다 — 별도 invoke는 없다(그것은
-    act side effect를 두 번 일으킴, 불변식2.). ``graph``가 ``.stream``을 노출해야 한다.
+    act side effect를 두 번 일으킴, 불변식2.). graph가 .stream을 노출해야 한다.
     """
     seq = seq_start
     fh = None

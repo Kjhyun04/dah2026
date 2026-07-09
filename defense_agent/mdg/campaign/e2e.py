@@ -1,11 +1,11 @@
 """e2e.py (P6) — 6개 공격 E2E 캠페인 하네스: replay -> detect -> respond -> verify.
 
 시연된 6개 공격을 REAL 결정론 파이프라인(11개 노드 함수 + edges.py 라우팅)으로 재생하고,
-정규 ``run.jsonl``을 기록하며, 각각을 ``AttackOutcome``(탐지 + 대응 + 독립 Verifier 진실)으로
+정규 run.jsonl을 기록하며, 각각을 AttackOutcome(탐지 + 대응 + 독립 Verifier 진실)으로
 접는다.
 
-라이브 실행은 operator-go 유보다. 모든 actuation은 ``Backend(allow_live=
-False)`` -> DRY-RUN으로 흐르고, 오조준/미검증 셀렉터는 fail-closed inert-DRY다
+라이브 실행은 operator-go 유보다. 모든 actuation은 Backend(allow_live=
+False) -> DRY-RUN으로 흐르고, 오조준/미검증 셀렉터는 fail-closed inert-DRY다
 (PS-7). 하네스는 testbed 상태변경을 전혀 하지 않는다; 코드 + 시나리오 + dry뿐이다.
 
 보존되는 2대 불변식:
@@ -14,7 +14,7 @@ False)`` -> DRY-RUN으로 흐르고, 오조준/미검증 셀렉터는 fail-close
   2. 누수-0 — 유일한 actuation 경로는 Backend.run(여기선 DRY); 하네스는 아무것도 spawn하지 않는다.
 
 설계상 LANGGRAPH-FREE: 정규 그래프는 core/graph.py(langgraph)이나, 이식 가능한 replay
-기둥(H-J)은 run.jsonl이다. 이 하네스는 langgraph-free ``_TickExecutor``에서 동일한 edges를 통해
+기둥(H-J)은 run.jsonl이다. 이 하네스는 langgraph-free _TickExecutor에서 동일한 edges를 통해
 동일한 노드 함수를 구동하고 동일한 정규 recorder(replay.record.canonical_line)로 기록하므로,
 방출된 run.jsonl은 스키마상 프로덕션 드라이버와 바이트 동일하며 Verifier / Viewer / artifacts가
 변경 없이 소비한다. langgraph가 설치된 경우 프로덕션 드라이버(core.graph.build_graph 위의
@@ -62,7 +62,7 @@ _KEY = b"campaign-hmac-key-not-a-secret-32byte!!"   # 하네스 로컬; 실제 i
 # 결정론 클록 (replay 결정성; time.* 미사용 — PA-7)
 # --------------------------------------------------------------------------- #
 class DeterministicClock:
-    """고정 베이스·스텝 증가 클록. now()는 호출마다 ``step``만큼 전진하므로 재생된
+    """고정 베이스·스텝 증가 클록. now()는 호출마다 step만큼 전진하므로 재생된
     캠페인이 바이트 안정적이다(월클록 없음). sleep()은 no-op 전진이다."""
     def __init__(self, base: float = 1_800_000_000.0, step: float = 0.001):
         self._t = float(base)
@@ -82,8 +82,8 @@ class DeterministicClock:
 # --------------------------------------------------------------------------- #
 def _make_envelope(source_id: str, seq: int, ts: float, ev: dict) -> SensorEnvelope:
     """근거 payload 하나(metric/value/band/domain/channel/confidence)를 담은 서명된
-    SensorEnvelope를 만든다. HMAC은 정규 body 위에서 계산되어 ``sense``의 drain 시점
-    ``verify_envelope``가 이를 accept한다(PS-2)."""
+    SensorEnvelope를 만든다. HMAC은 정규 body 위에서 계산되어 sense의 drain 시점
+    verify_envelope가 이를 accept한다(PS-2)."""
     payload = {
         "metric": ev["metric"], "value": ev.get("value"),
         "band": ev.get("band", "normal"), "domain": ev.get("domain"),
@@ -96,7 +96,7 @@ def _make_envelope(source_id: str, seq: int, ts: float, ev: dict) -> SensorEnvel
 
 
 def queue_from_batch(batch: list[dict], seq0: int, ts: float):
-    """한 틱의 근거 스펙을 ``sense``가 drain할 서명된 봉투 큐로 변환한다.
+    """한 틱의 근거 스펙을 sense가 drain할 서명된 봉투 큐로 변환한다.
     (queue, next_seq)를 반환한다."""
     import queue as _q
     q: "_q.Queue" = _q.Queue()
@@ -178,7 +178,7 @@ _BRANCH = {
 
 
 def _apply(state: MDGState, patch: dict) -> None:
-    """노드 patch를 LangGraph 채널 시맨틱으로 ``state``에 적용한다: 누산 채널
+    """노드 patch를 LangGraph 채널 시맨틱으로 state에 적용한다: 누산 채널
     (ledger/decisions/incidents)은 extend(operator.add), 나머지는 모두 replace."""
     for k, v in patch.items():
         if k in _ACCUMULATORS and isinstance(v, list):
@@ -188,9 +188,9 @@ def _apply(state: MDGState, patch: dict) -> None:
 
 
 class _TickExecutor:
-    """``core.topology``의 최소 결정론 인터프리터: ENTRY -> (LINEAR | COND 분기) -> END를
+    """core.topology의 최소 결정론 인터프리터: ENTRY -> (LINEAR | COND 분기) -> END를
     걸으며, 단일 레시피(topology.BIND)에서 바인딩된 deps로 REAL 노드 함수를 호출하고 각
-    patch를 정규 recorder로 기록한다. 노드 순서·분기점·DI 바인딩이 모두 ``core.graph``가
+    patch를 정규 recorder로 기록한다. 노드 순서·분기점·DI 바인딩이 모두 core.graph가
     컴파일하는 동일 데이텀에서 오므로, 이 executor는 프로덕션 그래프에서 드리프트할 수
     없다(PA-9). Actuation은 DRY(Backend.allow_live=False); 인터프리터는 subprocess를
     spawn하지 않는다(누수-0, 불변식2.)."""
@@ -463,9 +463,9 @@ ATTACKS: list[AttackScenario] = [
 # 캠페인 전체 실행
 # --------------------------------------------------------------------------- #
 def run_campaign(out_dir: str, scenarios: Optional[list[AttackScenario]] = None) -> CampaignResult:
-    """6개 공격을 모두 ``out_dir``로 재생하고 CampaignResult를 반환한다(DRY, operator-go).
+    """6개 공격을 모두 out_dir로 재생하고 CampaignResult를 반환한다(DRY, operator-go).
 
-    각 공격은 ``<out_dir>/<attack_id>/run.jsonl``을 기록한다; artifacts.to_report는 그
+    각 공격은 <out_dir>/<attack_id>/run.jsonl을 기록한다; artifacts.to_report는 그
     기록들만으로 6장 보고서를 재구성한다."""
     os.makedirs(out_dir, exist_ok=True)
     scns = scenarios if scenarios is not None else ATTACKS

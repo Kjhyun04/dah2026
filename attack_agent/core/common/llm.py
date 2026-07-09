@@ -1,8 +1,8 @@
 """core.common.llm — 동기 litellm 래퍼 (아카이브 crs/common/llm_api.py sync-mirror).
 
 역할(P3, 과제 §12):
-  1. completion(...) — litellm 단일 호출점. **replay(고정 응답 주입, 오프라인/테스트용)** +
-     **live(실 litellm 호출)** 2모드. 반환 Result[ModelResponse](Ok/Err).
+  1. completion(...) — litellm 단일 호출점. replay(고정 응답 주입, 오프라인/테스트용) +
+     live(실 litellm 호출) 2모드. 반환 Result[ModelResponse](Ok/Err).
   2. ModelResponse / Choice / AgentResult[T] — 아카이브 core.py 봉투 중 P0 types.py 에
      아직 없는 3종만 신규 정의(Message/LLMToolCall/AgentAction 은 types.py 재사용).
   3. 오프라인 재현용 mock 빌더(mock_tool_response) + ReplayLLM 스크립트 헬퍼.
@@ -12,9 +12,9 @@ divergence(20 §1 C1 sync 단일스레드): acompletion->litellm.completion,
   MAX_RETRIES/슬립 상한을 축소(캠페인 hang 회귀 방지).
 
 가드(과제 §12-1):
-  - **빈 프롬프트/렌더 실패 호출 금지**: messages 가 비었거나 판단근거(content/tool_calls)가
+  - 빈 프롬프트/렌더 실패 호출 금지: messages 가 비었거나 판단근거(content/tool_calls)가
     전무하면 실호출 없이 Err 반환(빈 프롬프트로 API 태우지 않음).
-  - **비밀 로깅 금지**: 이 모듈은 secret_params 원값을 로그·에러에 절대 싣지 않는다.
+  - 비밀 로깅 금지: 이 모듈은 secret_params 원값을 로그·에러에 절대 싣지 않는다.
     (비밀 주입은 executor.run 의 vault->stdin 경로 책임 — 여기서는 프롬프트/응답만 다룸.)
 
 thinking OFF · temperature=0.7 고정(18 A6/A7). 작성 2026-07-05.
@@ -105,7 +105,7 @@ def mock_tool_response(
     """단일 tool_call 을 담은 ModelResponse 형태의 dict 생성(replay 주입용).
 
     completion(mock_response=...) 에 넘기면 litellm 호출 없이 이 응답이 그대로 반환된다.
-    arguments 는 JSON **문자열**(OpenAI wire 규약, LLMToolCall.function.arguments).
+    arguments 는 JSON 문자열(OpenAI wire 규약, LLMToolCall.function.arguments).
     """
     return {
         "choices": [
@@ -132,7 +132,7 @@ def mock_tool_response(
 class ReplayLLM:
     """녹화 스크립트 재생기(오프라인 결정론). (tool_name, arguments) 시퀀스를 순서대로 방출.
 
-    orchestrator 는 매 스텝 `replay(step)` 을 호출해 mock_response dict 를 받는다.
+    orchestrator 는 매 스텝 replay(step) 을 호출해 mock_response dict 를 받는다.
     스크립트 소진 시 None -> orchestrator 결정론 폴백 경로로.
     """
 
@@ -183,7 +183,7 @@ def completion(
 ) -> Result[ModelResponse]:
     """litellm 단일 호출 래퍼(sync). Ok(ModelResponse) | Err(CRSError).
 
-    replay: mock_response 가 주어지면 **litellm 미호출**로 그 응답을 그대로 반환
+    replay: mock_response 가 주어지면 litellm 미호출로 그 응답을 그대로 반환
       (오프라인/심사 재현 결정론). live: 실제 litellm.completion 호출.
 
     가드: 빈 프롬프트면 즉시 Err(호출 안 함). 재시도/폴백은 상한 내에서만(hang 방지).
@@ -252,7 +252,7 @@ def completion(
 
 
 def first_tool_call(resp: ModelResponse) -> Optional[LLMToolCall]:
-    """응답 assistant 메시지의 **첫 tool_call** 1개만 채택(턴당 tool 1개, 18 A3).
+    """응답 assistant 메시지의 첫 tool_call 1개만 채택(턴당 tool 1개, 18 A3).
 
     다중 tool_call 이 와도 첫 1개만 반환(나머지 무시) — 결정론.
     """

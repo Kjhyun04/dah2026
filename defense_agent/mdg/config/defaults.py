@@ -1,5 +1,5 @@
 """Python-native 단일 진리원으로서의 FIXED 상수(FEASIBILITY §3 · prototype §5 정본
-config). 병렬 *.yaml 파일이 이 값들을 미러링한다; ``loader.py`` 는 pyyaml이 설치되어
+config). 병렬 *.yaml 파일이 이 값들을 미러링한다; loader.py 는 pyyaml이 설치되어
 있으면 YAML을 선호하고 그렇지 않으면 여기로 폴백한다.
 
 이 값들은 결정론적 scoring 파이프라인(E5-E8/E19)이 읽는 값이다. FEASIBILITY_AUDIT §3
@@ -143,9 +143,9 @@ RECOVERY_FEASIBLE_MIN: float = 0.70  # 최소 success_probability; prior는 0.80
 #
 # PRESERVATION(실제 위협 복구는 손대지 않음): SURGICAL / keyed 응답은 INFRA_DESTRUCTIVE_TOOLS
 # 에 없으므로, 이 가드에 절대 걸리지 않는다 —
-#   • pfcp_firewall @ gcs_proxy / mongo_acl @ web_backend : nsenter_input_drop
+#   - pfcp_firewall @ gcs_proxy / mongo_acl @ web_backend : nsenter_input_drop
 #     '-s <verified attacker> -j DROP', 이미 two-endpoint verified/DISTINCT/self-DoS resolver로 이중 게이트됨.
-#   • send_signed_mode @ gcs_proxy : gcs_proxy를 THROUGH하여 서명 명령을 EMIT함(gcs_c2에
+#   - send_signed_mode @ gcs_proxy : gcs_proxy를 THROUGH하여 서명 명령을 EMIT함(gcs_c2에
 #     위임); chokepoint를 freeze/disconnect하지 않는다.
 PROTECTED_INFRA_CONTAINERS: frozenset[str] = frozenset({"web_backend", "gcs_proxy"})
 INFRA_DESTRUCTIVE_TOOLS: frozenset[str] = frozenset({"docker_pause", "docker_net_disconnect"})
@@ -216,11 +216,11 @@ INPUT_SPEC: dict[str, object] = {
     #   - infra role (gcs_proxy, web_backend, uav_proxy): tun_iface=None, cellular_network=None
     #     => VERIFIED-BY-PRESENCE (resolve.py: rb.verified = pid is not None), ip=''(해석할
     #     UE-pool 주소 없음). Presence != 행위 검증; 라이브 anchor는 별도로 확인됨
-    #     (targets/behavioral.py, ``verify_anchor`` 소비).
-    # ``verify_anchor`` 는 LIVE 소비 필드(targets/behavioral.confirm_behavioral_anchor)로,
-    # dead 아님: GATE2 probe가 읽는 별개의 ``behaviorally_verified`` 술어를 게이트한다.
+    #     (targets/behavioral.py, verify_anchor 소비).
+    # verify_anchor 는 LIVE 소비 필드(targets/behavioral.confirm_behavioral_anchor)로,
+    # dead 아님: GATE2 probe가 읽는 별개의 behaviorally_verified 술어를 게이트한다.
     # v3-topology "6/6"은 여기 선언된 5개의 해석 가능 role + epc_smf(log-tail 전용,
-    # ``log_containers`` 내)에 매핑됨; attacker_ue는 IMSI<->container pause 맵(P2-Q1 L1)이
+    # log_containers 내)에 매핑됨; attacker_ue는 IMSI<->container pause 맵(P2-Q1 L1)이
     # 필요로 하므로 유지된다(문서의 6에는 없음). uav_proxy는 §9-B 업링크 서명 강제
     # 지점(MEMORY: gcs_proxy env가 아니라 그 drop-log로 signing ON 확인됨) — netns tap이
     # 아니라 그 docker-logs drop line으로 관측되므로 netns=False.

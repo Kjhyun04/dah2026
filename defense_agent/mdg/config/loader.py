@@ -1,16 +1,16 @@
-"""Config 로더. 정규 *.yaml 파일(pyyaml)을 우선한다. pyyaml 이 없으면 ``defaults.py`` 의
+"""Config 로더. 정규 *.yaml 파일(pyyaml)을 우선한다. pyyaml 이 없으면 defaults.py 의
 Python 네이티브 상수로 폴백하여 결정론 파이프라인과 테스트가 추가 의존성 없이 동작한다.
 
 Q-D-4 문서 전용 — 이 로더를 통해 실제로 live-read 되는 키는 무엇인가:
-결정론 SCORING 파이프라인은 ``thresholds()`` 를 거쳐 스코어링 보정값을 다시 읽지 않는다.
-``defaults.py`` 상수를 직접 import 한다(설계상, 결정론 경로를 YAML 표면에서 떼어놓기 위함):
+결정론 SCORING 파이프라인은 thresholds() 를 거쳐 스코어링 보정값을 다시 읽지 않는다.
+defaults.py 상수를 직접 import 한다(설계상, 결정론 경로를 YAML 표면에서 떼어놓기 위함):
 scoring.py 는 D.SEVERITY_FACTOR/BAND_MAP/TRUST_BANDS/IMPACT_BANDS/LOW_CONFIDENCE_THRESHOLD/
 IMPACT_BAND_ORDER 를, compute_trust.py 는 D.METRICS/D.DOMAINS 를, correlate.py 는
 D.CORRELATION_RULES 를, intent_ledger.py 는 D.SEQ_WINDOW 를, ingest/verify.py 는 D.TS_SKEW_S 를,
 driver.py 는 D.DRIVER_BUDGETS 를, bundle.py 는 D.DEBOUNCE_*/DEESCALATION_* 를 읽는다. 따라서
-``thresholds()`` 페이로드 안의
-``severity_factor/band_map/metrics/trust_bands/impact_bands/low_confidence_threshold/
-seq_window/ts_skew_s/correlation_rules/driver`` 키(및 thresholds.yaml 의 대응 scoring 섹션)는
+thresholds() 페이로드 안의
+severity_factor/band_map/metrics/trust_bands/impact_bands/low_confidence_threshold/
+seq_window/ts_skew_s/correlation_rules/driver 키(및 thresholds.yaml 의 대응 scoring 섹션)는
 스코어링 관점에서 DEAD 이다 — 이들을 편집해도 스코어링이 재보정되지 않는다.
 이 로더를 통해 실제로 live-consume 되는 키:
   - thresholds(): rtt_baseline_ms/rtt_mdev_ms (recon.py), evidence_ttl_s (evidence.py),
@@ -48,9 +48,9 @@ def thresholds() -> dict:
     if y:
         return y
     # Q-D-4 주의: 이 pyyaml-부재 폴백은 의도적으로 thresholds.yaml 의 SUBSET(비-미러)이다 —
-    # ``evidence_ttl_s``, ``llm_response_max_bytes``, ``debounce``, ``deescalation`` 같은 키를 생략한다.
-    # 이 생략은 구조적으로 HARMLESS 하다: 모든 소비자는 ``.get(key, <default>)`` 로 읽거나
-    # 키가 없으면 ``defaults.py`` 상수로 폴백한다(evidence.evidence_ttl_s -> D.TIME_WINDOWS; llm.client
+    # evidence_ttl_s, llm_response_max_bytes, debounce, deescalation 같은 키를 생략한다.
+    # 이 생략은 구조적으로 HARMLESS 하다: 모든 소비자는 .get(key, <default>) 로 읽거나
+    # 키가 없으면 defaults.py 상수로 폴백한다(evidence.evidence_ttl_s -> D.TIME_WINDOWS; llm.client
     # llm_response_max_bytes -> _DEFAULT_MAX_BYTES; recon rtt_* -> 리터럴 기본값). 따라서
     # 비-미러는 어떤 scoring/routing 스칼라도 바꾸지 않는다. "미러를 고치려고" 여기에 숫자 키를
     # 추가하지 마라 — 그러면 폴백 경로에 값이 도입되어 보정 변경이 된다.
@@ -73,7 +73,7 @@ def thresholds() -> dict:
 
 @lru_cache(maxsize=1)
 def demo_mode() -> dict:
-    """Phase 2 (PS-7/B3) demo-mode 완화 노브. thresholds.yaml ``demo_mode`` 블록 ->
+    """Phase 2 (PS-7/B3) demo-mode 완화 노브. thresholds.yaml demo_mode 블록 ->
     defaults 폴백. 반환값은 operator_auto(sandbox demo) 에서만 적용된다;
     production(operator_auto off)은 절대 참조하지 않으므로 엄격 태세는 영향받지 않는다."""
     thr = thresholds()

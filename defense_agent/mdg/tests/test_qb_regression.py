@@ -16,7 +16,7 @@
   6. G-A verify_routing 스코프 확장('source' 금지 + 제어흐름 조건
      스코핑) 및 G-C 수정(mongo dedupe 타임버킷 재발행, air_side band 매핑).
 
-실행: ``python mdg/tests/test_qb_regression.py`` (pytest / langgraph 불필요).
+실행: python mdg/tests/test_qb_regression.py (pytest / langgraph 불필요).
 """
 from __future__ import annotations
 
@@ -97,7 +97,7 @@ def test_is_read_only_argv_rejects_mutating_and_write_forms():
     # 변경성 docker 동사는 계속 차단(logs/inspect 만 통과)
     for verb in ("run", "rm", "exec", "pause", "stop", "ps", "kill", "restart"):
         assert is_read_only_argv(_NSPREFIX + ["docker", verb, "uav_ue"]) is False, verb
-    # `--` 종료자 없는 nsenter -> [] -> read-only 아님(fail-closed, argv 오독 없음)
+    # -- 종료자 없는 nsenter -> [] -> read-only 아님(fail-closed, argv 오독 없음)
     assert is_read_only_argv(["nsenter", "--target", "1", "--net"]) is False
     # ip -4 addr show 는 설계상 OPERATOR-GO 예약 => read-only 아님(ip 는 관측자 아님)
     assert is_read_only_argv(_NSPREFIX + ["ip", "-4", "addr", "show", "tun0"]) is False

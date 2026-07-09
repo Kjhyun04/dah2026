@@ -1,13 +1,13 @@
 """DefInputSpec — 방어 에이전트의 입력 사양(P2, pydantic v2).
 
 ZERO 하드코딩 계약: 이 모듈은 인라인 테스트베드 값을 전혀 담지 않는다(고정 IP 없음,
-컨테이너명 리터럴 없음). 모든 값은 config 에서 로드된다(``loader.input_spec()``
--> ``input_spec.yaml`` 오버라이드 또는 ``defaults.INPUT_SPEC``). 클래스는 순수
+컨테이너명 리터럴 없음). 모든 값은 config 에서 로드된다(loader.input_spec()
+-> input_spec.yaml 오버라이드 또는 defaults.INPUT_SPEC). 클래스는 순수
 구조 + 검증 + 편의 접근자이므로, A-1 실패 모드(이미 라이브에서 틀린
-상수화된 ``10.45.0.3``)는 구조적으로 불가능하다.
+상수화된 10.45.0.3)는 구조적으로 불가능하다.
 
 STABLE 식별자(컨테이너/네트워크명, 포트, NF 엔드포인트, 풀 CIDR)만
-config 에 선언된다. UE별 동적 tun IP 는 절대 선언되지 않는다 — ``resolve.py`` stage-2 가
+config 에 선언된다. UE별 동적 tun IP 는 절대 선언되지 않는다 — resolve.py stage-2 가
 라이브로 해석한다.
 """
 from __future__ import annotations
@@ -20,7 +20,7 @@ from ..config import loader
 
 
 class RoleSpec(BaseModel):
-    """한 역할의 stable 기술자. ``ip`` 는 의도적으로 ABSENT — 라이브로 해석됨."""
+    """한 역할의 stable 기술자. ip 는 의도적으로 ABSENT — 라이브로 해석됨."""
     role: str
     container: str
     netns: bool = False                     # netns collector 탭이 이 컨테이너에 합류하는가?
@@ -73,7 +73,7 @@ class DefInputSpec(BaseModel):
     def imsi_container_map(self) -> dict[str, str]:
         """Static IMSI -> container 맵(P2-Q1 layer-1). ue*.conf bind-mount 에서 온
         boot 상수; netns 진입 없이(WITHOUT) IP->IMSI(SMF log)->container pause-target
-        해석을 가능하게 함. 어떤 역할도 ``imsi`` 를 선언하지 않으면 비어 있음(layer-2 로 fail-closed)."""
+        해석을 가능하게 함. 어떤 역할도 imsi 를 선언하지 않으면 비어 있음(layer-2 로 fail-closed)."""
         return {r.imsi: r.container for r in self.roles if r.imsi}
 
     def initial_reach(self) -> dict[str, bool]:

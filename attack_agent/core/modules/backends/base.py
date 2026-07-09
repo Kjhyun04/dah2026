@@ -1,15 +1,15 @@
 """core.modules.backends.base — 백엔드 실행 계약 + 종료 프리미티브 (DESIGN §4.3).
 
-이 모듈이 P1 실행엔진의 **정본 계약**이다. DESIGN §4.3 의 느슨한 `Backend.run(cmd)`
-표현을 구조화 `ExecRequest -> Result[ExecOutput]` 로 재정의한다(Map gaps: 'cmd' 저명세
-해소). 계약의 심장은 회고(§0·§4.1)에서 무너진 지점 — **확실히 죽고, 자원을 회수한다** —
+이 모듈이 P1 실행엔진의 정본 계약이다. DESIGN §4.3 의 느슨한 Backend.run(cmd)
+표현을 구조화 ExecRequest -> Result[ExecOutput] 로 재정의한다(Map gaps: 'cmd' 저명세
+해소). 계약의 심장은 회고(§0·§4.1)에서 무너진 지점 — 확실히 죽고, 자원을 회수한다 —
 을 세 축으로 보장하는 것이다:
 
   (A) 하드 타임아웃      : asyncio.timeout 워치독.
   (B) 확실한 강제종료    : 프로세스 트리 kill(POSIX=killpg / Windows=taskkill /T).
-                          컨테이너 내부는 `timeout -k`(R1) 2차 보증 — LocalBackend 배선.
+                          컨테이너 내부는 timeout -k(R1) 2차 보증 — LocalBackend 배선.
   (C) 자원회수          : finalize() 로 성공/예외/취소 무관 정리 coro 를 항상 await.
-                          stdout/stderr 는 **PIPE 미사용**(손자 파이프 데드락 회피) ->
+                          stdout/stderr 는 PIPE 미사용(손자 파이프 데드락 회피) ->
                           scoped_tempfile 로 파일 캡처 후 트림 로드.
 
 반환은 tool_wrap 의 Result[T](Ok|Err) 계약을 계승한다(Runner 시그니처와 정합).
@@ -17,7 +17,7 @@
 비밀(secret_params)은 argv/env 가 아니라 ExecRequest.stdin(bytes) 로만 주입한다(R6).
 grep0(06 P2·17 §3): 이 계층은 truth/감독/ground-truth 를 import·산출하지 않는다.
 
-aixcc utils.py 가 `.shield` 에서 import 하지만 참조본에 미복사된 finalize/scoped_pipe
+aixcc utils.py 가 .shield 에서 import 하지만 참조본에 미복사된 finalize/scoped_pipe
 프리미티브를 여기서 재구현한다(Map gaps: 종료계약 핵심 프리미티브).
 작성 2026-07-05.
 """
@@ -64,7 +64,7 @@ _DEFAULT_MAX_OUTPUT_BYTES: int = 256 * 1024  # 파일 캡처 트림 상한
 class ExecRequest:
     """Backend.run 입력(구조화). ExecBinding + 검증 params + 해석된 비밀 -> 실행요청.
 
-    argv    : 실행 커맨드 벡터. argv[0]=이미지 baked script 경로. **비밀 원문 불포함**
+    argv    : 실행 커맨드 벡터. argv[0]=이미지 baked script 경로. 비밀 원문 불포함
               (secret_params 는 stdin 경로). shell 미경유(주입 안전).
     stdin   : secret_params 값(vault->stdin, R6). None 이면 자식 stdin=DEVNULL.
     sidecar : 실행 발판(ue/core/sgi/host). host 는 컨테이너 없이 호스트 직접 실행.
@@ -112,10 +112,10 @@ class ExecOutput:
 
 @contextlib.asynccontextmanager
 async def finalize(coro: Awaitable[object]) -> AsyncIterator[None]:
-    """본문 성공/예외/취소와 무관하게 정리 coro 를 **항상 await**(확정 자원회수).
+    """본문 성공/예외/취소와 무관하게 정리 coro 를 항상 await(확정 자원회수).
 
-    workdb.task_entry 의 `async with finalize(self._reap(proc)): async with
-    asyncio.timeout(t): await proc.wait()` 패턴을 백엔드 종료계약에 이식.
+    workdb.task_entry 의 async with finalize(self._reap(proc)): async with
+    asyncio.timeout(t): await proc.wait() 패턴을 백엔드 종료계약에 이식.
     shield 로 취소가 정리를 중단시키지 못하게 보호한다.
     """
     try:
@@ -181,8 +181,8 @@ def terminate_tree(proc: asyncio.subprocess.Process) -> None:
     """프로세스 트리 확정 kill. POSIX=killpg(SIGKILL) / Windows=taskkill /F /T.
 
     정확 대상 지정: PID/프로세스그룹만 죽인다(넓은 grep kill 금지).
-    주의(DESIGN §4.1): 로컬 `docker exec` 클라이언트를 죽여도 dockerd 소유
-      컨테이너-내부 프로세스는 죽지 않는다 — 그 보증은 컨테이너 내부 `timeout -k`(R1)
+    주의(DESIGN §4.1): 로컬 docker exec 클라이언트를 죽여도 dockerd 소유
+      컨테이너-내부 프로세스는 죽지 않는다 — 그 보증은 컨테이너 내부 timeout -k(R1)
       가 담당(LocalBackend 배선). 이 함수는 로컬 프로세스 트리만 책임진다.
     """
     if proc.returncode is not None:
@@ -233,14 +233,14 @@ async def supervise_subprocess(
     """단일 로컬 프로세스 실행 = 종료계약 정본 구현(A+B+C 단일 계약).
 
     미러 규격(workdb.task_entry):
-      `async with finalize(reap): async with asyncio.timeout(t): await proc.wait()`
+      async with finalize(reap): async with asyncio.timeout(t): await proc.wait()
 
     - 출력은 PIPE 아닌 임시파일(scoped_tempfile)로 캡처 -> 손자 파이프 데드락 회피.
     - 비밀(stdin bytes)은 표준입력으로만 주입(argv/env 노출 0, R6).
     - 타임아웃 시 프로세스 트리 강제종료 + killed/timed_out 표기 + 자원회수.
     - sem 이 주어지면 단일 슬롯 직렬화(공유 한정자원 예: 5762 pool=1).
 
-    ※ dockerd 소유 컨테이너의 확정 종료는 여기서 보장 못 함(그건 컨테이너 내부
+    dockerd 소유 컨테이너의 확정 종료는 여기서 보장 못 함(그건 컨테이너 내부
       timeout -k, LocalBackend 배선). 이 함수는 '로컬 프로세스 트리' 계약만 보장.
     """
     guard = sem if sem is not None else contextlib.nullcontext()
@@ -341,7 +341,7 @@ class Backend(ABC):
     teardown: 표준 정리(자식·소켓·임시파일·기동 사이드카/reap). orphan 0.
     구현     : mock/local/ssh. mock 통과 ≠ 배포안전(게이트1 통합테스트로만 판정).
 
-    async 컨텍스트 매니저 지원 -> `async with LocalBackend(...) as be:` 로 teardown 보장.
+    async 컨텍스트 매니저 지원 -> async with LocalBackend(...) as be: 로 teardown 보장.
     """
 
     @abstractmethod
