@@ -1,4 +1,4 @@
-"""test_operator_select — ① OPERATOR-SELECT path (Item A).
+"""test_operator_select — 1. OPERATOR-SELECT path (Item A).
 
 Locks the operator-select override: the operator explicitly picks a legal candidate
 (env MDG_OPERATOR_PICK -> state['operator_pick']) and rank_recovery promotes THAT action to
@@ -6,7 +6,7 @@ chosen_action, bypassing the autonomous ranking that permanently demotes send_si
 the reversible blockades (backdoor_pause). A blank/non-matching pick leaves the autonomous ranking
 intact (fail-safe). The selected send_signed_mode is COMMAND-BOUND (KEY-FREE command_digest) and,
 on the HIGH/flight escalate route, authorized via OperatorGate.issue with a durable secret-free
-receipt. Fully deterministic (env string only, 불변식①) and offline.
+receipt. Fully deterministic (env string only, 불변식1.) and offline.
 
   S2 legal set (signing CONFIRMED_ON + web_backend & gcs_proxy verified):
       single-signal -> {backdoor_pause, signed_guided}. Autonomous ranking picks backdoor_pause

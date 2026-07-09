@@ -1,14 +1,14 @@
 """core.common.config — InputSpec 입력 규격 + config/goal 로더 (문서 10 정본).
 
 심사원이 "무엇을 입력하면 되는지"를 완전히 명시(doc10). 두 파일 + env + 실행인자:
-  ① config.yaml → InputSpec (환경·타깃·실행제어).  load_config(path) -> InputSpec
-  ② goal.yaml   → Goal      (선언적 목표).           load_goal(path)  -> kb.Goal
-  ③ env vars    → 비밀(값)  . config 엔 env var **이름**만 저장(resolve_secret 로 조회).
+  1. config.yaml -> InputSpec (환경·타깃·실행제어).  load_config(path) -> InputSpec
+  2. goal.yaml   -> Goal      (선언적 목표).           load_goal(path)  -> kb.Goal
+  3. env vars    -> 비밀(값)  . config 엔 env var **이름**만 저장(resolve_secret 로 조회).
 
 원칙(doc10 §3, D3 계승):
   - 하드코딩 0 : 코드에 IP/키/경로/컨테이너명 0개 — 전부 InputSpec 입력.
   - 비밀 = env var **이름** 참조 : llm.api_key_env·supervisor.aria_key_env 는 이름만.
-  - 필수 누락 → 즉시 ValidationError : 완전명시 강제(doc15 §3-A). 기본값 금지 필드 존재.
+  - 필수 누락 -> 즉시 ValidationError : 완전명시 강제(doc15 §3-A). 기본값 금지 필드 존재.
   - 닫힌 어휘 : exec.mode·goal.{defense,success}·llm.mode 는 Literal 로 오타/열린값 거부.
 
 설계 결정(gap 해소):
@@ -41,7 +41,7 @@ from core.modules.kb import Goal
 
 
 def _parse_duration(v: Any) -> int:
-    """종료 타임아웃 정규화 (doc10 '30s' 문자열 ↔ doc15 30 정수). 초 단위 int 반환.
+    """종료 타임아웃 정규화 (doc10 '30s' 문자열 <-> doc15 30 정수). 초 단위 int 반환.
 
     수용: 30 / 30.0 / '30' / '30s' / '2m'. bool 은 거부(오매칭 방지).
     """
@@ -68,7 +68,7 @@ def _parse_duration(v: Any) -> int:
 
 
 def _split_pred(raw: str) -> tuple[str, Optional[str]]:
-    """'name(arg)' → ('name','arg'), 'name' → ('name', None). 공백 정리."""
+    """'name(arg)' -> ('name','arg'), 'name' -> ('name', None). 공백 정리."""
     s = str(raw).strip()
     if s.endswith(")") and "(" in s:
         name, rest = s.split("(", 1)
@@ -192,7 +192,7 @@ class LlmSpec(BaseModel):
     mode: Literal["live", "replay"]
     model: str
     api_key_env: str
-    # (옵션·비파괴) MODEL_MAP 경로. 지정 시 driver 가 configs/models.yaml 로 role→routable
+    # (옵션·비파괴) MODEL_MAP 경로. 지정 시 driver 가 configs/models.yaml 로 role->routable
     #   모델을 해석(A5·07 §4). 미지정=None 이면 model 문자열을 그대로 사용(하위호환).
     models_path: Optional[str] = None
 
@@ -234,7 +234,7 @@ class PremiseSpec(BaseModel):
     """2-G 전제(APT 초기 발판, doc12). footholds 없는 계층은 정직히 봉쇄.
 
     footholds 예: ['container_access(sgi)', 'host_access(uav_proxy)'].
-    weakcred_pivot=true → weakcred('pivot') 사실 추가(T2 측면이동 전제).
+    weakcred_pivot=true -> weakcred('pivot') 사실 추가(T2 측면이동 전제).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -249,7 +249,7 @@ class PremiseSpec(BaseModel):
 
 
 class InputSpec(BaseModel):
-    """config.yaml 정본(doc10 §2). 필수 누락 → ValidationError.
+    """config.yaml 정본(doc10 §2). 필수 누락 -> ValidationError.
 
     필수: testbed{host,user,ssh_key} · exec.vantage{ue,sgi} · tools.image.air ·
           llm{mode,model,api_key_env}. 나머지는 기본값.
@@ -259,7 +259,7 @@ class InputSpec(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     testbed: TestbedSpec
-    exec_: ExecSpec = Field(alias="exec")  # 'exec'(파이썬 빌트인) 회피 → 별칭
+    exec_: ExecSpec = Field(alias="exec")  # 'exec'(파이썬 빌트인) 회피 -> 별칭
     tools: ToolsSpec
     tgt: TgtSpec = Field(default_factory=TgtSpec)
     supervisor: SupervisorSpec = Field(default_factory=SupervisorSpec)
@@ -272,7 +272,7 @@ class InputSpec(BaseModel):
     premise: PremiseSpec = Field(default_factory=PremiseSpec)
 
     def premise_facts(self) -> list[Fact]:
-        """premise → Fact 리스트(WorldState.initial(footholds=...) 주입용)."""
+        """premise -> Fact 리스트(WorldState.initial(footholds=...) 주입용)."""
         return footholds_to_facts(self.premise.footholds, self.premise.weakcred_pivot)
 
 
@@ -282,10 +282,10 @@ class InputSpec(BaseModel):
 
 
 def parse_goal_target(raw: str | dict | None, goal_type: Optional[str]) -> dict[str, Any]:
-    """G27 파싱 규약. 'mode=4'→{'mode':'4'} · 'artifact=sign_key'→{...} · dict 통과.
+    """G27 파싱 규약. 'mode=4'->{'mode':'4'} · 'artifact=sign_key'->{...} · dict 통과.
 
     '='로 key=value 분할. '=' 없는 bare 문자열은 goal_type 로 키 추론
-      (exfil→artifact, mode_set/signing_bypass→mode). int 강제는 하류 kb._as_int 위임.
+      (exfil->artifact, mode_set/signing_bypass->mode). int 강제는 하류 kb._as_int 위임.
     """
     if raw is None:
         return {}
@@ -377,21 +377,21 @@ class GoalSpec(BaseModel):
         return [str(s).strip().upper() for s in v if str(s).strip()]
 
     def to_goal(self) -> Goal:
-        """하위호환 브리지 → kb.Goal. scope 빈 리스트는 None(=전체)로 축약."""
+        """하위호환 브리지 -> kb.Goal. scope 빈 리스트는 None(=전체)로 축약."""
         return Goal(type=self.type, target=self.target, success=self.success, scope=self.scope or None)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 4. premise → Fact 매핑 (footholds → WorldState.initial)
+# 4. premise -> Fact 매핑 (footholds -> WorldState.initial)
 # ═══════════════════════════════════════════════════════════════════════════
 
 
 def _foothold_to_fact(item: str) -> Optional[Fact]:
-    """단일 foothold 문자열 → Fact. 닫힌 어휘 {host_access, container_access, weakcred}.
+    """단일 foothold 문자열 -> Fact. 닫힌 어휘 {host_access, container_access, weakcred}.
 
-    인자 없는 host_access/container_access 는 대상 컨테이너 미상 → 보수적 skip(None)
+    인자 없는 host_access/container_access 는 대상 컨테이너 미상 -> 보수적 skip(None)
       (하드코딩 0: 임의 기본 컨테이너명 금지). weakcred 는 라이브러리 기본 'pivot' 사용.
-    어휘 밖 이름 → skip(None) — 정직성(fact 미주입=해당 계층 봉쇄).
+    어휘 밖 이름 -> skip(None) — 정직성(fact 미주입=해당 계층 봉쇄).
     """
     name, arg = _split_pred(item)
     if name == "host_access":
@@ -406,7 +406,7 @@ def _foothold_to_fact(item: str) -> Optional[Fact]:
 def footholds_to_facts(
     footholds: list[str], weakcred_pivot: bool = False
 ) -> list[Fact]:
-    """premise → Fact 리스트. types.py 헬퍼 재사용. 중복 제거, 순서 보존.
+    """premise -> Fact 리스트. types.py 헬퍼 재사용. 중복 제거, 순서 보존.
 
     weakcred_pivot=True 면 weakcred('pivot') 추가. 파싱 불가 항목은 조용히 skip(정직).
     """
@@ -426,14 +426,14 @@ def footholds_to_facts(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 5. 비밀 해석 — env var 이름 → 값 (config 엔 값 미기재)
+# 5. 비밀 해석 — env var 이름 -> 값 (config 엔 값 미기재)
 # ═══════════════════════════════════════════════════════════════════════════
 
 
 def resolve_secret(env_name: str, env: Optional[Mapping[str, str]] = None) -> str:
     """env var **이름** 참조 규칙(doc10 §3·4). 부트스트랩 시점에 값 조회.
 
-    env 미지정 시 os.environ 사용. 이름 비었거나 미설정/빈값 → 명시적 에러.
+    env 미지정 시 os.environ 사용. 이름 비었거나 미설정/빈값 -> 명시적 에러.
     """
     e: Mapping[str, str] = os.environ if env is None else env
     if not env_name:
@@ -447,7 +447,7 @@ def resolve_secret(env_name: str, env: Optional[Mapping[str, str]] = None) -> st
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 6. 로더 (YAML → 검증된 모델). PyYAML safe_load.
+# 6. 로더 (YAML -> 검증된 모델). PyYAML safe_load.
 # ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -460,8 +460,8 @@ def _load_yaml(path: str | Path) -> Any:
         raise FileNotFoundError(f"config file not found: {p}")
     text = p.read_text(encoding="utf-8")
 
-    # ${VAR} / ${VAR:-default} → os.environ 치환. 배포 의존값(테스트베드 IP·SSH키 등)을
-    #   .env 로 외부화(하드코딩 0). 미설정+기본없음 → 원문 유지(명시 실패 유도).
+    # ${VAR} / ${VAR:-default} -> os.environ 치환. 배포 의존값(테스트베드 IP·SSH키 등)을
+    # .env 로 외부화(하드코딩 0). 미설정+기본없음 -> 원문 유지(명시 실패 유도).
     def _sub(m):  # type: ignore[no-untyped-def]
         val = os.environ.get(m.group(1))
         if val:
@@ -473,7 +473,7 @@ def _load_yaml(path: str | Path) -> Any:
 
 
 def load_config(path: str | Path) -> InputSpec:
-    """config.yaml → InputSpec. 필수 누락/오타 → ValidationError(완전명시 강제)."""
+    """config.yaml -> InputSpec. 필수 누락/오타 -> ValidationError(완전명시 강제)."""
     raw = _load_yaml(path)
     if not isinstance(raw, dict):
         raise ValueError(f"config root must be a mapping: {path}")
@@ -481,7 +481,7 @@ def load_config(path: str | Path) -> InputSpec:
 
 
 def load_goal(path: str | Path) -> Goal:
-    """goal.yaml → kb.Goal. 최상위 'goal:' 래퍼 수용(없으면 플랫 매핑으로 간주)."""
+    """goal.yaml -> kb.Goal. 최상위 'goal:' 래퍼 수용(없으면 플랫 매핑으로 간주)."""
     raw = _load_yaml(path)
     if not isinstance(raw, dict):
         raise ValueError(f"goal root must be a mapping: {path}")
@@ -492,7 +492,7 @@ def load_goal(path: str | Path) -> Goal:
 
 
 def load_goal_spec(path: str | Path) -> "GoalSpec":
-    """goal.yaml → GoalSpec 전체(defense/success 보존). defense→signing 시드 배선용."""
+    """goal.yaml -> GoalSpec 전체(defense/success 보존). defense->signing 시드 배선용."""
     raw = _load_yaml(path)
     node = raw.get("goal", raw) if isinstance(raw, dict) else raw
     if not isinstance(node, dict):

@@ -1,21 +1,21 @@
 """core.common.llm — 동기 litellm 래퍼 (아카이브 crs/common/llm_api.py sync-mirror).
 
 역할(P3, 과제 §12):
-  ① completion(...) — litellm 단일 호출점. **replay(고정 응답 주입, 오프라인/테스트용)** +
+  1. completion(...) — litellm 단일 호출점. **replay(고정 응답 주입, 오프라인/테스트용)** +
      **live(실 litellm 호출)** 2모드. 반환 Result[ModelResponse](Ok/Err).
-  ② ModelResponse / Choice / AgentResult[T] — 아카이브 core.py 봉투 중 P0 types.py 에
+  2. ModelResponse / Choice / AgentResult[T] — 아카이브 core.py 봉투 중 P0 types.py 에
      아직 없는 3종만 신규 정의(Message/LLMToolCall/AgentAction 은 types.py 재사용).
-  ③ 오프라인 재현용 mock 빌더(mock_tool_response) + ReplayLLM 스크립트 헬퍼.
+  3. 오프라인 재현용 mock 빌더(mock_tool_response) + ReplayLLM 스크립트 헬퍼.
 
-divergence(20 §1 C1 sync 단일스레드): acompletion→litellm.completion,
-  asyncio.sleep→time.sleep, PrioritySemaphore/OTEL/telemetry 전량 드롭.
+divergence(20 §1 C1 sync 단일스레드): acompletion->litellm.completion,
+  asyncio.sleep->time.sleep, PrioritySemaphore/OTEL/telemetry 전량 드롭.
   MAX_RETRIES/슬립 상한을 축소(캠페인 hang 회귀 방지).
 
 가드(과제 §12-1):
   - **빈 프롬프트/렌더 실패 호출 금지**: messages 가 비었거나 판단근거(content/tool_calls)가
     전무하면 실호출 없이 Err 반환(빈 프롬프트로 API 태우지 않음).
   - **비밀 로깅 금지**: 이 모듈은 secret_params 원값을 로그·에러에 절대 싣지 않는다.
-    (비밀 주입은 executor.run 의 vault→stdin 경로 책임 — 여기서는 프롬프트/응답만 다룸.)
+    (비밀 주입은 executor.run 의 vault->stdin 경로 책임 — 여기서는 프롬프트/응답만 다룸.)
 
 thinking OFF · temperature=0.7 고정(18 A6/A7). 작성 2026-07-05.
 """
@@ -43,9 +43,9 @@ except Exception:
 # ═══════════════════════════════════════════════════════════════════════════
 
 DEFAULT_TEMP = 0.7          # 18 A6
-MAX_RETRIES = 3             # 아카이브 8 → 축소(단일 캠페인 블록 최소화)
-RETRY_DELAY_S = 2           # 아카이브 EXCEPTION_DELAY 20 → 축소
-RATE_LIMIT_DELAY_S = 5      # 아카이브 15 → 축소
+MAX_RETRIES = 3             # 아카이브 8 -> 축소(단일 캠페인 블록 최소화)
+RETRY_DELAY_S = 2           # 아카이브 EXCEPTION_DELAY 20 -> 축소
+RATE_LIMIT_DELAY_S = 5      # 아카이브 15 -> 축소
 MAX_SLEEP_S = 30            # 슬립 하드캡(hang 방지)
 
 # temp 0.7 유지하는 Anthropic 계열 thinking 비활성 마커(18 A7).
@@ -133,7 +133,7 @@ class ReplayLLM:
     """녹화 스크립트 재생기(오프라인 결정론). (tool_name, arguments) 시퀀스를 순서대로 방출.
 
     orchestrator 는 매 스텝 `replay(step)` 을 호출해 mock_response dict 를 받는다.
-    스크립트 소진 시 None → orchestrator 결정론 폴백 경로로.
+    스크립트 소진 시 None -> orchestrator 결정론 폴백 경로로.
     """
 
     def __init__(self, script: list[tuple[str, str]]) -> None:
@@ -163,7 +163,7 @@ def _prompt_is_empty(messages: list[dict[str, Any]]) -> bool:
 
 
 def _build_response(raw: dict[str, Any]) -> ModelResponse:
-    """dict → ModelResponse. cost 키 보정(litellm model_dump 는 cost 미포함일 수 있음)."""
+    """dict -> ModelResponse. cost 키 보정(litellm model_dump 는 cost 미포함일 수 있음)."""
     if "cost" not in raw:
         raw = {**raw, "cost": 0.0}
     return ModelResponse(**raw)
@@ -244,7 +244,7 @@ def completion(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 4. wire 응답 파서 헬퍼 — ModelResponse → 첫 tool_call(LLMToolCall)
+# 4. wire 응답 파서 헬퍼 — ModelResponse -> 첫 tool_call(LLMToolCall)
 # ═══════════════════════════════════════════════════════════════════════════
 
 

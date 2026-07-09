@@ -1,27 +1,27 @@
 """core.modules.resolve — 타깃 해석·IP 추출·역할 확정 (문서 13 §5 · 14).
 
 P2 정찰의 '타깃해석' 절반. recon(reach/unauth/signing/seid)이 **무엇에 닿나**를
-채운다면, 이 모듈은 **어디에 닿나**(role→컨테이너→IP:port)를 런타임에 해석한다.
+채운다면, 이 모듈은 **어디에 닿나**(role->컨테이너->IP:port)를 런타임에 해석한다.
 
 2단계 원칙(14 §0):
-  ① 해석(init)     : owner-side. role→컨테이너→IP·port (docker inspect / docker exec).
-  ② 확정 측정(runtime): attacker-observable. 5762 HEARTBEAT 로 역할 서명 확인
-                        (sysid==1 ∧ type==QUADROTOR) → prov=verified. 실패 시 미바인딩.
+  1. 해석(init)     : owner-side. role->컨테이너->IP·port (docker inspect / docker exec).
+  2. 확정 측정(runtime): attacker-observable. 5762 HEARTBEAT 로 역할 서명 확인
+                        (sysid==1 ∧ type==QUADROTOR) -> prov=verified. 실패 시 미바인딩.
 
 동적 IP 대응(13 §0·§5):
   - config 는 **컨테이너 이름**(하드코딩 0) + 논리 포트. IP 는 런타임 해석.
   - bridge net IP = `docker inspect <name>` (.NetworkSettings.Networks).
-  - UE풀 tun IP(10.45.x)는 srsue 가 만들어 inspect 에 안 보임 → `docker exec <name>
+  - UE풀 tun IP(10.45.x)는 srsue 가 만들어 inspect 에 안 보임 -> `docker exec <name>
     ip -br addr show tun_srsue` 로 추출.
-  - route_net(vantage, role): 벤티지가 라우팅되는 net 선택(14 §3 표) → 어느 소스 IP 를 쓸지.
+  - route_net(vantage, role): 벤티지가 라우팅되는 net 선택(14 §3 표) -> 어느 소스 IP 를 쓸지.
 
-★ 실행은 **backend.run 경유만** — 직접 docker/ssh subprocess 호출 코드 없음(종료계약·R6
+실행은 **backend.run 경유만** — 직접 docker/ssh subprocess 호출 코드 없음(종료계약·R6
   일관). ExecRequest(sidecar='host', on_host=True) 로 호스트 CLI(docker inspect/exec)를,
   sidecar='ue' 로 tools_ue 의 식별 프로브를 태운다.
-★ 이 워크플로우는 **완전 오프라인** — 아래 async 메서드는 테스트베드에 실행되지 않는다.
+이 워크플로우는 **완전 오프라인** — 아래 async 메서드는 테스트베드에 실행되지 않는다.
   코드+결정론 파서만 제공하며, 실제 inspect/probe 는 런북(배포 게이트1)으로 위임한다.
-★ 하드코딩 0: 컨테이너 이름·net 이름·포트·iface 는 전부 주입(InputSpec.tgt/exec.vantage).
-★ grep0: 감독/ground-truth 미참조 — 공격자-관측(inspect 권한 + 5762 백도어)만.
+하드코딩 0: 컨테이너 이름·net 이름·포트·iface 는 전부 주입(InputSpec.tgt/exec.vantage).
+grep0: 감독/ground-truth 미참조 — 공격자-관측(inspect 권한 + 5762 백도어)만.
 작성 2026-07-06.
 """
 
@@ -62,7 +62,7 @@ type Vantage = Literal["ue", "core", "sgi", "host"]
 
 
 class Net(str, Enum):
-    """도달 net 부류 (13 §0 실측). route_net 이 벤티지→net 을 고른다.
+    """도달 net 부류 (13 §0 실측). route_net 이 벤티지->net 을 고른다.
 
     값 = docker network **논리 이름의 기본값**(inspect Networks 키와 매칭). 인스턴스별
     실제 net 이름이 다르면 TargetResolver(net_names=...) 로 재매핑(하드코딩 0).
@@ -71,14 +71,14 @@ class Net(str, Enum):
     CELLULAR = "net_cellular"  # UE eth0 직결(mongo·sgwu)
     CORE = "net_core"          # 코어망(pivot 후 pfcp)
     SGI = "net_sgi"            # SGi C2 앱계층(oracle·web)
-    UE_POOL = "ue_pool"        # tun_srsue 10.45.x (inspect 미노출 → exec 추출)
+    UE_POOL = "ue_pool"        # tun_srsue 10.45.x (inspect 미노출 -> exec 추출)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 1. route_net — 벤티지가 라우팅되는 net 선택 (14 §3 표. 결정론.)
 # ═══════════════════════════════════════════════════════════════════════════
 
-# (vantage) → (role → Net). 실측 근거(13 §0·14 §3). role 키 = TgtSpec 어휘(config).
+# (vantage) -> (role -> Net). 실측 근거(13 §0·14 §3). role 키 = TgtSpec 어휘(config).
 #   UE 벤티지: uav5762=UE풀(UE-to-UE), mongo/s1u/pivot=net_cellular(eth0 직결),
 #              oracle/web/cipher=net_sgi(gcs_proxy 앱계층 라우팅).
 #   SGi 벤티지: C2 앱 전부 net_sgi 로컬.
@@ -107,10 +107,10 @@ _ROUTE: dict[str, dict[str, Net]] = {
 
 
 def route_net(vantage: str, role: str) -> Net:
-    """(벤티지, role) → 도달에 쓸 Net (14 §3 실측 규칙). 미정의 조합은 CRSError.
+    """(벤티지, role) -> 도달에 쓸 Net (14 §3 실측 규칙). 미정의 조합은 CRSError.
 
-    ★ 정직성: 라우팅 근거 없는 (벤티지,role) 은 임의 추정하지 않고 실패시킨다
-      (하드코딩 fallback 금지). host 벤티지는 net 개념 없음 → 호출 부적절(CRSError).
+    정직성: 라우팅 근거 없는 (벤티지,role) 은 임의 추정하지 않고 실패시킨다
+      (하드코딩 fallback 금지). host 벤티지는 net 개념 없음 -> 호출 부적절(CRSError).
     """
     table = _ROUTE.get(vantage)
     if table is None:
@@ -128,12 +128,12 @@ def route_net(vantage: str, role: str) -> Net:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 1-B. args_template IP placeholder → role (닫힌 주입면. safeexec 러너가 소비)
+# 1-B. args_template IP placeholder -> role (닫힌 주입면. safeexec 러너가 소비)
 # ═══════════════════════════════════════════════════════════════════════════
 
-# 닫힌 placeholder→role 맵(임의 주입면 차단; role 은 _ROUTE/TgtSpec 어휘와 정합).
+# 닫힌 placeholder->role 맵(임의 주입면 차단; role 은 _ROUTE/TgtSpec 어휘와 정합).
 #   registry.py INJECT tool 의 args_template 이 쓰는 IP placeholder 만 여기 등록한다.
-#   미등록 field(예: mode)는 IP 로 취급 안 함 → resolver 미개입(planner ParamSpec 영역).
+# 미등록 field(예: mode)는 IP 로 취급 안 함 -> resolver 미개입(planner ParamSpec 영역).
 IP_PLACEHOLDER_ROLES: dict[str, str] = {"oracle_ip": "oracle", "cipher_ip": "cipher"}
 # (web8080 역경로 대비 "web_ip":"web" 는 후속 확장 슬롯; 지금은 미등록=미노출.)
 
@@ -158,16 +158,16 @@ def target_ip_fields(args_template: str) -> tuple[str, ...]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 2. 결정론 파서 — inspect Networks · ip -br addr · HEARTBEAT (raw→fact)
+# 2. 결정론 파서 — inspect Networks · ip -br addr · HEARTBEAT (raw->fact)
 #    (오프라인: 아래 파서만으로 로컬 검증 가능. 실행 없이 순수 함수.)
 # ═══════════════════════════════════════════════════════════════════════════
 
 
 def parse_inspect_networks(stdout: str) -> dict[str, str]:
-    """`docker inspect -f '{{json .NetworkSettings.Networks}}'` → {net_name: ip}.
+    """`docker inspect -f '{{json .NetworkSettings.Networks}}'` -> {net_name: ip}.
 
     입력 JSON: {"net_cellular": {"IPAddress": "10.44.0.31", ...}, ...}.
-    빈 IPAddress(연결됐지만 미할당)는 제외(보수: 확실한 것만). 파싱 실패 → {}.
+    빈 IPAddress(연결됐지만 미할당)는 제외(보수: 확실한 것만). 파싱 실패 -> {}.
     """
     s = (stdout or "").strip()
     if not s:
@@ -189,9 +189,9 @@ def parse_inspect_networks(stdout: str) -> dict[str, str]:
 
 
 def parse_br_addr(stdout: str, iface: str = _DEFAULT_TUN_IFACE) -> Optional[str]:
-    """`ip -br addr show <iface>` → 첫 IPv4 주소(프리픽스 제거). 없으면 None.
+    """`ip -br addr show <iface>` -> 첫 IPv4 주소(프리픽스 제거). 없으면 None.
 
-    출력 예: `tun_srsue  UNKNOWN  10.45.0.3/16` → '10.45.0.3'. iface 토큰 유무 무관하게
+    출력 예: `tun_srsue  UNKNOWN  10.45.0.3/16` -> '10.45.0.3'. iface 토큰 유무 무관하게
     라인에서 dotted-quad/CIDR 토큰을 결정론 추출(브리핑 포맷 `-br`).
     """
     if not stdout:
@@ -222,10 +222,10 @@ class HeartbeatObs:
 
 
 def parse_heartbeat(stdout: str) -> HeartbeatObs:
-    """식별 프로브의 HEARTBEAT JSON → HeartbeatObs. 키 별칭 허용(스크립트 규약 흡수).
+    """식별 프로브의 HEARTBEAT JSON -> HeartbeatObs. 키 별칭 허용(스크립트 규약 흡수).
 
     수용 키: sysid|srcSystem|src_system, type|mav_type|mavtype. 값은 int 강제(실패=None).
-    파싱 실패/빈 입력 → 빈 관측(is_uav=False, 보수: 확정 못 하면 미바인딩).
+    파싱 실패/빈 입력 -> 빈 관측(is_uav=False, 보수: 확정 못 하면 미바인딩).
     """
     s = (stdout or "").strip()
     if not s:
@@ -277,7 +277,7 @@ type Provenance = Literal["config", "signature-discovered", "runtime-verified"]
 
 @dataclass(frozen=True, slots=True)
 class ResolvedTarget:
-    """role → (ip, port, net) 해석 1건 + 출처(14 §5). verified 만 완전 신뢰."""
+    """role -> (ip, port, net) 해석 1건 + 출처(14 §5). verified 만 완전 신뢰."""
 
     role: str
     ip: str
@@ -288,22 +288,22 @@ class ResolvedTarget:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 4. TargetResolver — role→IP 해석 + 확정 측정 (전부 backend.run 경유)
+# 4. TargetResolver — role->IP 해석 + 확정 측정 (전부 backend.run 경유)
 # ═══════════════════════════════════════════════════════════════════════════
 
 
 class TargetResolver:
     """컨테이너 이름 기반 타깃맵을 런타임에 해석(동적 UE풀 IP 흡수).
 
-    tgt          : role → 컨테이너 **이름**(config.InputSpec.tgt. IP 아님·하드코딩 0).
-    ports        : role → 논리 포트(config). 미지정 role 은 uav_port 등 기본 사용.
-    net_names    : Net → 실제 docker network 이름 재매핑(기본=Net.value). 인스턴스 흡수.
+    tgt          : role -> 컨테이너 **이름**(config.InputSpec.tgt. IP 아님·하드코딩 0).
+    ports        : role -> 논리 포트(config). 미지정 role 은 uav_port 등 기본 사용.
+    net_names    : Net -> 실제 docker network 이름 재매핑(기본=Net.value). 인스턴스 흡수.
     backend      : 실행 경유(host inspect/exec · ue 식별 프로브). 직접 docker 호출 금지.
     tun_iface    : UE풀 tun iface 명(기본 tun_srsue, 주입 가능).
     docker_bin   : docker CLI(기본 'docker', 주입 가능).
-    identify_script: tools_ue 식별 프로브 경로(VENDOR SLOT·baked). 5762 HEARTBEAT→JSON.
+    identify_script: tools_ue 식별 프로브 경로(VENDOR SLOT·baked). 5762 HEARTBEAT->JSON.
 
-    ★ 오프라인: async 메서드는 테스트베드 무실행. 커맨드 조립 + 파서만 제공.
+    오프라인: async 메서드는 테스트베드 무실행. 커맨드 조립 + 파서만 제공.
     """
 
     def __init__(
@@ -319,7 +319,7 @@ class TargetResolver:
         identify_script: str = "dah_exec/R4_UE_ENTRY/identify_uav.py",
     ) -> None:
         self._backend = backend
-        # role→name (빈/None 값 제거 — 미제공 role 은 해석 대상 아님).
+        # role->name (빈/None 값 제거 — 미제공 role 은 해석 대상 아님).
         self._tgt: dict[str, str] = {r: n for r, n in dict(tgt).items() if n}
         self._ports: dict[str, int] = dict(ports or {})
         self._net_names: dict[Net, str] = dict(net_names or {})
@@ -346,7 +346,7 @@ class TargetResolver:
         raise CRSError(f"resolve: no port for role {role!r} (config.port 필요)")
 
     def net_name(self, net: Net) -> str:
-        """Net → 실제 docker network 이름(재매핑 없으면 enum 기본값)."""
+        """Net -> 실제 docker network 이름(재매핑 없으면 enum 기본값)."""
         return self._net_names.get(net, net.value)
 
     # ── 커맨드 조립(전부 ExecRequest — backend.run 경유) ──────────────────
@@ -394,12 +394,12 @@ class TargetResolver:
         except Exception as e:  # noqa: BLE001
             return Err(CRSError(f"resolve run failed: {type(e).__name__}", extra={"tool": req.tool_id}))
 
-    # ── ① 해석(bridge/tun IP) ────────────────────────────────────────────
+    # ── 1. 해석(bridge/tun IP) ────────────────────────────────────────────
     async def resolve_ip(self, role: str, vantage: str) -> Result[str]:
-        """role@vantage → IP 문자열만 해석(port 불요). backend.run 경유(직접 docker 0).
+        """role@vantage -> IP 문자열만 해석(port 불요). backend.run 경유(직접 docker 0).
 
-        net==UE풀 → tun(docker exec ip addr) IP, 그 외 → inspect bridge[net] IP.
-        미바인딩(IP 미추출/실행실패) → Err(봉쇄, 14 §5 정직). safeexec IP 주입의 단일 소스.
+        net==UE풀 -> tun(docker exec ip addr) IP, 그 외 -> inspect bridge[net] IP.
+        미바인딩(IP 미추출/실행실패) -> Err(봉쇄, 14 §5 정직). safeexec IP 주입의 단일 소스.
         """
         try:
             name = self.container_of(role)
@@ -431,7 +431,7 @@ class TargetResolver:
         return Ok(ip)
 
     async def resolve(self, role: str, vantage: str) -> Result[ResolvedTarget]:
-        """role@vantage → ResolvedTarget (14 §3 알고리즘). backend.run 경유.
+        """role@vantage -> ResolvedTarget (14 §3 알고리즘). backend.run 경유.
 
         외부계약(ResolvedTarget 필드/시그니처/prov) 불변. 내부는 resolve_ip 위임으로 리팩터.
         포트는 config(port_of). prov=config(측정 전). UAV 는 verify_uav 로 승격.
@@ -450,11 +450,11 @@ class TargetResolver:
                 )
         return Err(CRSError("resolve: resolve_ip contract violation"))  # pragma: no cover
 
-    # ── ② 확정 측정(UAV 서명) ────────────────────────────────────────────
+    # ── 2. 확정 측정(UAV 서명) ────────────────────────────────────────────
     async def verify_uav(self, target: ResolvedTarget) -> Result[ResolvedTarget]:
         """5762 HEARTBEAT 로 진짜 UAV 확정(14 §2). 통과 시 prov=runtime-verified.
 
-        측정 실패/불일치 → Err(미바인딩 → 해당 계층 봉쇄, 14 §5 정직). backend.run 경유.
+        측정 실패/불일치 -> Err(미바인딩 -> 해당 계층 봉쇄, 14 §5 정직). backend.run 경유.
         """
         match await self._run(self._identify_req(target.ip, target.port)):
             case Err() as e:

@@ -1,6 +1,6 @@
-"""verify_leak0 — GATE1 누수-0 하네스 (기동 → N회 → 종료, 잔존 0).
+"""verify_leak0 — GATE1 누수-0 하네스 (기동 후 N회 실행하고 종료, 잔존 0).
 
-불변식② (누수-0 실행) 을 두 축에서 강제한다:
+불변식2. (누수-0 실행) 을 두 축에서 강제한다:
 
   A. PROCESS 잔존 0 — N회 관리형 exec 사이클 + teardown 후, 이 컨테이너 안에
      라벨(DAH_DEF_LABEL=dah_def) 붙은 프로세스가 0개로 남아야 한다
@@ -96,7 +96,7 @@ def _check_process_residue(rep: Report) -> None:
 
     # A2 (구조·항상 실행): Backend.teardown 은 allow_live 가 아니라 mode 로만 게이트된다.
     #   감사 P1 회귀 가드 — read_only 관측은 allow_live=False(기본 operator-go 유보) 에서도
-    #   실제로 spawn 하므로(run() 의 read_only fast-path → _spawn), 그 모드에서 크래시-고아
+    #   실제로 spawn 하므로(run() 의 read_only fast-path 가 _spawn 을 탄다), 그 모드에서 크래시-고아
     #   회수 primitive 가 켜져 있어야 한다. 예전 'not allow_live -> []' 가드는 바로 이 기본
     #   관측 경로의 회수를 꺼버렸다. reap_labelled 를 스파이로 감싸 호출 여부만 확인한다
     #   (자기 dah_def 라벨 서브트리만 os.kill(pid, SIGKILL) — 단일-pid, 보호자산 무변경).
@@ -110,7 +110,7 @@ def _check_process_residue(rep: Report) -> None:
 
     safeexec.reap_labelled = _spy_reap  # type: ignore[assignment]
     try:
-        # mock 은 spawn 0 → teardown 은 reap 를 호출하지 않고 [] 반환(게이트 유지).
+        # mock 은 spawn 0 이므로 teardown 은 reap 를 호출하지 않고 [] 반환(게이트 유지).
         rep.check(Backend(mode="mock", allow_live=False).teardown() == [],
                   "A2 mock teardown 이 [] 미반환")
         rep.check(_reap_calls == [], "A2 mock teardown 이 reap_labelled 를 호출(게이트 실패)")
@@ -133,7 +133,7 @@ def _check_process_residue(rep: Report) -> None:
               f"라이브 검증은 POSIX 컨테이너에서 MDG_OPERATOR_GO=1 로 실집행.")
         return
 
-    # A1 (operator-go): 라이브 spawn N회 → teardown → 라벨 프로세스 0 잔존.
+    # A1 (operator-go): 라이브 spawn N회 후 teardown 하면 라벨 프로세스 0 잔존.
     from mdg.safe_exec.backend import Backend, ExecRequest
     be = Backend(mode="local", allow_live=True)
     n_cycles = int(os.environ.get("MDG_LEAK0_N", "5"))
@@ -149,7 +149,7 @@ def _check_process_residue(rep: Report) -> None:
 
     # A1b (operator-go): allow_live=False + read_only 관측 spawn 잔존경로 (감사 P1 fix).
     #   기본 operator-go 유보 백엔드(allow_live=False)여도 read_only 관측 argv 는 DRY 가
-    #   아니라 실제 _spawn 한다. 그 경로에서 spawn→종료→teardown 후 라벨 잔존 0 을 강제한다.
+    #   아니라 실제 _spawn 한다. 그 경로에서 spawn 후 종료하고 teardown 한 뒤 라벨 잔존 0 을 강제한다.
     import shutil
     if shutil.which("ss"):
         from mdg.safe_exec.backend import Backend, ExecRequest  # noqa: F811

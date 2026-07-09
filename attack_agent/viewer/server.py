@@ -2,14 +2,14 @@
 
 grep0: core.* / supervisor.* 를 import 하지 않는다. 상류 산출 파일을 read + HTTP-serve 만 한다.
 - action_log 를 절대 write-open 하지 않는다(공격 agent 입력 오염 0).
-- @app.post/put/delete/patch 부재 → 공격 agent 주입면 신설 없음(read-only 소비자).
+- @app.post/put/delete/patch 부재 -> 공격 agent 주입면 신설 없음(read-only 소비자).
 - SSE 는 sse-starlette 무추가, 수동 event/data 프레이밍. 0.5s 파일 폴링 멀티플렉스.
 
 라우트(전부 GET):
-  GET /              → static/index.html
-  GET /static/*      → StaticFiles (정적, 외부요청 0)
-  GET /api/snapshot  → ingest.build_snapshot (초기 페인트)
-  GET /sse           → text/event-stream (action/comms/supervisor 증분 멀티플렉스)
+  GET /              -> static/index.html
+  GET /static/*      -> StaticFiles (정적, 외부요청 0)
+  GET /api/snapshot  -> ingest.build_snapshot (초기 페인트)
+  GET /sse           -> text/event-stream (action/comms/supervisor 증분 멀티플렉스)
 
 실행: uvicorn viewer.server:app  또는  python -m viewer.server --config config.yaml
 작성 2026-07-06.
@@ -50,8 +50,8 @@ def _sse_pack(event: str, data: dict) -> str:
 async def _sse_stream(request: Request, paths: dict) -> AsyncIterator[str]:
     """0.5s 폴링 멀티플렉스: action/comms 증분 tail + evaluation mtime 재read.
 
-    finally 에서 참조 정리(파일핸들은 tail_lines/read 가 with 로 즉시 닫음 → orphan 0).
-    await request.is_disconnected() 로 확실 종료 → 소켓은 uvicorn 소유(단일 프로세스).
+    finally 에서 참조 정리(파일핸들은 tail_lines/read 가 with 로 즉시 닫음 -> orphan 0).
+    await request.is_disconnected() 로 확실 종료 -> 소켓은 uvicorn 소유(단일 프로세스).
     """
     action_p = paths["action"]
     eval_p = paths["evaluation"]
@@ -112,7 +112,7 @@ async def _sse_stream(request: Request, paths: dict) -> AsyncIterator[str]:
                     "injections": ingest.inject_rows_from_action(action_steps),
                 })
 
-            # 3) 감독 evaluation mtime 변화 → 전량 재read
+            # 3) 감독 evaluation mtime 변화 -> 전량 재read
             m = ingest.file_mtime(eval_p)
             if m is not None and m != eval_mtime:
                 eval_mtime = m
@@ -130,7 +130,7 @@ async def _sse_stream(request: Request, paths: dict) -> AsyncIterator[str]:
     except asyncio.CancelledError:  # 클라이언트 절단/서버 종료
         pass
     finally:
-        # tail_lines/read 는 with 컨텍스트로 핸들 즉시 반환 → 잔여 핸들 없음.
+        # tail_lines/read 는 with 컨텍스트로 핸들 즉시 반환 -> 잔여 핸들 없음.
         action_steps.clear()
 
 
@@ -199,7 +199,7 @@ def create_app(
 
 
 def resolve_paths(args: argparse.Namespace) -> dict:
-    """--config(out.log/viewer.port) 또는 명시 인자 → {action,evaluation,comms,static,port}.
+    """--config(out.log/viewer.port) 또는 명시 인자 -> {action,evaluation,comms,static,port}.
 
     config 는 pyyaml 로 직독(core.common.config 미import — grep0/완전분리).
     evaluation/comms 기본값은 action_log 형제 파일(evaluation.json/supervisor.jsonl).

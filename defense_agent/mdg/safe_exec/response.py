@@ -2,13 +2,13 @@
 the safe-exec backends.
 
 Given the chosen Intent it applies, in order:
-  1. bundle discipline (core.bundle): idempotent applied()-skip → N-tick debounce. Either -> SKIP.
+  1. bundle discipline (core.bundle): idempotent applied()-skip, then N-tick debounce. Either path ends in SKIP.
   2. the 2-tier gate (core.gate): AUTO tool -> plan a live actuation; OPER tool (flight / docker
      pause / net-disconnect) -> operator_required (no actuation; act records an operator-gate
      Intent bound by signer_shim, side-effect 0).
   3. for the AUTO tool (``nsenter_input_drop``) build the netns-DROP ExecRequest via act_host.
 
-The SOLE subprocess path stays ``Backend.run`` (불변식②) — this controller only assembles argv
+The SOLE subprocess path stays ``Backend.run`` (불변식2.) — this controller only assembles argv
 and hands it over. Live actuation is operator-go RESERVED (Backend.allow_live=False -> DRY-RUN),
 so ``dispatch`` changes nothing on the testbed until an operator flips the flag. The controller
 holds NO docker sdk import and NO sock literal (act_host duck-types the docker backend).
@@ -56,7 +56,7 @@ class ResponseController:
         self.min_ticks = min_ticks
         # Phase 1 (sandbox demo): when True the 2-tier gate widens a registered OPER tool to auto
         # (docker_pause / flight recovery) so the OPER recovery path executes instead of deferring.
-        # DETERMINISTIC (env bool), transparency preserved via GateDecision.registry_tier (불변식①).
+        # DETERMINISTIC (env bool), transparency preserved via GateDecision.registry_tier (불변식1.).
         self.operator_auto = bool(operator_auto)
         # LIVE SMF session table (SmfSessionTable, ``imsi_for_ip(ip)->imsi|None``) — OPTIONAL. When
         # wired (out-of-graph collector owns it), an ip-kind source selector is cross-checked against
@@ -248,7 +248,7 @@ class ResponseController:
         # was selected+recorded but NEVER actuated, so ``inspect_paused`` could never reach True and
         # the S1 회복-완료 signal was unreachable. The enforce_at container KEY is verified (fail-
         # closed) before dispatch; the pause is reversible (docker unpause) and, like every actuation
-        # here, stays DRY until an operator flips allow_live on the docker backend (누수-0 정합, ②).
+        # here, stays DRY until an operator flips allow_live on the docker backend (누수-0 정합, 2.).
         if tool_id == "docker_pause" and oper_auto:
             container = (getattr(intent, "enforce_at", "") or "").strip()
             if container and ResponseController._binding_verified(container, world):
@@ -279,7 +279,7 @@ class ResponseController:
                                 reason=gd.reason + " -> inert DRY (signed-mode enforce_at unverified)")
         # 3b) any OTHER OPER tool widened to auto (docker_net_disconnect) has NO actuator here — its
         # live actuation is operator-tooling deferred. Emit an INERT DRY plan (side-effect 0) so the
-        # sandbox records the enforcement decision without a mis-built argv (누수-0 정합, ②).
+        # sandbox records the enforcement decision without a mis-built argv (누수-0 정합, 2.).
         if tool_id != "nsenter_input_drop":
             return ResponsePlan(rule, tool_id, "AUTO", exec_request=None,
                                 operator_auto_confirmed=oper_auto,

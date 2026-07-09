@@ -14,7 +14,7 @@ Order (exact):
   4. tool_wrap = Backend.run(ExecRequest) [safe-exec] + post world_update. legality/record_intent
      are NOT inside tool_wrap.
 
-The node NEVER calls subprocess directly — only Backend.run via the Response Controller (불변식②).
+The node NEVER calls subprocess directly — only Backend.run via the Response Controller (불변식2.).
 Live actuation is operator-go RESERVED (Backend.allow_live=False -> DRY-RUN). dry_streak -> 0 on act.
 """
 from __future__ import annotations
@@ -107,7 +107,7 @@ def act(state: MDGState, backend: Backend | None = None, ledger=None, clock=None
     # operator-auto-confirmed enforcement from a native AUTO one (transparency; registry_tier stays
     # OPER upstream). authority names WHO authorized it — the sandbox, not a human operator.
     op_auto_confirmed = bool(getattr(plan, "operator_auto_confirmed", False))
-    # ① operator-select PRESERVATION: when the operator EXPLICITLY picked this candidate,
+    # 1. operator-select PRESERVATION: when the operator EXPLICITLY picked this candidate,
     # rank_recovery stamped chosen.authority="operator-select". Do NOT let the operator_auto widen
     # clobber that human provenance to "sandbox-auto" — the durable ledger must show WHO authorized
     # (Item A goal #3). This is the PRIMARY S2 path: operator picks send_signed_mode with

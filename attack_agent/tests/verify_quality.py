@@ -1,7 +1,7 @@
-"""품질 게이트 — S5(타입힌트)·S8(구조↔문서)·S9(CLI 스키마)·P3(용어정의)·P5(비밀 리터럴)·P6(언어정책)·P7(스텁↔문서).
+"""품질 게이트 — S5(타입힌트)·S8(구조<->문서)·S9(CLI 스키마)·P3(용어정의)·P5(비밀 리터럴)·P6(언어정책)·P7(스텁<->문서).
 
 오프라인·무해(AST/파일 파싱만; litellm·도커·네트워크 불필요). 통과 시 exit 0.
-※ P8(코드 주석의 실측 주장↔근거 연결)은 본질적으로 주관적이라 자동 게이트가 아닌 수동 리뷰 항목으로 둔다(README §품질 게이트).
+※ P8(코드 주석의 실측 주장<->근거 연결)은 본질적으로 주관적이라 자동 게이트가 아닌 수동 리뷰 항목으로 둔다(README §품질 게이트).
 """
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from pathlib import Path as _Path  # noqa: E402
 _REPO = _Path(__file__).resolve().parents[1]
 if str(_REPO) not in _import_sys.path:
     _import_sys.path.insert(0, str(_REPO))
-_import_os.chdir(_REPO)  # cwd=repo root → cwd-relative paths resolve
+_import_os.chdir(_REPO)  # cwd=repo root -> cwd-relative paths resolve
 
 import ast  # noqa: E402
 import glob  # noqa: E402
@@ -70,7 +70,7 @@ def _s9() -> None:
     try:
         import run_live_gate5  # noqa
         _old = sys.argv[:]
-        sys.argv = ["run_live_gate5"]  # _parse_args() 는 sys.argv 를 읽음 → 기본값 파싱
+        sys.argv = ["run_live_gate5"]  # _parse_args() 는 sys.argv 를 읽음 -> 기본값 파싱
         try:
             ns2 = run_live_gate5._parse_args()
         finally:
@@ -92,7 +92,7 @@ _SECRET = re.compile(r"(sk-or-[A-Za-z0-9]|sk-ant-[A-Za-z0-9]|\b[0-9a-fA-F]{64}\b
 
 
 def _code_only(path: str) -> str:
-    """tokenize 로 COMMENT/STRING 을 공백치환 → 실제 코드 라인만."""
+    """tokenize 로 COMMENT/STRING 을 공백치환 -> 실제 코드 라인만."""
     src = open(path, "rb").read()
     out = bytearray(src)
     try:

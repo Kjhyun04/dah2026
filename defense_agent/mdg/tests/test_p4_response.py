@@ -311,7 +311,7 @@ def test_emit_signed_live_delegates_via_single_backend_spawn():
     passed as sh POSITIONAL args (no injection); the spawn is mutating (read_only=False)."""
     be = _RecordingBackend(allow_live=True, ok=True, dry_run=False, note="MOCK exec")
     emit = signer_shim.emit_signed(_signed_intent(), backend=be)
-    assert len(be.reqs) == 1                                # SINGLE Backend spawn (불변식②)
+    assert len(be.reqs) == 1                                # SINGLE Backend spawn (불변식2.)
     assert be.reqs[0].argv == ["docker", "exec", "gcs_c2", "sh", "-c",
                                'printf "%s %s" "$1" "$2" > /tmp/mdg_correct', "sh", "GUIDED", "30"]
     assert "/tmp/mdg_correct" in be.reqs[0].argv[5]        # trigger-file write, not a sender exec

@@ -1,22 +1,22 @@
 """core.orchestrator — P3 공격 계획 오케스트레이터 (비동기 ReAct 스켈레톤).
 
-과제 §12-3. FSM: RECON→SELECT→EXECUTE→INFER→(goal?END:PIVOT).
-  매 턴: (1) scoped tool 에 legality → tool_status 렌더(default.yaml user),
+과제 §12-3. FSM: RECON->SELECT->EXECUTE->INFER->(goal?END:PIVOT).
+  매 턴: (1) scoped tool 에 legality -> tool_status 렌더(default.yaml user),
          (2) LLM 이 **닫힌 화이트리스트**에서 tool 1개 선택(replay 또는 live),
          (3) tool_wrap 실행 await (pre_hook=legality 하드게이트, post_hook=kb_update/redact),
          (4) kb_update 반영, (5) goal_reached 판정.
 
-★ 종료는 **드라이버(시스템)의 결정론**(goal_reached ∨ max_steps ∨ 교착 하드캡).
+종료는 **드라이버(시스템)의 결정론**(goal_reached ∨ max_steps ∨ 교착 하드캡).
   LLM 은 terminate 하지 않으며 스스로 멈추지 않는다(11 §3·prompt §5·DESIGN FSM).
 
-★ grep0 불변식(06 P2·17 §3): 이 모듈은 **감독/ground-truth/truth** 산출을 절대
+grep0 불변식(06 P2·17 §3): 이 모듈은 **감독/ground-truth/truth** 산출을 절대
   import·참조하지 않는다. 공격자-가시 result payload(Recon/Collect/Inject)만 다룬다.
 
-★ 비동기(18 A2): 순차 await(병렬 gather 없음) — AgentAction 순서 결정론화.
+비동기(18 A2): 순차 await(병렬 gather 없음) — AgentAction 순서 결정론화.
   LLM 호출(llm.completion)은 동기 래퍼이며 루프에서 직접 호출(단일 스레드).
 
-★ 레시피 금지: 순서/조합 처방을 코드·프롬프트에 넣지 않는다.
-  선택은 legality(missing↔produces)에서 창발, 폴백도 상태 기반 결정표.
+레시피 금지: 순서/조합 처방을 코드·프롬프트에 넣지 않는다.
+  선택은 legality(missing<->produces)에서 창발, 폴백도 상태 기반 결정표.
 작성 2026-07-05.
 """
 
@@ -66,11 +66,11 @@ except Exception:
     pass
 
 
-# 실행기 러너 타입: params(dict) → Result[payload] (executor.run 을 감싼 결정론 러너).
+# 실행기 러너 타입: params(dict) -> Result[payload] (executor.run 을 감싼 결정론 러너).
 type Runner = Callable[..., Awaitable[Result[Any]]]
-# 러너 팩토리: spec → runner. 미주입 시 stub(미배선).
+# 러너 팩토리: spec -> runner. 미주입 시 stub(미배선).
 type RunnerFactory = Callable[[ToolSpec], Runner]
-# replay 훅: (step) → mock_response dict | None (None=결정론 폴백/ live).
+# replay 훅: (step) -> mock_response dict | None (None=결정론 폴백/ live).
 type ReplayHook = Callable[..., Optional[dict[str, Any]]]
 
 
@@ -175,9 +175,9 @@ class AttackOrchestrator:
         self._ids: list[ToolId] = scoped_tool_ids(goal)
 
         # 러너 팩토리(executor.run 주입점) 선택(하위호환 3단계):
-        #   ① runner_factory 명시 주입 → 그대로 사용(replay/커스텀).
-        #   ② backend 주입 → safeexec.make_runner_factory 로 real 실행엔진 배선.
-        #   ③ 둘 다 없음 → _unwired_runner(항상 Err, 안전 no-op) 유지.
+        # 1. runner_factory 명시 주입 -> 그대로 사용(replay/커스텀).
+        # 2. backend 주입 -> safeexec.make_runner_factory 로 real 실행엔진 배선.
+        # 3. 둘 다 없음 -> _unwired_runner(항상 Err, 안전 no-op) 유지.
         if runner_factory is not None:
             rf: RunnerFactory = runner_factory
         elif backend is not None:
@@ -210,7 +210,7 @@ class AttackOrchestrator:
 
     # ── hook 어댑터 (tool_wrap PreHook/PostHook 시그니처 정합) ─────────────
     def _make_legality_pre(self, spec: ToolSpec):
-        """legality 하드게이트 pre_hook. runnable=False → ToolError(미실행)."""
+        """legality 하드게이트 pre_hook. runnable=False -> ToolError(미실행)."""
 
         async def pre(*_a: Any, **_k: Any) -> Optional[ToolError]:
             st = legality(spec, self.kb)
@@ -287,10 +287,10 @@ class AttackOrchestrator:
 
     # ── SELECT: LLM 이 닫힌 집합에서 tool 1개 선택 ────────────────────────
     def _select(self, statuses: dict[str, ToolStatus]) -> Optional[LLMToolCall]:
-        """ephemeral user(tool_status) 렌더 → completion → 첫 tool_call 1개.
+        """ephemeral user(tool_status) 렌더 -> completion -> 첫 tool_call 1개.
 
         직전 verdict 가 BLOCKED/ERROR/TIMEOUT 이면 adapt_user 프롬프트로 피벗한다.
-        렌더 실패/LLM 장애 시 **빈 프롬프트 호출 금지** → 결정론 폴백표로 직행.
+        렌더 실패/LLM 장애 시 **빈 프롬프트 호출 금지** -> 결정론 폴백표로 직행.
         """
         # (1) tool_status 스냅샷 user 메시지 렌더(StrictUndefined). 실패=폴백.
         try:
@@ -304,7 +304,7 @@ class AttackOrchestrator:
             return self._fallback_select(statuses)
         self.msgs.append(Message(role="user", content=user_text))
 
-        # (2) LLM 호출(replay 우선 → 오프라인 결정론).
+        # (2) LLM 호출(replay 우선 -> 오프라인 결정론).
         mock = self.replay(self._step, statuses) if self.replay is not None else None
         res = llm.completion(
             model=self.model,
@@ -322,7 +322,7 @@ class AttackOrchestrator:
                 tc = llm.first_tool_call(resp)  # 턴당 tool 1개
                 return tc if tc is not None else self._fallback_select(statuses)
             case Err(_):
-                # LLM 장애 → 결정론 폴백(빈/오류 프롬프트로 재호출하지 않음).
+                # LLM 장애 -> 결정론 폴백(빈/오류 프롬프트로 재호출하지 않음).
                 return self._fallback_select(statuses)
         return self._fallback_select(statuses)
 
@@ -366,7 +366,7 @@ class AttackOrchestrator:
         """결정론 폴백표(레시피 아님, 상태 기반): runnable ∧ 非Blocked tool 1개.
 
         목표부합(SetMode/Disrupt/SetFlag/Produce) 우선, 없으면 runnable recon.
-        아무 것도 없으면 None → 드라이버가 교착으로 종료.
+        아무 것도 없으면 None -> 드라이버가 교착으로 종료.
         """
         blocked = {EffectEvalKind.BLOCKED}
         # ADAPT 경로: 직전 실패/차단이면 같은 tool 반복을 피하고 enabler 후보를 우선.
@@ -407,11 +407,11 @@ class AttackOrchestrator:
             function=ToolCallFunction(name=tid, arguments=json.dumps(params)),
         )
 
-    # ── ACT: wire tool_call → 닫힌 ToolCall 검증 → tool_wrap 실행 ──────────
+    # ── ACT: wire tool_call -> 닫힌 ToolCall 검증 -> tool_wrap 실행 ──────────
     async def _handle_tool_call(self, tc: LLMToolCall) -> tuple[str, Optional[str]]:
-        """LLMToolCall → 검증 → 실행. (verdict, blocked_by) 반환 + role='tool' 관찰 누적.
+        """LLMToolCall -> 검증 -> 실행. (verdict, blocked_by) 반환 + role='tool' 관찰 누적.
 
-        닫힘 3중: name∈ToolId(get_spec KeyError) → params∈ParamSpec → legality pre_hook.
+        닫힘 3중: name∈ToolId(get_spec KeyError) -> params∈ParamSpec -> legality pre_hook.
         """
         name = tc.function.name
         # (1) arguments JSON 파싱
@@ -442,7 +442,7 @@ class AttackOrchestrator:
         # (5) 관찰(role='tool') 누적 + verdict 도출
         if isinstance(res, ToolSuccess):
             payload = res.result
-            # exec_meta.killed=True(하드타임아웃 강제종료) → TIMEOUT(누수감시 신호 반영).
+            # exec_meta.killed=True(하드타임아웃 강제종료) -> TIMEOUT(누수감시 신호 반영).
             #   보수판정: killed payload 는 accepted/effect 가 이미 0(safeexec.parse_output).
             if getattr(payload, "killed", False):
                 self._observe(tc.id, name, _safe_dump(payload))
@@ -494,9 +494,9 @@ class AttackOrchestrator:
     async def seed_recon(self) -> None:
         """LLM 계획 전 KB 시드(12 §5 init baseline). 동일 runner_factory 로 recon 러너 조립.
 
-        recon_reach → (net_core 도달 시) recon_session 을 실행해 reach/unauth/seid 를
+        recon_reach -> (net_core 도달 시) recon_session 을 실행해 reach/unauth/seid 를
         KB 에 병합(kb_update 경유). 레시피 아님(사실 세우기). 미배선/Err 러너는 조용히 skip
-        (unwired 기본은 Err → no-op). StepRecord 를 남기지 않는다(정찰=상시·비-스텝).
+        (unwired 기본은 Err -> no-op). StepRecord 를 남기지 않는다(정찰=상시·비-스텝).
         """
         from core.modules.recon import build_recon_runners, run_baseline_recon
 
@@ -514,7 +514,7 @@ class AttackOrchestrator:
             if self._auto_seed_recon:
                 await self.seed_recon()  # init baseline: KB 시드(12 §5)
             while True:
-                # ① 결정론 종료 판정(선행)
+                # 1. 결정론 종료 판정(선행)
                 if goal_reached(self.kb, self.goal):
                     break
                 if self._step >= self.max_steps:
@@ -528,7 +528,7 @@ class AttackOrchestrator:
 
                 tc = self._select(statuses)
                 if tc is None:
-                    # 가용 tool 없음 → 교착
+                    # 가용 tool 없음 -> 교착
                     break
 
                 verdict, blocked_by = await self._handle_tool_call(tc)
@@ -544,7 +544,7 @@ class AttackOrchestrator:
                 self._append_evidence(self.steps[-1])
                 self._step += 1
 
-                # ② 진전성: KB 무변화면 stall 카운트(동일상태 순환 차단)
+                # 2. 진전성: KB 무변화면 stall 카운트(동일상태 순환 차단)
                 after = self.kb.snapshot()
                 stalls = 0 if after != before else stalls + 1
         finally:
@@ -608,7 +608,7 @@ class AttackOrchestrator:
 
 
 def _safe_dump(payload: Any) -> str:
-    """result payload → JSON 문자열(관찰용). 실패 시 repr. 비밀 원값 미포함(마스킹 전제)."""
+    """result payload -> JSON 문자열(관찰용). 실패 시 repr. 비밀 원값 미포함(마스킹 전제)."""
     try:
         if hasattr(payload, "model_dump"):
             return json.dumps(payload.model_dump(), ensure_ascii=False, default=str)
@@ -618,7 +618,7 @@ def _safe_dump(payload: Any) -> str:
 
 
 def _str_params(arguments: str) -> dict[str, str]:
-    """LLMToolCall.arguments(JSON str) → StepRecord.params(str dict)."""
+    """LLMToolCall.arguments(JSON str) -> StepRecord.params(str dict)."""
     try:
         d = json.loads(arguments or "{}")
         if isinstance(d, dict):

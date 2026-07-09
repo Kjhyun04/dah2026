@@ -82,7 +82,7 @@ def _connected_subnets():
 
 
 def discover_uav():
-    """UE풀 스윕(:5762)→HEARTBEAT sysid=1∧quad UAV 자가발견(하드코딩0). 실패 None."""
+    """UE풀 스윕(:5762)->HEARTBEAT sysid=1∧quad UAV 자가발견(하드코딩0). 실패 None."""
     from pymavlink import mavutil
     for net in _connected_subnets():
         for ip in list(net.hosts())[:32]:
@@ -184,7 +184,7 @@ def main() -> int:
     except Exception as e:
         log("예외:", type(e).__name__, str(e)); emit(False, "no_effect"); return 1
     finally:
-        # ★ 가역 보장: 주입했고 baseline 이 비행안전이면 예외 여부와 무관하게 복원.
+        # 가역 보장: 주입했고 baseline 이 비행안전이면 예외 여부와 무관하게 복원.
         try:
             if m is not None and injected and baseline in FLIGHT_SAFE and baseline != mode:
                 log(f"복원 → baseline custom_mode={baseline}")

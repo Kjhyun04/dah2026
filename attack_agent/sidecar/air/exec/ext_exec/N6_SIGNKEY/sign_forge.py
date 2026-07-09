@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import os
 
-# ★ MAVLink2 강제 — 링크서명은 MAVLink2 전용. pymavlink import 이전에 세팅해야 유효하며,
+# MAVLink2 강제 — 링크서명은 MAVLink2 전용. pymavlink import 이전에 세팅해야 유효하며,
 #   pymavlink 는 함수 내부 lazy import 이므로 모듈 top-level 인 이 시점에 이미 확정됨.
 os.environ.setdefault("MAVLINK20", "1")
 
@@ -86,7 +86,7 @@ def parse_args(argv) -> tuple[Optional[str], Optional[int]]:
 
 
 def conn_str(ep: Optional[str]) -> Optional[str]:
-    """oracle.conn_str 동일: 스킴 없으면 'udpout:' 접두, 포트 없으면 ':14556' 보정. None→None."""
+    """oracle.conn_str 동일: 스킴 없으면 'udpout:' 접두, 포트 없으면 ':14556' 보정. None->None."""
     if not ep:
         return None
     s = ep if ep.split(":", 1)[0] in ("tcp", "udp", "udpin", "udpout") else "udpout:" + ep
@@ -100,8 +100,8 @@ def read_stdin_secret(name: str = SECRET_NAME) -> Optional[str]:
     """stdin 의 'name=value' 라인에서 name 값 취득(safeexec._encode_stdin 정본 정합).
 
     sys.stdin.buffer 를 EOF 까지 read(상한 64KiB) 후 utf-8 decode, 각 라인을 첫 '=' 기준 split
-    (값에 '=' 허용). name 일치 라인의 값 strip 반환. 없거나 빈 stdin(DEVNULL) → None.
-    ★ 값·raw stdin 절대 로깅 금지.
+    (값에 '=' 허용). name 일치 라인의 값 strip 반환. 없거나 빈 stdin(DEVNULL) -> None.
+    값·raw stdin 절대 로깅 금지.
     """
     try:
         raw = sys.stdin.buffer.read(64 * 1024)
@@ -124,26 +124,26 @@ def read_stdin_secret(name: str = SECRET_NAME) -> Optional[str]:
 
 
 def derive_secret_key(raw: str) -> bytes:
-    """유출키 문자열 → 정확히 32바이트 대칭키(MAVLink signing secret_key 규격).
+    """유출키 문자열 -> 정확히 32바이트 대칭키(MAVLink signing secret_key 규격).
 
     결정론 사다리(실키 인코딩 불명에 대한 방어):
-      (1) strip 후 len==64 ∧ 전부 hex → bytes.fromhex
+      (1) strip 후 len==64 ∧ 전부 hex -> bytes.fromhex
       (2) base64 디코드가 정확히 32바이트면 사용
       (3) raw.encode('utf-8') 가 정확히 32바이트면 그대로
-      (4) 그 외 → hashlib.sha256(raw.encode('utf-8')).digest()  (MAVProxy passphrase 관례)
-    ★ raw·산출 키는 로깅 금지. 실패시 예외 → main 이 no_effect 처리.
+      (4) 그 외 -> hashlib.sha256(raw.encode('utf-8')).digest()  (MAVProxy passphrase 관례)
+    raw·산출 키는 로깅 금지. 실패시 예외 -> main 이 no_effect 처리.
     """
     import base64
     import hashlib
 
     s = raw.strip()
-    # (1) hex 64자 → 32바이트
+    # (1) hex 64자 -> 32바이트
     if len(s) == 64:
         try:
             return bytes.fromhex(s)
         except ValueError:
             pass
-    # (2) base64 → 정확히 32바이트
+    # (2) base64 -> 정확히 32바이트
     try:
         dec = base64.b64decode(s, validate=True)
         if len(dec) == 32:
@@ -154,7 +154,7 @@ def derive_secret_key(raw: str) -> bytes:
     b = raw.encode("utf-8")
     if len(b) == 32:
         return b
-    # (4) sha256(passphrase) → 32바이트
+    # (4) sha256(passphrase) -> 32바이트
     return hashlib.sha256(raw.encode("utf-8")).digest()
 
 
@@ -240,7 +240,7 @@ def main() -> int:
         finally:
             del secret  # 서명 배선 후 키 소멸
 
-        # 5. baseline 선-read — 실패(None) 시 가역 보장 불가 → 미주입.
+        # 5. baseline 선-read — 실패(None) 시 가역 보장 불가 -> 미주입.
         baseline, sysid = read_mode(m, None, 6.0)
         if baseline is None:
             log("baseline 미관측 — 가역 보장 불가 → 미주입")
@@ -269,7 +269,7 @@ def main() -> int:
         emit(False, "no_effect", signed=_SIGNED)
         return 1
     finally:
-        # ★ 가역 보장: 주입했고 baseline 이 비행안전이면 예외 여부와 무관하게 서명된 명령으로 복원.
+        # 가역 보장: 주입했고 baseline 이 비행안전이면 예외 여부와 무관하게 서명된 명령으로 복원.
         try:
             if m is not None and injected and baseline in FLIGHT_SAFE and baseline != mode:
                 log(f"복원 → baseline custom_mode={baseline}(서명됨)")

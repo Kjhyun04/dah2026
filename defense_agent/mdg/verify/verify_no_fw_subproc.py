@@ -1,4 +1,4 @@
-"""verify_no_fw_subproc — 불변식② (static AST).
+"""verify_no_fw_subproc — 불변식2. (static AST).
 
 Enforces: graph nodes + core modules NEVER spawn a subprocess directly. Nodes must
 route all side effects through Backend.run.

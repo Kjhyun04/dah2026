@@ -5,9 +5,9 @@
 core.common.results 계약에서 **offline baked** 한 분류표일 뿐 — 행동공간 확장이 아니다.
 
 데이터 계약(정확 일치):
-  action step   : core.driver.campaign_to_jsonl → {"type":"step", **StepRecord}
+  action step   : core.driver.campaign_to_jsonl -> {"type":"step", **StepRecord}
   action final  : {"type":"campaign_result", goal_reached, steps, defenses_bypassed, win_causes, kb_final}
-  evaluation    : supervisor.build_evaluation → {schema, goal, ground_truth, verdict{...,autonomy_accuracy}}
+  evaluation    : supervisor.build_evaluation -> {schema, goal, ground_truth, verdict{...,autonomy_accuracy}}
   frame(뷰어정의): {schema:"dah.supervisor.frame/1", t, dir:up|down, mtype, mode, signed, src_ip}
 
 작성 2026-07-06.
@@ -73,7 +73,7 @@ def kind_of(tool_id: str) -> str:
 
 
 def mode_name(mode: Any) -> Optional[str]:
-    """custom_mode int → 표시명(모르면 원값 문자열). None→None."""
+    """custom_mode int -> 표시명(모르면 원값 문자열). None->None."""
     if mode is None:
         return None
     try:
@@ -150,7 +150,7 @@ def redact(obj: Any) -> Any:
 
 
 def parse_action_line(line: str) -> Optional[dict]:
-    """action JSONL 1줄 → redact 된 dict. type∈{step,campaign_result} 아니면 None."""
+    """action JSONL 1줄 -> redact 된 dict. type∈{step,campaign_result} 아니면 None."""
     line = line.strip()
     if not line:
         return None
@@ -164,7 +164,7 @@ def parse_action_line(line: str) -> Optional[dict]:
 
 
 def load_action_log(path: "str | Path") -> dict:
-    """action JSONL 로드 → {"steps":[step...], "campaign": dict|None, "count": int}."""
+    """action JSONL 로드 -> {"steps":[step...], "campaign": dict|None, "count": int}."""
     steps: list[dict] = []
     campaign: Optional[dict] = None
     p = Path(path)
@@ -186,7 +186,7 @@ def load_action_log(path: "str | Path") -> dict:
 
 
 def load_evaluation(path: "str | Path") -> Optional[dict]:
-    """evaluation.json 전량 read + redact → dict. 부재/파싱실패 → None(직전 스냅샷 유지 계약)."""
+    """evaluation.json 전량 read + redact -> dict. 부재/파싱실패 -> None(직전 스냅샷 유지 계약)."""
     p = Path(path)
     if not p.exists():
         return None
@@ -207,7 +207,7 @@ _VALID_DIR = ("up", "down")
 
 
 def parse_frame_line(line: str) -> Optional[dict]:
-    """supervisor.jsonl 1줄 → frame(dir/mtype/mode/t/signed). dir∉{up,down} 이면 None."""
+    """supervisor.jsonl 1줄 -> frame(dir/mtype/mode/t/signed). dir∉{up,down} 이면 None."""
     line = line.strip()
     if not line:
         return None
@@ -231,7 +231,7 @@ def parse_frame_line(line: str) -> Optional[dict]:
 
 
 def load_comms_stream(path: "str | Path | None") -> list[dict]:
-    """supervisor.jsonl 프레임들. 부재 → []."""
+    """supervisor.jsonl 프레임들. 부재 -> []."""
     if path is None:
         return []
     p = Path(path)
@@ -246,10 +246,10 @@ def load_comms_stream(path: "str | Path | None") -> list[dict]:
 
 
 def frames_from_evaluation(ev: dict) -> list[dict]:
-    """스트림 부재 시 재구성: ground_truth.mode_timeline→down, uplink_cmds→up, t 정렬.
+    """스트림 부재 시 재구성: ground_truth.mode_timeline->down, uplink_cmds->up, t 정렬.
 
     ※ evaluation 의 t 는 감독 캡처 상대시각. down=autopilot HEARTBEAT(관측 mode),
-      up=업링크 DO_SET_MODE(target mode). signed 는 프레임별 미기록 → None(정직).
+      up=업링크 DO_SET_MODE(target mode). signed 는 프레임별 미기록 -> None(정직).
       signing_observed(링크 전역)은 별도 감독패널에 표기.
     """
     gt = (ev or {}).get("ground_truth") or {}
@@ -282,9 +282,9 @@ def frames_from_evaluation(ev: dict) -> list[dict]:
 
 
 def inject_rows_from_action(steps: list[dict]) -> list[dict]:
-    """tool_id∈INJECT_TOOL_IDS 스텝 → 주입로그 레인 rows(source='attacker-inject').
+    """tool_id∈INJECT_TOOL_IDS 스텝 -> 주입로그 레인 rows(source='attacker-inject').
 
-    ※ StepRecord 엔 timestamp 없음 → step 인덱스 순서만. 감독 wire 시각(t)과 절대정렬 불가.
+    ※ StepRecord 엔 timestamp 없음 -> step 인덱스 순서만. 감독 wire 시각(t)과 절대정렬 불가.
       'accepted' 는 공격 agent 자기-ACK(verdict==OK)일 뿐 ground-truth 아님(감독패널 참조).
     """
     rows: list[dict] = []
@@ -344,7 +344,7 @@ def build_snapshot(
     eval_path: "str | Path",
     comms_path: "str | Path | None",
 ) -> dict:
-    """3소스 로드 → 뷰어 스냅샷.
+    """3소스 로드 -> 뷰어 스냅샷.
 
     banner.mismatch = autonomy_accuracy.agree is False (agent 자기판정 ≠ 감독 ground-truth).
       agree==None(감독 claim 부재) 또는 True 이면 mismatch=False.
@@ -383,8 +383,8 @@ def build_snapshot(
 def tail_lines(path: "str | Path", offset: int) -> "tuple[list[str], int]":
     """오프셋(바이트) 이후 **완결된** JSONL 줄만 반환, (new_lines, new_offset).
 
-    파일 truncate/rotate(size<offset) → 오프셋 0 리셋 재동기. 미완결 마지막 줄은
-    다음 폴링까지 보류(offset 을 그 앞으로 되돌림) → 부분줄 파싱실패 레이스 제거.
+    파일 truncate/rotate(size<offset) -> 오프셋 0 리셋 재동기. 미완결 마지막 줄은
+    다음 폴링까지 보류(offset 을 그 앞으로 되돌림) -> 부분줄 파싱실패 레이스 제거.
     """
     p = Path(path)
     if not p.exists():
@@ -393,7 +393,7 @@ def tail_lines(path: "str | Path", offset: int) -> "tuple[list[str], int]":
         size = p.stat().st_size
     except OSError:
         return [], offset
-    if size < offset:  # truncate/rotate 감지 → 재동기
+    if size < offset:  # truncate/rotate 감지 -> 재동기
         offset = 0
     if size == offset:
         return [], offset

@@ -10,8 +10,8 @@ RELAXED to record-then-pass:
     and, with observe=None, already_applied never fires, so debounce is its sole re-actuation
     throttle — shrinking it would accumulate duplicate DROP rules (leak-0 / reversibility risk).
 Production (operator_auto off) is UNCHANGED: provenance_relaxed=False and the full
-debounce.physical_action_min_ticks hold applies (strict PS-7). 불변식① (deterministic: env bool +
-config, no LLM) and ② (no new subprocess path) are intact.
+debounce.physical_action_min_ticks hold applies (strict PS-7). 불변식1. (deterministic: env bool +
+config, no LLM) and 2. (no new subprocess path) are intact.
 
 Runnable standalone as ``python mdg/tests/test_provenance_relaxed.py``.
 """

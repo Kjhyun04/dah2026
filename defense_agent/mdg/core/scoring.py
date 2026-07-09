@@ -2,7 +2,7 @@
 
 Pure functions. No I/O, no subprocess, no LLM. compute_trust / compute_impact /
 correlate nodes call these; tests/test_math.py tests these directly. This is the
-numeric authority that the conditional edges route on (불변식① — LLM never here).
+numeric authority that the conditional edges route on (불변식1. — LLM never here).
 """
 from __future__ import annotations
 
@@ -159,7 +159,7 @@ def overall_impact(distrust_by_domain: dict, weights: dict, floor_table: dict) -
       a dead-collector domain (contract #1).
     - the criticality floor is computed over D regardless of weights (contract #2).
     - overall is monotonic non-decreasing in every distrust: injected fake signals can only
-      RAISE impact, never conceal it (불변식① / PS-7 contract #3).
+      RAISE impact, never conceal it (불변식1. / PS-7 contract #3).
     """
     D = list(distrust_by_domain.keys())
     floor = max((crit_floor(d, float(distrust_by_domain[d]), floor_table) for d in D), default=0.0)

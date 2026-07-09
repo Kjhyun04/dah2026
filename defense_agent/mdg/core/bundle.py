@@ -1,5 +1,5 @@
 """bundle.py — atomic response bundle · idempotent applied()-skip · N-tick debounce ·
-de-escalation (DETERMINISTIC, secret-free — 불변식①).
+de-escalation (DETERMINISTIC, secret-free — 불변식1.).
 
 An enforced response is an ATOMIC BUNDLE (recovery op + optional attack-path block, X4/X6):
 the bundle-level risk = max(atomic risk) and reversible = all(atomic reversible) — the exact

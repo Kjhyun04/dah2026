@@ -4,7 +4,7 @@
 이 워크플로우는 테스트베드 무접속이므로 실제 벤더 코드를 fetch/생성하지 않는다.
 
 통제단계(control stage)에서 read-only scp 로
-    testbed/proxy/mav_aria_proxy.py  →  이 파일(aria_gcm.py)
+    testbed/proxy/mav_aria_proxy.py  ->  이 파일(aria_gcm.py)
 의 `AriaGCM` 클래스 + ARIA 봉투 파서만 추출(doc18 D8: 전체복사 아님, 원본 경로·해시 주석)
 하여 **덮어쓴다**. 원본 = ctypes 로 OpenSSL libcrypto(EVP, aria-256-gcm)를 호출하는
 종단 암호 프록시의 GCM 래퍼.

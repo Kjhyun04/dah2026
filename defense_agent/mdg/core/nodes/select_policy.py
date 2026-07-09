@@ -52,7 +52,7 @@ _INCIDENT_RECOVERY = {
 # FAIL-CLOSED: an unrecognized member metric yields no domain -> signed_guided is NOT admitted.
 # Container-isolation (backdoor_pause) stays domain-agnostic. This restricts the candidate set
 # ONLY; the legality signing gate still double-gates signed_guided out under UNKNOWN signing, so
-# the live/replay legal set stays byte-identical (불변식①). Command single-signals
+# the live/replay legal set stays byte-identical (불변식1.). Command single-signals
 # (Unauthorized_Command / Signature_Verify_Fail) are unaffected — signed_guided still enters.
 _RTYPE_DOMAIN_GUARD = {"signed_guided": "command"}
 

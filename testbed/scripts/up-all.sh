@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # up-all.sh — DAH v2 전체 콜드스타트 (최종 ARIA 구성). 재현성 검증용.
-#   순서: EPC → 가입자 → RAN(attach) → SGi 라우팅 → ARIA(SITL+GPS+프록시+GCS) → 웹.
+#   순서: EPC, 가입자 등록, RAN(attach), SGi 라우팅, ARIA(SITL+GPS+프록시+GCS), 웹 순으로 올린다.
 #   전제: 프리플라이트(01) 통과 + 이미지 3+web(10/80) 빌드 완료.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"

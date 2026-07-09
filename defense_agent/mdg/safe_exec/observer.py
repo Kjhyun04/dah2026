@@ -18,18 +18,18 @@ Per-mechanism confirmation (rule resolved to its response_tool via RECOVERY_PRIO
     preliminary window, so ``already_applied`` (applied∧confirmed) would stay False and the
     NON-idempotent ``iptables -I`` would be re-inserted every debounce window, accumulating
     duplicate rules a single ``-D`` cannot fully revert (가역성/leak-0 저촉). Rule-existence
-    confirms as soon as the DROP is actually installed → re-actuation is suppressed idempotently.
+    confirms as soon as the DROP is actually installed, so re-actuation is suppressed idempotently.
   - ``send_signed_mode`` (signed_*) : downlink telemetry ``rel_alt`` recovered to target
     (30 m ± tol) AND ``mode`` is an explicit non-landing flight mode (present, not LAND) —
     flight re-established. A MISSING mode is NOT treated as recovered (altitude alone is too
     sparse a signal — the vehicle transits 30 m while descending, so a bare altitude match
     could false-confirm; a positive mode reading is required).
 
-불변식② (누수-0): EVERY probe here is READ-ONLY. The docker probe is a metadata
+불변식2. (누수-0): EVERY probe here is READ-ONLY. The docker probe is a metadata
 ``inspect`` (read_only=True fast-path); the ss probe is an allowlisted observer wrapped in
 the target's netns; telemetry is a passive collector snapshot. NOTHING spawns except through
 the single injected ``Backend`` (``backend.run`` = the sole ``_spawn`` site). No new subprocess
-path is introduced. 불변식① (결정론): the observer reads live state only; routing never depends
+path is introduced. 불변식1. (결정론): the observer reads live state only; routing never depends
 on it (effect_confirm -> END regardless), so determinism is untouched.
 
 Fail-safe: any unresolved target / missing dep / DRY / error yields ``False`` (UNCONFIRMED),
@@ -183,8 +183,8 @@ def make_effect_observer(docker: Any = None, netns_prefix_map: Optional[dict] = 
                            path stays UNCONFIRMED, safe.
     ``priors``           : rule -> {response_tool, enforce_at, ...} (defaults to RECOVERY_PRIORS).
 
-    The returned closure is deterministic given the live world (불변식①) and probes read-only only
-    (불변식②). Unknown rule / missing dep / any error -> False (never a spurious confirm)."""
+    The returned closure is deterministic given the live world (불변식1.) and probes read-only only
+    (불변식2.). Unknown rule / missing dep / any error -> False (never a spurious confirm)."""
     priors = priors if priors is not None else RECOVERY_PRIORS
 
     def observe(rule: str) -> bool:

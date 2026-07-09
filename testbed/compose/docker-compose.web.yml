@@ -1,4 +1,4 @@
-# P8 — 웹 대시보드 백엔드(평문 tap → WebSocket). net_sgi + 호스트 8080 노출(SSH 터널).
+# P8 — 웹 대시보드 백엔드. 평문 tap 을 받아 WebSocket 으로 내보낸다. net_sgi 에 붙고 호스트 8080 을 노출한다(SSH 터널 경유).
 name: dahv2
 
 networks:

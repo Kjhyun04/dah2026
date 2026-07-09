@@ -2,7 +2,7 @@
 
 Both join a target container's network namespace (via the recon-injected
 ``nsenter --target <pid> --net --`` prefix; None => inert) and run ``tcpdump`` through
-the safe-exec Backend (불변식②). They observe the plaintext MAVLink planes the testbed
+the safe-exec Backend (불변식2.). They observe the plaintext MAVLink planes the testbed
 exposes:
 
   AirCommandTap   — uplink command entry on gcs_proxy eth0 UDP:14556 (B-3). Idle
@@ -50,7 +50,7 @@ def _count_packets(stdout: str) -> int:
 # CRC-validate frames for the two message ids we care about, so IP/UDP header bytes in
 # the tcpdump hex can never masquerade as a valid frame (a stray 0xFD/0xFE that is not a
 # real, CRC-correct HEARTBEAT/GLOBAL_POSITION_INT is rejected). READ-ONLY decode of an
-# already-captured buffer — no new subprocess (불변식②) and no routing effect (불변식①:
+# already-captured buffer — no new subprocess (불변식2.) and no routing effect (불변식1.:
 # both metrics are emitted band="normal", which correlate() never turns into an incident).
 # --------------------------------------------------------------------------- #
 _MSGID_HEARTBEAT = 0
@@ -210,7 +210,7 @@ class AirCommandTap(BaseCollector):
             return []                                   # inert: unresolved netns target
         # 짧은 deadline: idle 인터페이스에서 tcpdump가 count 패킷을 기다리며 무한 블로킹하지
         # 않도록 ~2.0s 마감을 준다. -c count는 유지하되(공격 시 즉시 count까지 캡처) idle이면
-        # 타임아웃이 먼저 끊어 빈 stdout(=n<=0)으로 즉시 반환 → 관측은 세마포어 미획득이라
+        # 타임아웃이 먼저 끊어 빈 stdout(=n<=0)으로 즉시 반환한다. 이 관측은 세마포어 미획득이라
         # 집행 경로를 막지 않지만, 짧은 마감으로 관측 스레드 자체의 정체도 방지한다.
         res = self._observe(
             _tcpdump_argv(self.netns_prefix, self.iface, self.port, self.count),
@@ -269,7 +269,7 @@ class AirTelemetryTap(BaseCollector):
         if self.netns_prefix is None:
             return []                                   # inert: unresolved netns target
         # deadline ~3.0s: ~1Hz HEARTBEAT에서 2s 창은 약 2패킷만 보여 HB jitter>2s이거나
-        # 샘플링 공백이 짧은 실공백과 정렬되면 n==0→Packet_Loss(warning) 오탐이 났다. 창을
+        # 샘플링 공백이 짧은 실공백과 정렬되면 n==0이 되어 Packet_Loss(warning) 오탐이 났다. 창을
         # 3.0s로 소폭 확대해 최소 한 번의 HB를 안정적으로 포착, 오탐을 완화한다(손실-온셋
         # 지연은 interval_s≈0.1 back-to-back 재무장으로 별도 완화). count는 유지하되
         # 타임아웃이 먼저 끊는다 — 실제 손실이면 빈 반환(n==0)이 Packet_Loss로 정상 처리된다.

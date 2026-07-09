@@ -3,7 +3,7 @@
 The §9-B MAVLink2 uplink-signing enforcement lives in ``uav_proxy``. When an UNSIGNED
 command is injected the proxy drops it and prints an authoritative drop line to stdout:
 
-    [proxy] ⛔ 서명검증 실패 → SITL 차단 (누적 N)
+    [proxy] 서명검증 실패 -> SITL 차단 (누적 N)
 
 That line is POSITIVE evidence that signing enforcement is ON (uav_proxy actually blocked
 an unsigned command). This collector tails ``docker logs uav_proxy`` read-only (same
@@ -21,7 +21,7 @@ Discipline (P3-Q2 lock):
   - ANSI-strip FIRST (shared ``log_common.ansi_strip``) so colour escapes can never sit
     between the tokens the matcher expects.
 
-Boundaries: subprocess (``docker logs``) issued ONLY through the safe-exec Backend (불변식②);
+Boundaries: subprocess (``docker logs``) issued ONLY through the safe-exec Backend (불변식2.);
 no docker sdk import, no sock/proxy URL literal. Null-safe: ``parse_signing_line(None)`` -> None.
 A dry/mock Backend yields no lines (the collector simply emits nothing — inert).
 """
@@ -70,7 +70,7 @@ def _docker_logs_argv(container: str, since_s: int) -> list[str]:
 class SignLogCollector(BaseCollector):
     """Out-of-graph daemon: tails ``docker logs uav_proxy`` and emits the §9-B signing
     drop-line as command-domain evidence (P3-Q2). The 6+1 collector; subprocess goes through
-    the safe-exec Backend only (불변식②). A dry/mock backend yields no lines (inert)."""
+    the safe-exec Backend only (불변식2.). A dry/mock backend yields no lines (inert)."""
     source_id = "uav_signlog"
     domain = "command"
 

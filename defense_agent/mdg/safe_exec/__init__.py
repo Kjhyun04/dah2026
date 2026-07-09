@@ -1,1 +1,1 @@
-"""safe-exec backend — the only subprocess path (불변식②)."""
+"""safe-exec backend — the only subprocess path (불변식2.)."""

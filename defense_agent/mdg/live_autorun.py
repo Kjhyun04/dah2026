@@ -11,10 +11,10 @@ lifecycle. The sequence is exactly:
 and a try/finally that ALWAYS reclaims the observers on the way out (audit P2: 종료 시
 관측자 미회수). ``_shutdown`` stops every collector, joins them (bounded), then calls
 ``Backend.teardown()`` to reap any labelled crash-orphan subprocess (R4). Each step is
-individually guarded so one failure cannot strand the rest -> shutdown leak-0 (불변식②).
+individually guarded so one failure cannot strand the rest -> shutdown leak-0 (불변식2.).
 
 Invariant discipline:
-  - 불변식② (누수-0): the ONLY subprocess path is the injected ``Backend`` (safe-exec R1~R6).
+  - 불변식2. (누수-0): the ONLY subprocess path is the injected ``Backend`` (safe-exec R1~R6).
     This module spawns nothing directly — even the boot ``docker inspect`` used to resolve
     netns PIDs is routed through ``Backend.run`` (``_SafeExecDocker``), so there is exactly
     one spawn site. On exit ``_shutdown`` guarantees collectors are stopped/joined and any
@@ -68,18 +68,18 @@ def parse_operator_auto(env) -> bool:
     """sandbox OPER auto-confirm gate: operator_auto is True ONLY when MDG_OPERATOR_AUTO is an
     explicit truthy token (same vocabulary as allow_live). Absent/blank/anything-else -> False
     (안전 기본: OPER 티어는 사람 대기/escalate). SITL/데모 전용 — Phase 1 이 이 값을 gate/edge 로
-    소비해 OPER 대응을 자동승인·집행한다. 결정론(불변식①): env 입력만으로 분기 결정, LLM 불가시."""
+    소비해 OPER 대응을 자동승인·집행한다. 결정론(불변식1.): env 입력만으로 분기 결정, LLM 불가시."""
     return str(env.get("MDG_OPERATOR_AUTO", "")).strip().lower() in _TRUE
 
 
 def parse_operator_pick(env) -> str:
-    """① operator-select input: the recovery_type OR tool_id the operator explicitly picks from the
+    """1. operator-select input: the recovery_type OR tool_id the operator explicitly picks from the
     legal candidate set (env MDG_OPERATOR_PICK). Returns the stripped token, "" when unset/blank.
     When set AND matching a legal Action, rank_recovery promotes it to chosen_action (overriding the
     autonomous ranking that permanently demotes send_signed_mode below the reversible blockades); a
     blank/non-matching value leaves the autonomous ranking intact (fail-safe). Unlike allow_live/
     operator_auto this is NOT a boolean gate — it carries a value — so it is NOT run through _TRUE.
-    결정론(불변식①): env 문자열만으로 결정, LLM 불가시."""
+    결정론(불변식1.): env 문자열만으로 결정, LLM 불가시."""
     return str(env.get("MDG_OPERATOR_PICK", "")).strip()
 
 
@@ -102,7 +102,7 @@ def _make_verify(keyring: Keyring, seqwm: SeqWatermark) -> Callable[[Any], tuple
 
 class _SafeExecDocker:
     """Duck-typed ``docker`` backend (``inspect_pid`` / ``inspect_networks``) routed through
-    the safe-exec ``Backend`` so this launcher keeps ZERO direct subprocess sites (불변식②).
+    the safe-exec ``Backend`` so this launcher keeps ZERO direct subprocess sites (불변식2.).
 
     ``docker inspect`` is a READ-ONLY docker-daemon metadata read (resolve.py stage-1: container
     existence + ``.State.Pid`` + cellular IP — NOT a netns entry, NOT a state change), so it is sent
@@ -144,7 +144,7 @@ class _SafeExecDocker:
         """Phase 4 S1 actuator: freeze the attacker container (``docker pause``). This is a STATE
         CHANGE (read_only=False), so it stays operator-go DRY until allow_live is flipped on the
         backend — the same actuation gate as the netns DROP. Reversible via ``docker unpause``
-        (recorded as revert_cmd). Routes through the single Backend._spawn site (불변식②)."""
+        (recorded as revert_cmd). Routes through the single Backend._spawn site (불변식2.)."""
         return self.backend.run(ExecRequest(
             argv=["docker", "pause", container], timeout_s=8.0, reversible=True,
             revert_cmd=f"docker unpause {container}"))
@@ -159,7 +159,7 @@ class _SafeExecDocker:
 
         Returns True/False when the metadata read succeeds, None on DRY/failure/unresolved so the
         observer treats an inconclusive read as UNCONFIRMED (never a spurious recovery-confirm).
-        Same single-spawn, read-only ``inspect`` path as pid/network resolution (불변식②)."""
+        Same single-spawn, read-only ``inspect`` path as pid/network resolution (불변식2.)."""
         out = self._inspect(container, "{{.State.Paused}}")
         if out is None:
             return None
@@ -183,7 +183,7 @@ def _default_saver():
 
 
 def _shutdown(collectors, backend, join_timeout: float = 10.0) -> None:
-    """Exception-safe observer reclamation (audit P2, 불변식② 종료 누수-0).
+    """Exception-safe observer reclamation (audit P2, 불변식2. 종료 누수-0).
 
     Order: stop() EVERY collector first (signal the whole roster before waiting, so total
     wait is ~max(interval) not the sum), then join() each with a bounded timeout, then
@@ -246,11 +246,11 @@ def run(out_dir: str, run_id: str, *, allow_live: bool = False, operator_auto: b
     # returns it — deps only bind it as the ACT node kwarg (a node kwarg is NOT a state channel).
     # Seed it into state0 here so the conditional edge can actually read it. It is a LastValue
     # channel and the driver carries state forward each tick (re-seed), so this holds on every tick.
-    # Absent/False keeps the legacy escalate posture (회귀 0). Deterministic (불변식①): env bool only.
+    # Absent/False keeps the legacy escalate posture (회귀 0). Deterministic (불변식1.): env bool only.
     state0["operator_auto"] = bool(operator_auto)
-    # ① operator-select: seed the picked recovery_type/tool_id into the STATE channel rank_recovery
+    # 1. operator-select: seed the picked recovery_type/tool_id into the STATE channel rank_recovery
     # reads (same seed-once-carry-each-tick pattern as operator_auto — LastValue, no node returns it).
-    # Blank -> autonomous ranking (회귀 0). Deterministic (env string only, 불변식①).
+    # Blank -> autonomous ranking (회귀 0). Deterministic (env string only, 불변식1.).
     state0["operator_pick"] = str(operator_pick or "")
     world = state0.get("worldstate")
     pidmap = dict(getattr(world, "pid", {}) or {})
@@ -275,7 +275,7 @@ def run(out_dir: str, run_id: str, *, allow_live: bool = False, operator_auto: b
     # Resolves each applied rule to its response_tool and confirms via a READ-ONLY probe:
     # docker_pause->inspect .State.Paused / nsenter_input_drop->ss (no 5762 ESTAB in target netns) /
     # send_signed_mode->telemetry rel_alt 30m recovered. All probes go through the single Backend
-    # (불변식②). Was None (effect_confirm always confirmed=False -> no 회복 신호).
+    # (불변식2.). Was None (effect_confirm always confirmed=False -> no 회복 신호).
     # Phase 5: wire the live flight-state snapshot from the AirTelemetryTap (14560/14550 decode)
     # into the observer so send_signed_mode (S2 signed_guided 30m 복귀) can actually CONFIRM.
     # Duck-typed by ``snapshot`` so a custom/absent collector_builder simply leaves telemetry
@@ -293,16 +293,16 @@ def run(out_dir: str, run_id: str, *, allow_live: bool = False, operator_auto: b
         "ledger": ledger, "observe": observe, "gate": None,
         # Phase 4: the duck-typed docker backend so an operator_auto docker_pause ACTUATES via
         # act_host.pause (S1 회복). None -> operator-go DRY (fail-safe). Same read-only inspect
-        # backend the effect-observer uses; ``pause`` is state-changing -> allow_live-gated (②).
+        # backend the effect-observer uses; ``pause`` is state-changing -> allow_live-gated (2.).
         "docker": docker,
         # Phase 0: sandbox OPER auto-confirm flag -> build_graph 가 gate/edge 로 넘길 배선(실사용 Phase 1).
-        # 기본 False 유지 시 기존 escalate 경로 무변경(회귀 0). 결정론(불변식①): env 입력만으로 결정.
+        # 기본 False 유지 시 기존 escalate 경로 무변경(회귀 0). 결정론(불변식1.): env 입력만으로 결정.
         "operator_auto": operator_auto,
-        # ① operator-select: thread the picked token through deps too (rank_recovery reads it from
+        # 1. operator-select: thread the picked token through deps too (rank_recovery reads it from
         # the seeded STATE channel; deps carries it for parity with operator_auto / future binders).
         "operator_pick": str(operator_pick or ""),
         # LLM advisory(orient/decide): ANTHROPIC_API_KEY + litellm/jinja2 있으면 활성, 없으면 {None,None}
-        # 결정론 폴백(G6). LLM 은 edge-invisible(라우팅/집행 불가시)이라 켜져도 불변식① 무손상.
+        # 결정론 폴백(G6). LLM 은 edge-invisible(라우팅/집행 불가시)이라 켜져도 불변식1. 무손상.
         **build_llm_deps(),
         "smf_table": smf_table,                           # P4 stale-binding guard (b) live re-attribution
         "source_domains": source_domains_fn(collectors),  # {source_id -> domain} for liveness (P3-Q5)
@@ -359,7 +359,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     # 둘 다 없으면 default False(운영 제약 유보). env 파서가 여전히 유일 truthy 소스, 플래그는 그 위 OR.
     allow_live = bool(args.allow_live) or parse_allow_live(os.environ)
     operator_auto = parse_operator_auto(os.environ)       # sandbox OPER auto-confirm: default False
-    operator_pick = parse_operator_pick(os.environ)       # ① operator-select token: default "" (off)
+    operator_pick = parse_operator_pick(os.environ)       # 1. operator-select token: default "" (off)
 
     if allow_live:
         # Issue#2(b): allow_live=1 이면 monitor/autorun 기동 시 stderr 로 굵은 경고 배너 강제 출력.

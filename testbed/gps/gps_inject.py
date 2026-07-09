@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-# uav_gps — GPS 인젝터 (SITL 참값 미러). SIMSTATE(truth lat/lng)+VFR_HUD(alt) → GPS_INPUT @10Hz.
+# uav_gps — GPS 인젝터 (SITL 참값 미러). SIMSTATE(truth lat/lng)+VFR_HUD(alt) -> GPS_INPUT @10Hz.
 #   SITL은 SIM_GPS1_ENABLE=0, GPS1_TYPE=14(MAV) 로 떠 있어야 함. UAV netns 로컬(비셀룰러 센서 표현).
 #   사용: python3 gps_inject.py udpin:0.0.0.0:14540   (v2 재사용, v1 검증 로직)
-#   ★ v2.1 수정: 속도(vn/ve/vd)를 0이 아닌 참값으로 주입 — 수평은 참값 위치 미분,
-#     수직은 VFR_HUD climb rate. (이전엔 vn=ve=vd=0 + ignore_flags=0 → 상승 중
+#   v2.1 수정: 속도(vn/ve/vd)를 0이 아닌 참값으로 주입 — 수평은 참값 위치 미분,
+#     수직은 VFR_HUD climb rate. (이전엔 vn=ve=vd=0 + ignore_flags=0 이라 상승 중
 #     EKF에 "수직속도 0"을 주입해 이륙 시 고도 폭주. 정지 검증(G2)만 통과했던 버그.)
 import sys, time, math
 from pymavlink import mavutil
@@ -31,7 +31,7 @@ while True:
     if last_truth and now - last_send >= 0.1:                  # 10Hz
         last_send = now
         lat, lon = last_truth
-        # 참값 속도(NED): 수평=참값 위치 미분, 수직=climb rate(+up → vd는 -). 되먹임 없음.
+        # 참값 속도(NED): 수평=참값 위치 미분, 수직=climb rate(+up 이면 vd는 -). 되먹임 없음.
         if prev_lat is not None and now > prev_t:
             ddt = now - prev_t
             vn = ((lat - prev_lat) / 1e7) * R_EARTH / ddt

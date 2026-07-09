@@ -67,7 +67,7 @@ def build_collectors(out_queue: "_queue.Queue", keyring: Keyring, kid: str, *,
     m = netns_prefix_map or {}
     common = dict(backend=backend, clock=clock)
     # 명령/텔레 평면 blind-gap 복원(적대검증 medium/low): 두 air 탭만 interval_s≈0.1로
-    # 배선해 tcpdump를 back-to-back 재무장시킨다 → ~100% 듀티사이클. default 2.0s면 매
+    # 배선해 tcpdump를 back-to-back 재무장시킨다. 이러면 듀티사이클이 약 100%가 된다. default 2.0s면 매
     # 사이클 tcpdump(≤창) 후 _stop.wait(2.0) 무캡처 대기로 약 50% 듀티사이클이 되어,
     # 14556에 도착하는 단발 COMMAND_LONG(disarm/SET_MODE 등)이 blind-gap에 소실될 수
     # 있다. read_only 관측은 pool=1 세마포어를 잡지 않으므로(backend.run) 연속 재무장이

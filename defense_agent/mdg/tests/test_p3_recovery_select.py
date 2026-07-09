@@ -76,7 +76,7 @@ def test_s1_unknown_signing_only_backdoor_pause_legal():
 
 def test_s1_legal_set_byte_identical_to_pre_phase3():
     # the legal set under the LIVE UNKNOWN posture must be exactly the pre-Phase-3 set so replay
-    # stays byte-identical (불변식①). Only backdoor_pause — signed_guided never leaks into live.
+    # stays byte-identical (불변식1.). Only backdoor_pause — signed_guided never leaks into live.
     world = _world(signing=SigningObs.UNKNOWN, verified={"web_backend": True, "gcs_proxy": True})
     legal, _ = _drive(world)
     assert [a.recovery_type for a in legal] == ["backdoor_pause"]

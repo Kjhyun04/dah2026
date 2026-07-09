@@ -1,4 +1,4 @@
-"""gate.py — 2-tier authorization gate (DETERMINISTIC, secret-free — 불변식①).
+"""gate.py — 2-tier authorization gate (DETERMINISTIC, secret-free — 불변식1.).
 
 Two independent tiers gate every response:
 
@@ -58,7 +58,7 @@ def gate_for(tool_id: str, risk: str, reversible: bool,
     PRESERVED (still carry the original OPER classification) so routing/ledger stays transparent
     that this was an operator-gate tool auto-approved — not a native AUTO tool. This is a
     DETERMINISTIC function of (registry + risk + the env-sourced operator_auto bool): no LLM field,
-    so a hostile advice can never flip it (불변식①). An UNREGISTERED/ghost id is NEVER widened —
+    so a hostile advice can never flip it (불변식1.). An UNREGISTERED/ghost id is NEVER widened —
     the closed-registry fail-closed is absolute, operator_auto does not rescue an unknown tool.
     """
     spec = REGISTRY.get(tool_id)

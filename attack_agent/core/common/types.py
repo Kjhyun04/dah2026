@@ -44,7 +44,7 @@ class ToolKind(str, Enum):
 
 
 class Risk(str, Enum):
-    """HITL 게이트 결정 (06). HIGH → 승인 필요 (04 불변식 2)."""
+    """HITL 게이트 결정 (06). HIGH -> 승인 필요 (04 불변식 2)."""
 
     LOW = "LOW"
     MED = "MED"
@@ -100,7 +100,7 @@ class ReachTarget(str, Enum):
 
 
 class Artifact(str, Enum):
-    """보유 아티팩트 (04 §1 · 11 §1-B). produces↔consumes 연결점."""
+    """보유 아티팩트 (04 §1 · 11 §1-B). produces<->consumes 연결점."""
 
     K_OPC = "k_opc"
     IMSI = "imsi"
@@ -128,14 +128,14 @@ class PredKind(str, Enum):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 2. Fact — boolean-presence 술어 (11 §1-A). frozen → set/subset 판정 가능.
+# 2. Fact — boolean-presence 술어 (11 §1-A). frozen -> set/subset 판정 가능.
 # ═══════════════════════════════════════════════════════════════════════════
 
 
 class Fact(BaseModel):
     """세계상태 KB의 참인 boolean 사실. 없으면 '미확인'(보수원칙, 11 §1-D).
 
-    frozen=True → hashable → WorldState.facts: set[Fact], `f in facts` 판정.
+    frozen=True -> hashable -> WorldState.facts: set[Fact], `f in facts` 판정.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -174,7 +174,7 @@ def weakcred(x: str = "pivot") -> Fact:
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 3. Effect — 상태 전이 선언 (06 §3). SetMode / Disrupt / Cond (조건부).
-#    effect_eval(11 §2)의 입력. 조건부로 방어상태 의존성 인코딩 → ADAPT 유도.
+# effect_eval(11 §2)의 입력. 조건부로 방어상태 의존성 인코딩 -> ADAPT 유도.
 # ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -215,9 +215,9 @@ class SetFlag(BaseModel):
 
 
 class Cond(BaseModel):
-    """조건부 효과. when 충족 → then, 아니면 Blocked(else_blocked) (06 §3).
+    """조건부 효과. when 충족 -> then, 아니면 Blocked(else_blocked) (06 §3).
 
-    effect_eval: signing==on → Blocked / off → then / unknown → Uncertain (11 §2).
+    effect_eval: signing==on -> Blocked / off -> then / unknown -> Uncertain (11 §2).
     """
 
 
@@ -249,11 +249,11 @@ class ParamSpec(BaseModel):
 
 
 class ExecBinding(BaseModel):
-    """safe-exec 바인딩 (06 §2-1 exec · 04 §4). 닫힘 강제점 ②: 이 경로로만 실행.
+    """safe-exec 바인딩 (06 §2-1 exec · 04 §4). 닫힘 강제점 2.: 이 경로로만 실행.
 
     exec_binding 정본 = 사이드카 baked 스크립트 (19 PART2 C5).
 
-    secret_params (R6·ADV-F5): vault→**stdin** 라우팅되는 비밀 param/artifact 이름.
+    secret_params (R6·ADV-F5): vault->**stdin** 라우팅되는 비밀 param/artifact 이름.
       argv 금지(누수). 이 이름들은 args_template 에 **원문이 나타나면 안 됨**;
       실행기가 vault 에서 값을 읽어 `printf %s | docker exec -i … --<name>-stdin` 로 주입.
       (예: forge_sign 의 sign_key, forge_aria 의 aria_key, replay 의 ciphertext.)
@@ -262,14 +262,14 @@ class ExecBinding(BaseModel):
     sidecar: Literal["ue", "core", "sgi", "host"]  # 실행 발판 사이드카(vantage)
     script: str         # 이미지 baked 스크립트 경로 (04 §4)
     args_template: str = ""  # "{...}" params 치환 템플릿 (06 §5 예시). 비밀 원문 금지.
-    secret_params: tuple[str, ...] = ()  # vault→stdin 라우팅 (argv 노출 금지, R6)
+    secret_params: tuple[str, ...] = ()  # vault->stdin 라우팅 (argv 노출 금지, R6)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 5. ToolSpec — 정적 선언 = 레지스트리 1행 (06 §2-1)
 # ═══════════════════════════════════════════════════════════════════════════
 
-# 닫힘 강제점 ① (06): Planner 출력 id가 이 Literal 밖이면 거부. 22 원시 전량 (04 §5, V2-D36).
+# 닫힘 강제점 1. (06): Planner 출력 id가 이 Literal 밖이면 거부. 22 원시 전량 (04 §5, V2-D36).
 ToolId = Literal[
     # RECON (상태불변 · 각 계층 첫 단계)
     "recon_reach",
@@ -305,7 +305,7 @@ ToolId = Literal[
 class ToolSpec(BaseModel):
     """레지스트리 1행. '무엇을 필요로/바꾸는가'만 선언(P1 선언적>절차적).
 
-    조합('어떻게')은 미포함 → 레시피 없이 precond/consumes/produces/effect로 창발.
+    조합('어떻게')은 미포함 -> 레시피 없이 precond/consumes/produces/effect로 창발.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -318,8 +318,8 @@ class ToolSpec(BaseModel):
     precond: tuple[Fact, ...] = ()               # 환경 전제 (AND · Legality 게이트 입력)
     require_any: tuple[tuple[Fact, ...], ...] = ()  # 사실 OR-그룹들 (각 그룹 ≥1, 그룹 간 AND)
     require_any_artifact: tuple[tuple[Artifact, ...], ...] = ()  # 아티팩트 OR-그룹 (nonce_scan)
-    consumes: tuple[Artifact, ...] = ()          # 필요 아티팩트 (produces→consumes 창발 엣지)
-    produces: tuple[Artifact, ...] = ()          # 산출 아티팩트 → KB 갱신·후속 tool 활성
+    consumes: tuple[Artifact, ...] = ()          # 필요 아티팩트 (produces->consumes 창발 엣지)
+    produces: tuple[Artifact, ...] = ()          # 산출 아티팩트 -> KB 갱신·후속 tool 활성
     produces_facts: tuple[Fact, ...] = ()        # recon류 산출 사실(백워드체이닝 표시용)
     effect: Optional[Effect] = None              # 상태 전이 (목표도달 판정 대상)
 
@@ -340,7 +340,7 @@ class ToolSpec(BaseModel):
 class ToolCall(BaseModel):
     """Planner 출력 (06 §2-2). id는 고를 수만 있음(생성 불가). params=열린 조합 축.
 
-    ⚠ 의도적 부재(03): '왜 이 조합인가'·다음단계 힌트를 Call에 넣지 않음 → 레시피 차단.
+    주의 의도적 부재(03): '왜 이 조합인가'·다음단계 힌트를 Call에 넣지 않음 -> 레시피 차단.
     """
 
     model_config = ConfigDict(extra="ignore")
@@ -351,7 +351,7 @@ class ToolCall(BaseModel):
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 6. 아카이브 봉투 계승 (crs/common/core.py) — AgentAction · Message · ToolResult
-#    동일 봉투 / 이질 payload T. Ok→ToolSuccess / Err→ToolError (tool_wrap).
+# 동일 봉투 / 이질 payload T. Ok->ToolSuccess / Err->ToolError (tool_wrap).
 # ═══════════════════════════════════════════════════════════════════════════
 
 

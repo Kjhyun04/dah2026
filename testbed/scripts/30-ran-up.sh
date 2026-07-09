@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 30-ran-up.sh — P3 RAN 기동. eNB 먼저→안정화→UE (ZMQ desync 방지).
+# 30-ran-up.sh — P3 RAN 기동. eNB 를 먼저 띄워 안정화한 뒤 UE 를 올린다 (ZMQ desync 방지).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 log(){ printf '\033[1;34m[RAN]\033[0m %s\n' "$*"; }

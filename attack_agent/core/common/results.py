@@ -3,16 +3,16 @@
 이 3종(ReconResult/CollectResult/InjectResult) = ToolSuccess[T]의 T (06 §6).
 **공격 payload 아님** — tool이 반환하는 '공격자-가시' 데이터(15 §1).
 
-22 원시 커버(kind→result):
-  PROBE  → ReconResult   : recon_reach(reach) · recon_defense(signing) · recon_session(seid,sessions)
-  COLLECT→ CollectResult : capture_downlink · s1u_capture(ciphertext,pcap) · subdb_dump(k_opc,imsi)
+22 원시 커버(kind->result):
+  PROBE  -> ReconResult   : recon_reach(reach) · recon_defense(signing) · recon_session(seid,sessions)
+  COLLECT-> CollectResult : capture_downlink · s1u_capture(ciphertext,pcap) · subdb_dump(k_opc,imsi)
                            key_extract(aria_key) · signkey_leak(sign_key) · nonce_scan(nonce_collision)
-  INJECT → InjectResult  : serial5762 · oracle · webcmd · forge_sign · forge_aria · replay · naive
+  INJECT -> InjectResult  : serial5762 · oracle · webcmd · forge_sign · forge_aria · replay · naive
                            (mode via effect) · pfcp_delete/pfcp_flood/peer_flood(c2) ·
                            subdb_canary(subscriber_written flag) · forceland(mode=9) · pivot_exploit(reach)
 
-@ToolVerifyClass 제약(15 §2·아카이브): **optional list 금지** → 리스트는 필수+기본 [].
-  pydantic v2에서 `= []` 는 인스턴스마다 deepcopy → 공유 변이 없음(core.py 주석 규격).
+@ToolVerifyClass 제약(15 §2·아카이브): **optional list 금지** -> 리스트는 필수+기본 [].
+  pydantic v2에서 `= []` 는 인스턴스마다 deepcopy -> 공유 변이 없음(core.py 주석 규격).
 
 완전분리(06 P2): InjectResult엔 **감독 ground-truth 필드 없음**. effect는 공격자-관측 추정치.
 작성 2026-07-05.
@@ -57,7 +57,7 @@ class CollectResult(_ResultBase):
 class InjectResult(_ResultBase):
     """주입 INJECT 반환 (15 §1). ACK 수용 + 공격자-관측 효과.
 
-    ⚠ 감독 ground-truth 필드 없음(완전분리·06 P2). effect는 자기판정 추정치.
+    주의 감독 ground-truth 필드 없음(완전분리·06 P2). effect는 자기판정 추정치.
     """
 
     accepted: bool = False                     # ACK 수용
@@ -82,11 +82,11 @@ class CampaignResult(BaseModel):
     """최종산출 = terminate 반환 (15 §2). viewer·심사 근거.
 
     감독 판정은 별도 산출(여기 미포함, 완전분리). 자기 ACK 판정만.
-    @ToolVerifyClass: optional list 금지 → 리스트 필수+기본 [].
+    @ToolVerifyClass: optional list 금지 -> 리스트 필수+기본 [].
     """
 
     goal_reached: bool = False
-    chain: list[StepRecord] = []          # ★ 도출된 조합 = 실행 원시 순서
+    chain: list[StepRecord] = []          # 도출된 조합 = 실행 원시 순서
     defenses_bypassed: list[str] = []     # 우회한 방어 (signing/auth…)
     win_causes: list[str] = []            # config-flaw/key-leak/crypto-break
     kb_final: dict = {}                   # 최종 KB 스냅샷 (마스킹)

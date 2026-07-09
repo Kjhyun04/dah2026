@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # DAH R3 — UE 격리 미비 취약점 실증 (읽기전용). Open5GS UPF는 UE-to-UE를 유저스페이스
-# 스위칭 → 커널 iptables 격리 불가(검증됨). 아래는 공격 기준선 도달성 근거.
+# 스위칭하므로 커널 iptables 로는 격리가 불가능하다(검증됨). 아래는 공격 기준선의 도달성을 보이는 근거다.
 set -uo pipefail
 UAV=10.45.0.3; ATK_HOST=attacker_ue; SGI_C2=172.30.0.10
 p(){ docker exec "$1" ping -c2 -W2 "$2" >/dev/null 2>&1 && echo REACHABLE || echo BLOCKED; }

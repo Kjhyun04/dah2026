@@ -7,7 +7,7 @@
   (3) HTML/JS 자기완결: 외부 URL(http(s)://··//cdn··fonts) 부재 · EventSource('/sse') ·
       3패널 컨테이너 id(panel-action/panel-comms/panel-supervisor) 존재.
   (4) ingest 라운드트립: action/evaluation/comms 샘플 로드 · frames_from_evaluation 재구성.
-  (5) redact: 계획 secret 주입→마스킹 확인 · build_snapshot 직렬화 전체 _SECRET_RE 잔존 0.
+  (5) redact: 계획 secret 주입->마스킹 확인 · build_snapshot 직렬화 전체 _SECRET_RE 잔존 0.
   (6) 분류 정합(soft): registry importable 이면 INJECT 집합 & len==22 경고성 대조(FAIL 아님).
 
 이 파일은 fastapi/uvicorn/pymavlink 미설치라도 통과한다(server 는 compile 만, import 안 함).
@@ -175,7 +175,7 @@ _snap = ingest.build_snapshot(_sample / "action.jsonl", _sample / "evaluation.js
 check("build_snapshot.banner.mismatch==True (agree=False)", _snap["banner"]["mismatch"] is True)
 check("build_snapshot.comms.source=='stream'(스트림 존재)", _snap["comms"]["source"] == "stream")
 
-# 스트림 부재 폴백 → reconstructed
+# 스트림 부재 폴백 -> reconstructed
 _snap2 = ingest.build_snapshot(_sample / "action.jsonl", _sample / "evaluation.json", None)
 check("스트림 부재 → comms.source=='reconstructed'", _snap2["comms"]["source"] == "reconstructed")
 
@@ -215,7 +215,7 @@ try:
     _reg_layers = {tid for tid in REGISTRY}
     warn("_LAYER 키가 registry tool 전량 커버",
          set(ingest._LAYER.keys()) >= _reg_layers)
-except Exception as e:  # registry 미탑재 환경 → soft skip
+except Exception as e:  # registry 미탑재 환경 -> soft skip
     print(f"      [skip] registry 미import ({type(e).__name__}) — 분류정합 soft 생략")
 
 

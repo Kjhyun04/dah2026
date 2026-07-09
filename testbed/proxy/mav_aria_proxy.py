@@ -2,7 +2,7 @@
 # mav_aria_proxy — MAVLink C2를 국산암호 ARIA-256-GCM(AEAD)으로 감싸는 UDP 프록시 쌍.
 #   [SITL]--평문--(uav_proxy)==ARIA-GCM 암호문(셀룰러)==(gcs_proxy)--평문--[GCS]
 #   datagram = VER(0x01) || nonce(12, 패킷별 랜덤) || CT || TAG(16)   (MAVLink 메시지 1:1)
-#   AEAD 인증 실패(변조/오키) → 조용히 폐기. KCMVP 검증모듈 교체 지점 = AriaGCM 1개.
+#   AEAD 인증에 실패하면(변조되었거나 키가 틀리면) 조용히 폐기한다. KCMVP 검증모듈 교체 지점은 AriaGCM 한 곳뿐이다.
 #   사용:
 #     자가검증:  python3 mav_aria_proxy.py --selftest
 #     UAV측:  --plain-listen 127.0.0.1:14550 --cipher-listen 0.0.0.0:14555 --cipher-peer <GCS>:14555 --key-hex <64hex>
@@ -10,7 +10,7 @@
 import sys, os, socket, select, argparse, ctypes, ctypes.util
 from ctypes import c_void_p, c_char_p, c_int, POINTER, byref, create_string_buffer
 
-# ── ARIA-256-GCM via OpenSSL libcrypto (ctypes) ─────────────────────────────
+# ARIA-256-GCM: OpenSSL libcrypto를 ctypes로 직접 호출한다.
 GCM_SET_IVLEN = 0x9; GCM_GET_TAG = 0x10; GCM_SET_TAG = 0x11
 class AriaGCM:
     """OpenSSL EVP_aria_256_gcm AEAD. (KCMVP 검증모듈 교체 지점)"""
@@ -78,7 +78,7 @@ class C2Cipher:
         if len(blob) < 1 or blob[0:1] != VER: return None
         return self.a.decrypt(self.key, blob[1:])
 
-# ── 자가검증 (roundtrip + 변조탐지 + 타키거부) ───────────────────────────────
+# 자가검증: roundtrip 확인, 변조 탐지, 잘못된 키 거부까지 한 번에 점검한다.
 def selftest():
     print("[selftest] ARIA-256-GCM 가용성...")
     c = C2Cipher(os.urandom(32)); print("           ✓ EVP_aria_256_gcm OK")
@@ -90,7 +90,7 @@ def selftest():
     print("           ✓ roundtrip OK · 1비트 변조/타키 → 폐기 OK")
     print("[selftest] ✅ 전체 통과 — ARIA-GCM C2 프록시 사용 가능"); return 0
 
-# ── UDP 양방향 암호 릴레이 (MAVLink 메시지 1:1, 패킷별 nonce) ────────────────
+# UDP 양방향 암호 릴레이. MAVLink 메시지 하나당 패킷 하나이며, 패킷마다 nonce를 새로 쓴다.
 def _make_verifier():
     import os
     kf = os.environ.get("MAV_SIGN_KEYFILE")
@@ -131,12 +131,12 @@ def run_proxy(a):
     while True:
         r, _, _ = select.select([plain, ciph], [], [])
         for s in r:
-            if s is plain:                               # 평문 → 암호화 → 셀룰러
+            if s is plain:                               # 평문을 받아 암호화한 뒤 셀룰러로 내보낸다.
                 data, addr = plain.recvfrom(65535)
                 if plain_peers is None: learned_pp = addr
                 if cp is None: continue
                 ciph.sendto(cph.wrap(data), cp); up += 1
-            else:                                        # 암호문 → 복호 → 평문측(fan-out)
+            else:                                        # 암호문을 복호해서 평문측으로 전달한다(fan-out).
                 blob, addr = ciph.recvfrom(65535)
                 if a.cipher_peer is None: cp = addr
                 pt = cph.unwrap(blob)

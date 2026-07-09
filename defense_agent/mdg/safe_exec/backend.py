@@ -1,4 +1,4 @@
-"""Backend.run(ExecRequest) — THE ONLY subprocess path (불변식②, Robo Duck R1~R6).
+"""Backend.run(ExecRequest) — THE ONLY subprocess path (불변식2., Robo Duck R1~R6).
 
 Graph nodes and collectors never spawn processes; they hand an ExecRequest to
 Backend.run, which is the sole owner of ``subprocess``. Backend performs the spawn
@@ -190,7 +190,7 @@ class Backend:
         #   idle air-tap tcpdump가 count 패킷을 기다리며 오래 블로킹해도, pool=1 세마포어를
         #   점유하지 않으므로 그래프 act 노드/타 collector의 집행이 직렬 대기하지 않는다
         #   (성능 경합 버그 수정). teardown/reap(R1·R6)은 _spawn 내부에서 그대로 수행되므로
-        #   불변식②(누수-0)는 세마포어와 무관하게 유지된다.
+        # 불변식2.(누수-0)는 세마포어와 무관하게 유지된다.
         #   5762 pool=1 의도 무손상: WebProbe의 ss는 read-only 관측이라 5762 소켓 슬롯을
         #   실제로 점유(연결/집행)하지 않는다 — 세마포어 없이도 자원 단일화 대상이 아님.
         if read_only:
@@ -212,7 +212,7 @@ class Backend:
         mode. Gating reap on allow_live would disable crash-orphan recovery for the
         primary read-only observation path (감사 P1).
 
-        This is not a protected-asset state change: reap_labelled → iter_labelled_pids
+        This is not a protected-asset state change: reap_labelled calls iter_labelled_pids and
         scans ONLY this container's /proc for our own DAH_DEF_LABEL=dah_def marker and
         os.kill(pid, SIGKILL)s each such pid individually (single-pid semantics, per the
         Python os.kill contract). It can therefore only tear down our own labelled

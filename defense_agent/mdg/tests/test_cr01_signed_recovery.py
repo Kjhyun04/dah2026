@@ -3,7 +3,7 @@
 Locks the "command-domain incident -> send_signed_mode becomes a LEGAL recovery" wiring,
 end to end through select_policy + legality + rank_recovery, with ZERO core hardcode
 (tuning lives only in recovery_priors.yaml + the closed _INCIDENT_RECOVERY map). Runs
-offline and fully deterministic (불변식①).
+offline and fully deterministic (불변식1.).
 
 Two routes deliver send_signed_mode as a legal candidate; both are locked here:
 

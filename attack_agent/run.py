@@ -1,14 +1,14 @@
-"""run.py — 엔트리포인트 CLI (10 §1 · 13 §6). config+goal → recon-only 폐루프 → JSONL.
+"""run.py — 엔트리포인트 CLI (10 §1 · 13 §6). config+goal -> recon-only 폐루프 -> JSONL.
 
 사용:
   python run.py --config config.yaml --goal goal.yaml [--recon-only] [--backend mock|local|ssh]
   python run.py --config config.yaml --goal-expr "mode_set mode=4 defense=on"
                 [--no-llm] [--out run.jsonl]
 
-★ 완전 오프라인 기본: --backend mock + --no-llm(seed-only) → docker/테스트베드 무접속으로
-  부트스트랩 폐루프(config→WorldState→backend→runner_factory→recon 시드→CampaignResult)를
+완전 오프라인 기본: --backend mock + --no-llm(seed-only) -> docker/테스트베드 무접속으로
+  부트스트랩 폐루프(config->WorldState->backend->runner_factory->recon 시드->CampaignResult)를
   로컬 검증한다. local/ssh 백엔드·live LLM 은 사람 런북(gate-1) 전용(여기서 강제하지 않음).
-★ recon-only(기본 on): 노출/실행 tool 이 RECON 계층뿐 → 주입(INJECT) tool 미실행.
+recon-only(기본 on): 노출/실행 tool 이 RECON 계층뿐 -> 주입(INJECT) tool 미실행.
 작성 2026-07-06.
 """
 
@@ -24,7 +24,7 @@ try:  # Windows 콘솔(cp949) 유니코드 출력 보호.
 except Exception:
     pass
 
-# run.py 는 repo 루트 → core 패키지가 sys.path 에 있도록 보장(직접 실행 대비).
+# run.py 는 repo 루트 -> core 패키지가 sys.path 에 있도록 보장(직접 실행 대비).
 _ROOT = Path(__file__).resolve().parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))

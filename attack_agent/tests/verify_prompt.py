@@ -3,10 +3,10 @@
 무해·오프라인(테스트베드/도커/네트워크/litellm 불필요). 구조 검사는 파일·AST·jinja 렌더 위주.
 
 P1(레시피 금지, V2-D5): prompts/default.yaml 에 '특정 tool id 2개 이상을 순서(sequencing)로
-  엮은 처방'(예: "serial5762 다음 oracle 를 써라", "A → B → C" 체인)이 없는지 검사.
-  ★휴리스틱(명시): 한 스팬(라인/3라인 창) 안에서 (a) REGISTRY 의 서로 다른 tool id 가 2개 이상
-    등장하고 (b) 그 두 id **사이**에 순서 접속어(다음/이후/→/then/순서/뒤에/후에/연쇄)가 놓일 때만
-    '레시피'로 flag. 단순 나열(·, 쉼표)·용어정의 번호목록·일반 의사결정 원칙("불확실→먼저 정찰",
+  엮은 처방'(예: "serial5762 다음 oracle 를 써라", "A -> B -> C" 체인)이 없는지 검사.
+ 휴리스틱(명시): 한 스팬(라인/3라인 창) 안에서 (a) REGISTRY 의 서로 다른 tool id 가 2개 이상
+    등장하고 (b) 그 두 id **사이**에 순서 접속어(다음/이후/->/then/순서/뒤에/후에/연쇄)가 놓일 때만
+    '레시피'로 flag. 단순 나열(·, 쉼표)·용어정의 번호목록·일반 의사결정 원칙("불확실->먼저 정찰",
     카테고리어 '정찰/recon')은 위반이 아님(접속어가 두 tool id 사이에 없으므로 통과).
   또한 파일 상단(주석 헤더, agents: 이전)에 '레시피 금지' 원칙문이 실재하는지 확인.
 
@@ -19,7 +19,7 @@ P2(StrictUndefined 렌더): core.common.prompt_context 로더로 default.yaml �
 
 P4(tool 3자 정합): REGISTRY 길이==23, ToolId(Literal)==REGISTRY keys,
   default.yaml agents.*.tools keys==REGISTRY keys(3자), 각 tool 의 summary 필드 비어있지 않음.
-  주의: ToolSpec(pydantic) 자체엔 description/summary 필드가 없음 → 사람이 읽는 요약은
+  주의: ToolSpec(pydantic) 자체엔 description/summary 필드가 없음 -> 사람이 읽는 요약은
     prompts/default.yaml 의 tools[<id>].summary 에 존재. 여기선 그 요약의 비어있지 않음을 검사.
 
 작성 2026-07-07.
@@ -30,13 +30,13 @@ _import_sys=__import__('sys'); _import_os=__import__('os')
 from pathlib import Path as _Path
 _REPO=_Path(__file__).resolve().parents[1]
 if str(_REPO) not in _import_sys.path: _import_sys.path.insert(0,str(_REPO))
-_import_os.chdir(_REPO)  # cwd=repo root → cwd-relative paths resolve
+_import_os.chdir(_REPO)  # cwd=repo root -> cwd-relative paths resolve
 
 import re
 import sys
 from typing import Any, Optional
 
-# Windows 콘솔(cp949)에서 유니코드(—·→… 등) 출력 깨짐/크래시 방지.
+# Windows 콘솔(cp949)에서 유니코드(—·->… 등) 출력 깨짐/크래시 방지.
 try:
     sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
 except Exception:

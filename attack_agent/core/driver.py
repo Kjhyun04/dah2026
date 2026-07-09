@@ -1,16 +1,16 @@
 """core.driver — recon-only run-driver (P2/P3 실행 글루).
 
 부트스트랩 폐루프(13 §6 · 10 §1):
-  load_config/load_goal → premise_facts → WorldState.initial
-    → SidecarManager(config) → Backend(container_of=SidecarManager)
-    → make_runner_factory(safeexec) → AttackOrchestrator → run() → CampaignResult(JSONL).
+  load_config/load_goal -> premise_facts -> WorldState.initial
+    -> SidecarManager(config) -> Backend(container_of=SidecarManager)
+    -> make_runner_factory(safeexec) -> AttackOrchestrator -> run() -> CampaignResult(JSONL).
 
-★ 완전 오프라인: 기본 백엔드는 **MockBackend**(docker/테스트베드 무접속). LocalBackend/
+완전 오프라인: 기본 백엔드는 **MockBackend**(docker/테스트베드 무접속). LocalBackend/
   SshBackend 배선은 정본 코드로 조립만 하며 실행은 사람 런북(gate-1)이 수행한다.
-★ recon-only 프로파일(명시 옵션): goal.scope 를 RECON 으로 강제 → 노출/실행 tool 이
-  RECON 계층(PROBE/COLLECT-recon)뿐 → **주입(INJECT) tool 은 구조적으로 미실행**.
+recon-only 프로파일(명시 옵션): goal.scope 를 RECON 으로 강제 -> 노출/실행 tool 이
+  RECON 계층(PROBE/COLLECT-recon)뿐 -> **주입(INJECT) tool 은 구조적으로 미실행**.
   offline dry-run(no_llm)은 auto_seed_recon 만으로 KB 를 시드하고 LLM 루프를 건너뛴다.
-★ TargetResolver 연결: 동일 backend(container_of=SidecarManager)를 주입 → role→IP 해석의
+TargetResolver 연결: 동일 backend(container_of=SidecarManager)를 주입 -> role->IP 해석의
   사이드카 exec 가 SidecarManager 를 경유(13 §5). 오프라인 무실행(런북).
 
 불변식: 하드코딩0(전부 config) · grep0 · 레시피 금지 · 종료계약(teardown=우리 라벨 rm -f).
@@ -53,18 +53,18 @@ except Exception:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 1. 사이드카 규격 조립 (config → SidecarSpec). 하드코딩0: 전부 config 파생.
+# 1. 사이드카 규격 조립 (config -> SidecarSpec). 하드코딩0: 전부 config 파생.
 # ═══════════════════════════════════════════════════════════════════════════
 
 # 벤티지 netns 공유 정책(13 §3 구조 사실 · IP/이름 아님):
-#   ue  = attacker_ue netns 공유(--network container:) → rogue UE 시야.
-#   core= pivot netns 공유(--network container:) → pivot 후 net_core 시야.
+# ue = attacker_ue netns 공유(--network container:) -> rogue UE 시야.
+# core= pivot netns 공유(--network container:) -> pivot 후 net_core 시야.
 #   sgi = net_sgi 네트워크 연결(--network <net>).
 _NETNS_SHARE: dict[str, bool] = {"ue": True, "core": True, "sgi": False}
 
 
 def build_sidecar_specs(cfg: InputSpec) -> list[SidecarSpec]:
-    """config.exec.vantage + tools.image → SidecarSpec 목록(ue/sgi/(core)).
+    """config.exec.vantage + tools.image -> SidecarSpec 목록(ue/sgi/(core)).
 
     core 는 vantage.core 지정 시에만(옵션). 이미지: pfcp 툴링 있으면 core=pfcp, 없으면 air.
     """
@@ -85,22 +85,22 @@ def build_sidecar_specs(cfg: InputSpec) -> list[SidecarSpec]:
 def build_sidecar_manager(
     cfg: InputSpec, *, docker_bin: str = "docker", backend: Optional[Backend] = None
 ) -> SidecarManager:
-    """config → SidecarManager(container_of 리졸버 제공). backend 는 이후 bind 가능."""
+    """config -> SidecarManager(container_of 리졸버 제공). backend 는 이후 bind 가능."""
     return SidecarManager(
         specs=build_sidecar_specs(cfg), docker_bin=docker_bin, backend=backend
     )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 2. WorldState 초기화 (premise footholds → 초기 사실)
+# 2. WorldState 초기화 (premise footholds -> 초기 사실)
 # ═══════════════════════════════════════════════════════════════════════════
 
 
 def build_worldstate(cfg: InputSpec, *, signing: Optional[str] = None) -> WorldState:
-    """premise.footholds/weakcred_pivot → WorldState.initial.
+    """premise.footholds/weakcred_pivot -> WorldState.initial.
 
     signing: goal.defense∈{on,off} 이면 config 선언으로 시드(prov=config, D18·19 PART1-1).
-      'auto'/None 이면 미시드 → recon_defense/lazy 학습 소유(정직: 미충족은 계층 보수 봉쇄).
+      'auto'/None 이면 미시드 -> recon_defense/lazy 학습 소유(정직: 미충족은 계층 보수 봉쇄).
     """
     from core.modules.kb import Signing
 
@@ -127,7 +127,7 @@ def build_backend(
     mock_table: Optional[Mapping[str, ExecOutput]] = None,
     mock_live_local: bool = False,
 ) -> Backend:
-    """exec.mode/명시 kind → Backend. container_of=SidecarManager 주입(local/ssh).
+    """exec.mode/명시 kind -> Backend. container_of=SidecarManager 주입(local/ssh).
 
     kind ∈ {'mock','local','ssh'}. 'mock' 은 오프라인 폐루프 기본(docker 무접속).
     local/ssh 는 정본 배선(실행은 런북) — SidecarManager.container_of 로 사이드카 해석.
@@ -160,19 +160,19 @@ def build_backend(
 
 
 def resolve_backend_from_config(cfg: InputSpec) -> str:
-    """config.exec.mode → 백엔드 종류('local'|'ssh'|'mock'). (docker_exec/host→local)."""
+    """config.exec.mode -> 백엔드 종류('local'|'ssh'|'mock'). (docker_exec/host->local)."""
     return resolve_backend_kind(cfg.exec_.mode)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 4. TargetResolver 연결 (role→IP 해석이 backend(=SidecarManager) 경유)
+# 4. TargetResolver 연결 (role->IP 해석이 backend(=SidecarManager) 경유)
 # ═══════════════════════════════════════════════════════════════════════════
 
 
 def build_resolver(
     cfg: InputSpec, backend: Backend, *, docker_bin: str = "docker"
 ) -> TargetResolver:
-    """config.tgt(role→컨테이너명) + backend → TargetResolver. 사이드카 exec 는 backend 경유.
+    """config.tgt(role->컨테이너명) + backend -> TargetResolver. 사이드카 exec 는 backend 경유.
 
     backend.container_of=SidecarManager 이므로 identify 프로브(sidecar='ue')가 사이드카를
     SidecarManager 로 해석한다(13 §5 연결). net_names 재매핑: config 는 이름만이라 기본 enum.
@@ -192,7 +192,7 @@ def build_resolver(
 # 5. 오케스트레이터 조립 (recon-only 프로파일)
 # ═══════════════════════════════════════════════════════════════════════════
 
-# recon-only scope 센티넬: A/B/C/D 미포함 → scoped_tool_ids 가 RECON 계층만 노출.
+# recon-only scope 센티넬: A/B/C/D 미포함 -> scoped_tool_ids 가 RECON 계층만 노출.
 _RECON_SCOPE: list[str] = ["RECON"]
 
 
@@ -214,18 +214,18 @@ def build_orchestrator(
     preflight: bool = True,
     resolver: Optional[TargetResolver] = None,
 ) -> AttackOrchestrator:
-    """AttackOrchestrator 조립. recon_only → RECON scope. no_llm → seed-only(LLM 루프 생략).
+    """AttackOrchestrator 조립. recon_only -> RECON scope. no_llm -> seed-only(LLM 루프 생략).
 
     no_llm=True: auto_seed_recon 으로 recon 러너만 태워 KB 시드 후 즉시 종료(max_steps=0).
       완전 오프라인·결정론(LLM 미호출). recon-only dry-run 의 기본.
     no_llm=False: 정상 ReAct 루프(replay 또는 live LLM). recon_only 면 노출 tool=RECON.
 
     resolver: INJECT tool 의 args_template IP placeholder({oracle_ip}/{cipher_ip}) 를 실행
-      시점에 role→IP 로 해석해 주입(safeexec make_runner (0)단계). 미전달 시 IP placeholder
+      시점에 role->IP 로 해석해 주입(safeexec make_runner (0)단계). 미전달 시 IP placeholder
       tool 은 fail-closed(Err) — 실 캠페인은 build_driver 가 build_resolver 결과를 넘긴다.
     """
     g = recon_only_goal(goal) if recon_only else goal
-    # 모델 해석(A5·07 §4): llm.models_path 지정 시 configs/models.yaml 로 role→routable 해석.
+    # 모델 해석(A5·07 §4): llm.models_path 지정 시 configs/models.yaml 로 role->routable 해석.
     #   미지정이면 cfg.llm.model 그대로(하위호환·회귀 0). override=cfg.llm.model(운영자 명시 존중).
     model = cfg.llm.model
     mm = None
@@ -235,7 +235,7 @@ def build_orchestrator(
         mm = load_model_map(cfg.llm.models_path)
         model = resolve_model("AttackOrchestrator", mm, override=cfg.llm.model)
     # runner_factory 는 backend 주입 시 orchestrator 내부에서 make_runner_factory 로 배선.
-    #   (동일 팩토리를 seed_recon 이 재사용 → 정찰 러너도 실행엔진에 연결.)
+    # (동일 팩토리를 seed_recon 이 재사용 -> 정찰 러너도 실행엔진에 연결.)
     _rf = make_runner_factory(
         backend=backend,
         vault=vault or Vault(),
@@ -310,14 +310,14 @@ class Driver:
     no_llm: bool = False
 
     async def run(self) -> CampaignResult:
-        """캠페인 실행 → CampaignResult. 종료 후 사이드카 우리-라벨 rm -f(원자 회수).
+        """캠페인 실행 -> CampaignResult. 종료 후 사이드카 우리-라벨 rm -f(원자 회수).
 
         orch.run() 이 backend.teardown()(per-job PGID reap)을 finally 로 보장하고,
         여기서 SidecarManager.teardown()(라벨 컨테이너 원자 회수·정본)을 추가 수행한다.
         오프라인(mock/미바인딩)에선 teardown 이 no-op.
         """
         # live/local/ssh 경로는 실행 전에 장수 사이드카를 보장해야 한다.
-        # (ensure 미실행 시 docker exec 대상 부재 → preflight rc=1 연쇄 오류)
+        # (ensure 미실행 시 docker exec 대상 부재 -> preflight rc=1 연쇄 오류)
         if not isinstance(self.backend, MockBackend):
             self.mgr.bind_backend(self.backend)
             # 필수 벤티지: ue/sgi. core 는 환경에 따라 pivot 컨테이너가 없을 수 있어 optional.
@@ -352,7 +352,7 @@ def build_driver(
     replay: Optional[ReplayHook] = None,
     defense: Optional[str] = None,
 ) -> Driver:
-    """config+goal → 완전 조립된 Driver.
+    """config+goal -> 완전 조립된 Driver.
 
     backend_kind 미지정 시: no_llm(오프라인 dry-run)=mock, 아니면 config.exec.mode 파생.
     workdir 미지정 시: config.out.log 디렉터리(파일 캡처 임시경로).
@@ -409,7 +409,7 @@ def build_driver(
 
 
 def campaign_to_jsonl(result: CampaignResult) -> str:
-    """CampaignResult → JSONL 문자열. 각 step 1줄 + 마지막 요약 1줄(type 태그).
+    """CampaignResult -> JSONL 문자열. 각 step 1줄 + 마지막 요약 1줄(type 태그).
 
     grep0/완전분리: 공격자-가시 payload 만(감독 truth 없음). kb_final 은 마스킹 스냅샷.
     """
@@ -444,7 +444,7 @@ def write_jsonl(result: CampaignResult, path: str | Path) -> Path:
 
 
 def recon_replay(steps: list[tuple[str, str]]) -> ReplayLLM:
-    """(tool, args-json) 시퀀스 → ReplayLLM(litellm 미호출 결정론 재생).
+    """(tool, args-json) 시퀀스 -> ReplayLLM(litellm 미호출 결정론 재생).
 
     recon-only 폐루프를 LLM 없이 재현(예: [('recon_reach','{}'),('recon_defense','{}')]).
     """

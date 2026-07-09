@@ -4,8 +4,8 @@ Each iteration = exactly ONE graph execution = 1 tick. A tick is driven by a sin
 graph.stream(inp, cfg, stream_mode='updates') pass: the stream IS the execution, its
 updates are recorded (PS-3 redact), and the resulting tick state is read back from the
 checkpointer via graph.get_state(cfg). There is NO separate graph.invoke() — running
-both would fire the act node's side effect TWICE per iteration (violates 불변식② 누수-0)
-and desync the recorded tick from the loop-condition state (violates 불변식①).
+both would fire the act node's side effect TWICE per iteration (violates 불변식2. 누수-0)
+and desync the recorded tick from the loop-condition state (violates 불변식1.).
 
 Tick continuity (CORRECTED — S-2 live finding): every tick's graph terminates at END
 (all loop-backs -> END, by topology). In LangGraph a thread that reached END has NO
@@ -68,7 +68,7 @@ def run_driver(graph, run_id: str, cfg: Optional[dict] = None, state0: Optional[
     forever (24/7 감시 모드): True 면 위 break 조건을 전부 무시하고 KeyboardInterrupt/프로세스
     종료까지 계속 관측한다 — 평시(quiescence)에 멈추지 않는 상시 탐지 데몬. tick_interval_s>0 이면
     매 틱 사이에 그만큼 대기(collector interval 에 맞춰 CPU 스핀 방지). 배치/replay(demo·campaign)는
-    forever=False 기본이라 결정론·바이트동일 재생이 무손상(불변식① 무영향). Green 평시 틱은 조기 END 라
+    forever=False 기본이라 결정론·바이트동일 재생이 무손상(불변식1. 무영향). Green 평시 틱은 조기 END 라
     incident/decision 채널이 누적하지 않아(operator.add([]) = 무증가) 상시런 메모리는 실제 사건 수로 유계."""
     budgets = D.DRIVER_BUDGETS
     max_iters = max_iters if max_iters is not None else budgets["max_iters"]
@@ -146,14 +146,14 @@ def _tick(graph, inp: Any, invoke_cfg: dict, jsonl_path: str,
           seq_start: int = 0) -> tuple[MDGState, int]:
     """Run EXACTLY ONE graph execution (1 tick); return ``(final_state, next_seq)``.
 
-    The single graph.stream() pass IS the execution (불변식②: the act side effect runs
+    The single graph.stream() pass IS the execution (불변식2.: the act side effect runs
     once per tick, never twice). Recording is DELEGATED to replay.record.record_update —
-    the ONE canonical recorder (project→redact→canonical sort_keys serialization→final
+    the ONE canonical recorder (project -> redact -> canonical sort_keys serialization -> final
     scrub), so the production driver and the tested recorder are a single byte-identical
     contract emitting the canonical {seq,node,patch} schema (not the legacy {node:patch}).
     Recording failures never crash the driver. The tick's final state is read back from the
     checkpointer (graph.get_state) so the recorded tick and the loop-condition state are one
-    and the same execution (불변식①).
+    and the same execution (불변식1.).
     """
     # Lazy import: record.py imports driver (redact/_scrub_str), so importing it at module
     # load would form a cycle. It is import-safe here (no langgraph/fastapi dependency).

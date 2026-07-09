@@ -7,7 +7,7 @@ Three panels (V3 §8):
                           agent's decision — the *agent ≠ truth* comparison (H-K)
 
 UI (2026-07): the alarming top banner is removed. The agent≠truth semantics survive as
-compact header stat chips (신뢰근원 trust_root + ⚠ 불일치 count) — the Verifier (a separate
+compact header stat chips (신뢰근원 trust_root + 불일치 count) — the Verifier (a separate
 trust root) stays authoritative for link health without a red warning bar. The per-tick
 timeline is grouped into collapsible batches of 10 ticks (newest auto-expanded, expand-state
 preserved across the 3s refresh) and risk-colored (Red=위험 / Yellow=주의 / Green=평시;
@@ -98,8 +98,8 @@ WARN_SIGNALS = {"Recon", "Port_Scan", "Telemetry_Degraded", "GPS_Jitter", "Rogue
 def _classify_view(signals: list[str]) -> tuple[list[str], str]:
     """표현계층 재분류: 상시 시그니처를 제외한 '공격 시그니처'와 로그용 밴드(위험/주의/평시).
 
-    상시(구조적) 조건만 있는 틱 → 평시(Green): 로그 타임라인이 신규 공격만 부각하도록.
-    비-상시 시그니처가 있으면 → 저심각(WARN)만이면 주의(Yellow), 그 외/미지 → 위험(Red, fail-alert)."""
+    상시(구조적) 조건만 있는 틱은 평시(Green)로 본다. 로그 타임라인이 신규 공격만 부각하도록 하기 위함이다.
+    비-상시 시그니처가 있을 때, 저심각(WARN)만이면 주의(Yellow), 그 외이거나 미지이면 위험(Red, fail-alert)."""
     attack = [s for s in signals if s not in STANDING_SIGNALS]
     if not attack:
         return attack, "Green"
@@ -114,9 +114,9 @@ def _detect_band(signals: list[str]) -> str:
 
     이유: command-hijack / 5762-LAND 의 실제 공격 서명은 config 지표(Unauthorized_Command,
     Port_5762_State)이며 이는 STANDING_SIGNALS 에 속한다. view_band 는 이들을 걷어내 Green 으로
-    보이므로, 그 값으로 복구 카드를 그리면 실제 비행 하이재킹 틱이 '밴드 Green→Green'(공격 없음)
-    으로 렌더된다. 복구 서사(탐지→…→회복)는 상시 시그니처를 포함한 밴드로 판정해야 한다.
-    상시/일반 구분 없이: 시그니처 없음→평시, 저심각(WARN)만→주의, 그 외→위험."""
+    보이므로, 그 값으로 복구 카드를 그리면 실제 비행 하이재킹 틱이 '밴드가 Green에서 Green으로'(공격 없음)
+    렌더된다. 복구 서사(탐지에서 회복까지)는 상시 시그니처를 포함한 밴드로 판정해야 한다.
+    상시/일반 구분 없이: 시그니처 없음은 평시, 저심각(WARN)만이면 주의, 그 외는 위험."""
     if not signals:
         return "Green"
     if all(s in WARN_SIGNALS for s in signals):
@@ -197,7 +197,7 @@ def _flight_series(comm_panel: list[dict]) -> list[dict]:
 
 def _recovery_events(ticks: list, band_by_tick: dict, flight: list[dict]) -> list[dict]:
     """Group ledger(Intent) + worldstate.applied[rule].confirmed + detection-band transitions into
-    per-incident recovery lifecycles: 탐지→대응→집행→확인→회복. One event per recovery ``rule``.
+    per-incident recovery lifecycles: 탐지 -> 대응 -> 집행 -> 확인 -> 회복. One event per recovery ``rule``.
 
     ``band_by_tick`` here is the recovery detection band (engine impact_band / incident presence,
     built by ``_recovery_band``), NOT the standing-filtered view_band — so a command-hijack /
@@ -409,7 +409,7 @@ def load_panels(run_path: str) -> dict:
     flight = _flight_series(comm_panel)
     # 복구 lifecycle 밴드는 view_band(상시조건 제외, 로그 전용)가 아니라 엔진 impact_band(권위)
     # /사건 기반 탐지밴드를 쓴다 — 실제 공격 서명이 상시 시그니처(Unauthorized_Command/
-    # Port_5762_State)인 command-hijack/5762-LAND 틱도 '탐지→회복' 서사가 성립하도록.
+    # Port_5762_State)인 command-hijack/5762-LAND 틱도 '탐지에서 회복까지' 서사가 성립하도록.
     band_by_tick = {row["tick"]: _recovery_band(row) for row in action_panel}
     recovery = {
         "events": _recovery_events(ticks, band_by_tick, flight),

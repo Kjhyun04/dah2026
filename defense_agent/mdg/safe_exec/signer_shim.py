@@ -10,7 +10,7 @@ This module provides two things:
 
   1. Command-bound OperatorRequest (PS-9). The token is an HMAC over
      ``(decision_id, command_digest, nonce, expiry)`` — so a CAPTURED approval cannot authorize
-     a DIFFERENT command (its command_digest differs → the HMAC no longer verifies). The nonce
+     a DIFFERENT command (its command_digest differs, so the HMAC no longer verifies). The nonce
      is single-use and issue/consume timestamps are MONOTONIC (replay + continuity).
 
   2. A KEY-FREE signed-mode emitter. ``emit_signed`` NEVER opens or references any signing-key
@@ -33,7 +33,7 @@ import warnings
 from dataclasses import dataclass, field
 from typing import Optional
 
-from .backend import ExecRequest  # single-spawn owner request type (불변식②); NO subprocess here
+from .backend import ExecRequest  # single-spawn owner request type (불변식2.); NO subprocess here
 
 # --- key-free emitter binding: the SoD contract in one place (load-bearing comment) --------- #
 # MDG delegates the actual signature to the container that already holds the key. We name the
@@ -287,7 +287,7 @@ def emit_signed(intent, backend=None) -> SignerEmit:
 
     allow_live=True (operator-approved live promotion): DELEGATE the signature to ``gcs_c2`` (which
     already holds its own key) by WRITING the recovery TRIGGER FILE, through the SOLE subprocess owner
-    ``Backend.run`` (불변식②, a single spawn site):
+    ``Backend.run`` (불변식2., a single spawn site):
     ``docker exec gcs_c2 sh -c 'printf "%s %s" "$1" "$2" > /tmp/mdg_correct' sh <MODE> <ALT>``. The deployed gcs.py — the
     only owner of the SITL signing link — polls that file and issues the SIGNED set_mode(GUIDED)+arm+
     takeoff(alt) with its own key, then removes it. This function never opens, reads, or names a

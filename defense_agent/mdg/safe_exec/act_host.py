@@ -12,7 +12,7 @@ Mechanism split (PS-1 권한분리):
     the proxy whitelist allows). This module holds NO docker sdk import and NO sock/proxy literal;
     a ``None`` backend yields an operator-go DRY dict.
 
-Boundaries (불변식②): this module NEVER imports subprocess. It BUILDS an ``ExecRequest`` (argv
+Boundaries (불변식2.): this module NEVER imports subprocess. It BUILDS an ``ExecRequest`` (argv
 list) and hands it to ``Backend.run`` — the sole spawn site. Minimal privilege: the netns DROP
 needs only CAP_NET_ADMIN (+CAP_SYS_ADMIN for the nsenter re-associate); ONLY this helper is granted
 them, never core/signer. Live actuation is operator-go RESERVED: ``Backend(allow_live=False)``

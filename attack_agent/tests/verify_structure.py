@@ -13,7 +13,7 @@ _import_sys=__import__('sys'); _import_os=__import__('os')
 from pathlib import Path as _Path
 _REPO=_Path(__file__).resolve().parents[1]
 if str(_REPO) not in _import_sys.path: _import_sys.path.insert(0,str(_REPO))
-_import_os.chdir(_REPO)  # cwd=repo root → cwd-relative paths resolve
+_import_os.chdir(_REPO)  # cwd=repo root -> cwd-relative paths resolve
 
 import ast
 import io
@@ -44,7 +44,7 @@ def _iter_project_py():
 
 
 def _module_dotted(path: Path) -> str:
-    """core/modules/kb.py → 'core.modules.kb'."""
+    """core/modules/kb.py -> 'core.modules.kb'."""
     rel = path.relative_to(REPO).with_suffix("")
     return ".".join(rel.parts)
 
@@ -101,7 +101,7 @@ def collect_imports():
                 if resolved:
                     dotted.add(resolved)
                 for a in node.names:
-                    names.add(a.name)               # 'from pkg import kb' → 'kb'
+                    names.add(a.name)               # 'from pkg import kb' -> 'kb'
                     if resolved and a.name != "*":
                         dotted.add(f"{resolved}.{a.name}")  # from pkg import submod
     return dotted, names

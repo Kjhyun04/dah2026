@@ -5,7 +5,7 @@ Covers the three wiring points of Phase 1 (RECOVERY_DEMO_PLAN Phase 1 / B1):
                        auto=True (tier2 "AUTO_BY_OPERATOR"), preserving flight/registry_tier for
                        transparency; an UNREGISTERED ghost is NEVER widened (fail-closed absolute).
   edges.py           — route_after_decide routes an otherwise-escalated OPER response to act under
-                       the env-sourced operator_auto bool (deterministic; 불변식① intact).
+                       the env-sourced operator_auto bool (deterministic; 불변식1. intact).
   act node           — the OPER tool EXECUTES (enforcement recorded) with the ledger Intent stamped
                        operator_auto_confirmed=True + authority="sandbox-auto"; operator_auto=0 keeps
                        the legacy operator-gate defer (regression: escalate/미집행).
@@ -88,7 +88,7 @@ def test_gate_operator_auto_widens_registered_oper():
 
 
 # --------------------------------------------------------------------------- #
-# edges.py — route_after_decide honors operator_auto deterministically (불변식①)
+# edges.py — route_after_decide honors operator_auto deterministically (불변식1.)
 # --------------------------------------------------------------------------- #
 def test_route_after_decide_operator_auto():
     chosen = _pause_intent()

@@ -13,7 +13,7 @@ _import_sys=__import__('sys'); _import_os=__import__('os')
 from pathlib import Path as _Path
 _REPO=_Path(__file__).resolve().parents[1]
 if str(_REPO) not in _import_sys.path: _import_sys.path.insert(0,str(_REPO))
-_import_os.chdir(_REPO)  # cwd=repo root → cwd-relative paths resolve
+_import_os.chdir(_REPO)  # cwd=repo root -> cwd-relative paths resolve
 
 import sys
 from pathlib import Path

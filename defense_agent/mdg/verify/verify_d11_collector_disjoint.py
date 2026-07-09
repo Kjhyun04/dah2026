@@ -1,4 +1,4 @@
-"""verify_d11_collector_disjoint — GATE1/GATE2 static self-DoS guard (불변식② E9/X1/G4/D11).
+"""verify_d11_collector_disjoint — GATE1/GATE2 static self-DoS guard (불변식2. E9/X1/G4/D11).
 
 The response layer must never sever the very collectors that feed ``sense``. Two independent
 severance mechanisms exist, each proven non-self-DoS here (STATIC — no live testbed change):

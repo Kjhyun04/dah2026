@@ -9,9 +9,9 @@ False)`` -> DRY-RUN, and mis-targeted / unverified selectors are fail-closed ine
 (PS-7). The harness performs NO testbed state change; it is code + scenarios + dry only.
 
 Two invariants preserved:
-  ① deterministic control flow — routing is edges.route_after_impact / route_after_decide
+  1. deterministic control flow — routing is edges.route_after_impact / route_after_decide
      (numeric/bool only); LLM nodes get None -> deterministic fallback (no network).
-  ② leak-0 — the only actuation path is Backend.run (DRY here); the harness spawns nothing.
+  2. leak-0 — the only actuation path is Backend.run (DRY here); the harness spawns nothing.
 
 LANGGRAPH-FREE by design: the canonical graph is core/graph.py (langgraph), but the portable
 replay pillar (H-J) is run.jsonl. This harness drives the SAME node functions through the SAME
@@ -194,7 +194,7 @@ class _TickExecutor:
     (topology.BIND) and recording each patch via the canonical recorder. Because the node
     order, the branch points, and the DI binding all come from the same datum ``core.graph``
     compiles, this executor cannot drift from the production graph (PA-9). Actuation is DRY
-    (Backend.allow_live=False); the interpreter spawns no subprocess (leak-0, 불변식②)."""
+    (Backend.allow_live=False); the interpreter spawns no subprocess (leak-0, 불변식2.)."""
 
     def __init__(self, deps: dict[str, Any]):
         self.deps = deps
@@ -217,7 +217,7 @@ class _TickExecutor:
         node = topology.ENTRY
         while node != topology.END:
             seq = self._emit(fh, seq, state, node, self._call(node, state))
-            if node in topology.COND_EDGES:                  # numeric/bool routing only (불변식①)
+            if node in topology.COND_EDGES:                  # numeric/bool routing only (불변식1.)
                 fn_name, mapping = topology.COND_EDGES[node]
                 node = mapping[_BRANCH[fn_name](state)]      # edges.route_* picks next node
             else:

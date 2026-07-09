@@ -11,7 +11,7 @@ Per-NF metric map (live-confirmed IPs):
   MME 10.50.0.2:9090 — enb/enb_ue/mme_session (sparse)
 
 httpx is a network client, not a subprocess, so this collector does not use the
-Backend (불변식② concerns only subprocess side effects).
+Backend (불변식2. concerns only subprocess side effects).
 """
 from __future__ import annotations
 

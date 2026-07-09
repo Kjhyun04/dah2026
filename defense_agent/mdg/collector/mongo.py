@@ -7,7 +7,7 @@ verdict (A-2):
   anomalous DB access from the cellular/attacker side -> DB_Access (identity_access).
   id == 22944 ("Connection ended") is ignored.
 
-The tail command is issued through the safe-exec Backend (불변식②). Only a bounded
+The tail command is issued through the safe-exec Backend (불변식2.). Only a bounded
 ``--since`` window is read each cycle (not -f) so the sync drain stays deterministic.
 
 PS-1 resolution (P1 panel, locked): the sock-proxy whitelist gains a read-only

@@ -1,4 +1,4 @@
-# web_backend — 평문 MAVLink(수동 tap, UDP 14560) → 파싱 → WebSocket 브로드캐스트 + 정적 페이지.
+# web_backend — 평문 MAVLink(수동 tap, UDP 14560)을 받아 파싱한 뒤 WebSocket 으로 브로드캐스트하고 정적 페이지도 함께 서빙한다.
 #   gcs_proxy 가 복호 평문을 fan-out(172.30.0.20:14560)로 보냄. 렌더는 브라우저(클라 GPU).
 import asyncio, json, time, os, threading
 from fastapi import FastAPI, WebSocket
@@ -10,7 +10,7 @@ clients = set()
 loop = None
 S = {"pos": None, "fix": 0, "hb": 0, "n": 0, "posn": 0, "t0": time.time()}
 
-# ── 서명 C2 명령 발신부 (웹 제어 인터페이스 → gcs_proxy:14556, MAVLink2 서명 link_id=5) ──
+# 서명 C2 명령 발신부. 웹 제어 인터페이스가 gcs_proxy:14556 으로 보내며, MAVLink2 서명(link_id=5)을 붙인다.
 SIGN_KEY = None
 try:
     _kf = os.environ.get("MAV_SIGN_KEYFILE", "/sign.key")

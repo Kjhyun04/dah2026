@@ -295,7 +295,7 @@ def write_truth(verdicts: list[Truth], path: str) -> None:
 
 
 def _utf8_stdout() -> None:
-    """Best-effort: allow Unicode (∧/≠/⚠) in CLI output on legacy consoles (e.g. cp949)."""
+    """Best-effort: allow Unicode (∧/≠/주의) in CLI output on legacy consoles (e.g. cp949)."""
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
     except Exception:

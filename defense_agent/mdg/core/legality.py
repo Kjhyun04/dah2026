@@ -55,7 +55,7 @@ def _predicate_holds(world: WorldState, pred: str, action: Action | None = None)
         # and verify role_verified[<that container>]. role_verified is CONTAINER-keyed; the alias
         # is only a placeholder, so a fictional key no longer satisfies legality. Fail-closed:
         # unresolved selector OR container absent/False -> illegal (self-DoS gate stays shut).
-        # Deterministic — reads a single bool, NO LLM field (불변식①).
+        # Deterministic — reads a single bool, NO LLM field (불변식1.).
         real = _resolve_role_key(action, key)
         if not real:
             return False

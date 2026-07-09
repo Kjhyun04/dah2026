@@ -54,7 +54,7 @@ def main() -> int:
     m = None
     try:
         m = mavutil.mavlink_connection(conn, source_system=255, source_component=190)
-        # 무인증 naive 직접주입(비행안전 모드만) → 암호/서명 계층이 폐기.
+        # 무인증 naive 직접주입(비행안전 모드만) -> 암호/서명 계층이 폐기.
         target_mode = mode if mode in FLIGHT_SAFE else 5
         for _ in range(3):
             m.mav.heartbeat_send(mavutil.mavlink.MAV_TYPE_GCS,

@@ -1,7 +1,7 @@
 """core.modules.backends.base — 백엔드 실행 계약 + 종료 프리미티브 (DESIGN §4.3).
 
 이 모듈이 P1 실행엔진의 **정본 계약**이다. DESIGN §4.3 의 느슨한 `Backend.run(cmd)`
-표현을 구조화 `ExecRequest → Result[ExecOutput]` 로 재정의한다(Map gaps: 'cmd' 저명세
+표현을 구조화 `ExecRequest -> Result[ExecOutput]` 로 재정의한다(Map gaps: 'cmd' 저명세
 해소). 계약의 심장은 회고(§0·§4.1)에서 무너진 지점 — **확실히 죽고, 자원을 회수한다** —
 을 세 축으로 보장하는 것이다:
 
@@ -9,13 +9,13 @@
   (B) 확실한 강제종료    : 프로세스 트리 kill(POSIX=killpg / Windows=taskkill /T).
                           컨테이너 내부는 `timeout -k`(R1) 2차 보증 — LocalBackend 배선.
   (C) 자원회수          : finalize() 로 성공/예외/취소 무관 정리 coro 를 항상 await.
-                          stdout/stderr 는 **PIPE 미사용**(손자 파이프 데드락 회피) →
+                          stdout/stderr 는 **PIPE 미사용**(손자 파이프 데드락 회피) ->
                           scoped_tempfile 로 파일 캡처 후 트림 로드.
 
-★ 반환은 tool_wrap 의 Result[T](Ok|Err) 계약을 계승한다(Runner 시그니처와 정합).
+반환은 tool_wrap 의 Result[T](Ok|Err) 계약을 계승한다(Runner 시그니처와 정합).
   예외를 밖으로 던지지 않는다 — 실패는 Err(CRSError) 로 봉투화.
-★ 비밀(secret_params)은 argv/env 가 아니라 ExecRequest.stdin(bytes) 로만 주입한다(R6).
-★ grep0(06 P2·17 §3): 이 계층은 truth/감독/ground-truth 를 import·산출하지 않는다.
+비밀(secret_params)은 argv/env 가 아니라 ExecRequest.stdin(bytes) 로만 주입한다(R6).
+grep0(06 P2·17 §3): 이 계층은 truth/감독/ground-truth 를 import·산출하지 않는다.
 
 aixcc utils.py 가 `.shield` 에서 import 하지만 참조본에 미복사된 finalize/scoped_pipe
 프리미티브를 여기서 재구현한다(Map gaps: 종료계약 핵심 프리미티브).
@@ -62,11 +62,11 @@ _DEFAULT_MAX_OUTPUT_BYTES: int = 256 * 1024  # 파일 캡처 트림 상한
 
 @dataclass(slots=True)
 class ExecRequest:
-    """Backend.run 입력(구조화). ExecBinding + 검증 params + 해석된 비밀 → 실행요청.
+    """Backend.run 입력(구조화). ExecBinding + 검증 params + 해석된 비밀 -> 실행요청.
 
     argv    : 실행 커맨드 벡터. argv[0]=이미지 baked script 경로. **비밀 원문 불포함**
               (secret_params 는 stdin 경로). shell 미경유(주입 안전).
-    stdin   : secret_params 값(vault→stdin, R6). None 이면 자식 stdin=DEVNULL.
+    stdin   : secret_params 값(vault->stdin, R6). None 이면 자식 stdin=DEVNULL.
     sidecar : 실행 발판(ue/core/sgi/host). host 는 컨테이너 없이 호스트 직접 실행.
     on_host : sidecar=='host' 동의(호스트에서 docker CLI/inspect 직접). 자동 세팅.
     """
@@ -92,8 +92,8 @@ class ExecRequest:
 class ExecOutput:
     """백엔드 원시 실행결과 = exec_meta 원천(09 §1 누수감시).
 
-    killed/timed_out → parse_output 이 보수판정(허위 effected/accepted 0)에 사용.
-    latency_ms/killed → results._ResultBase 로 전사. stdout 은 파일 경유 트림 로드.
+    killed/timed_out -> parse_output 이 보수판정(허위 effected/accepted 0)에 사용.
+    latency_ms/killed -> results._ResultBase 로 전사. stdout 은 파일 경유 트림 로드.
     """
 
     returncode: int
@@ -125,7 +125,7 @@ async def finalize(coro: Awaitable[object]) -> AsyncIterator[None]:
 
 
 def _as_future(coro: Awaitable[object]) -> "asyncio.Future[object]":
-    """coro/awaitable → Future(shield 대상). 이미 Future 면 그대로."""
+    """coro/awaitable -> Future(shield 대상). 이미 Future 면 그대로."""
     return asyncio.ensure_future(coro)  # type: ignore[arg-type]
 
 
@@ -162,7 +162,7 @@ def scoped_tempfile(dir_: Path, *, suffix: str = "") -> Iterator[Path]:
 
 
 def read_trimmed(path: Path, limit: int = _DEFAULT_MAX_OUTPUT_BYTES) -> str:
-    """출력 파일 → 트림 문자열(trim_tool_output 미러). 상한 초과 시 말미 절단 표기."""
+    """출력 파일 -> 트림 문자열(trim_tool_output 미러). 상한 초과 시 말미 절단 표기."""
     try:
         data = path.read_bytes()
     except OSError:
@@ -180,8 +180,8 @@ def read_trimmed(path: Path, limit: int = _DEFAULT_MAX_OUTPUT_BYTES) -> str:
 def terminate_tree(proc: asyncio.subprocess.Process) -> None:
     """프로세스 트리 확정 kill. POSIX=killpg(SIGKILL) / Windows=taskkill /F /T.
 
-    ★ 정확 대상 지정: PID/프로세스그룹만 죽인다(넓은 grep kill 금지).
-    ★ 주의(DESIGN §4.1): 로컬 `docker exec` 클라이언트를 죽여도 dockerd 소유
+    정확 대상 지정: PID/프로세스그룹만 죽인다(넓은 grep kill 금지).
+    주의(DESIGN §4.1): 로컬 `docker exec` 클라이언트를 죽여도 dockerd 소유
       컨테이너-내부 프로세스는 죽지 않는다 — 그 보증은 컨테이너 내부 `timeout -k`(R1)
       가 담당(LocalBackend 배선). 이 함수는 로컬 프로세스 트리만 책임진다.
     """
@@ -190,7 +190,7 @@ def terminate_tree(proc: asyncio.subprocess.Process) -> None:
     pid = proc.pid
     try:
         if os.name == "posix":
-            # start_new_session=True 로 띄운 자식 → 세션리더 pgid == pid.
+            # start_new_session=True 로 띄운 자식 -> 세션리더 pgid == pid.
             os.killpg(os.getpgid(pid), signal.SIGKILL)
         else:
             # Windows: 자식+손자 트리 확정 종료. taskkill 은 즉시 반환(단명).
@@ -235,7 +235,7 @@ async def supervise_subprocess(
     미러 규격(workdb.task_entry):
       `async with finalize(reap): async with asyncio.timeout(t): await proc.wait()`
 
-    - 출력은 PIPE 아닌 임시파일(scoped_tempfile)로 캡처 → 손자 파이프 데드락 회피.
+    - 출력은 PIPE 아닌 임시파일(scoped_tempfile)로 캡처 -> 손자 파이프 데드락 회피.
     - 비밀(stdin bytes)은 표준입력으로만 주입(argv/env 노출 0, R6).
     - 타임아웃 시 프로세스 트리 강제종료 + killed/timed_out 표기 + 자원회수.
     - sem 이 주어지면 단일 슬롯 직렬화(공유 한정자원 예: 5762 pool=1).
@@ -253,7 +253,7 @@ async def supervise_subprocess(
             scoped_tempfile(workdir, suffix=".out") as out_path,
             scoped_tempfile(workdir, suffix=".err") as err_path,
         ):
-            # 자식 출력 → 파일 fd(부모는 spawn 직후 자기 핸들 close).
+            # 자식 출력 -> 파일 fd(부모는 spawn 직후 자기 핸들 close).
             out_f = open(out_path, "wb")
             err_f = open(err_path, "wb")
             proc: Optional[asyncio.subprocess.Process] = None
@@ -308,7 +308,7 @@ async def supervise_subprocess(
                     async with asyncio.timeout(timeout_s):
                         await proc.wait()
                 except TimeoutError:
-                    # 하드 타임아웃 → 트리 강제종료. finalize 의 _reap 이 wait 회수.
+                    # 하드 타임아웃 -> 트리 강제종료. finalize 의 _reap 이 wait 회수.
                     killed = True
                     timed_out = True
                     terminate_tree(proc)
@@ -341,12 +341,12 @@ class Backend(ABC):
     teardown: 표준 정리(자식·소켓·임시파일·기동 사이드카/reap). orphan 0.
     구현     : mock/local/ssh. mock 통과 ≠ 배포안전(게이트1 통합테스트로만 판정).
 
-    async 컨텍스트 매니저 지원 → `async with LocalBackend(...) as be:` 로 teardown 보장.
+    async 컨텍스트 매니저 지원 -> `async with LocalBackend(...) as be:` 로 teardown 보장.
     """
 
     @abstractmethod
     async def run(self, req: ExecRequest) -> Result[ExecOutput]:
-        """실행요청 1건 → 결과. 실패(비도달·spawn실패·kill)는 Err 로 봉투화."""
+        """실행요청 1건 -> 결과. 실패(비도달·spawn실패·kill)는 Err 로 봉투화."""
         raise NotImplementedError
 
     @abstractmethod
@@ -374,7 +374,7 @@ class Backend(ABC):
 # ═══════════════════════════════════════════════════════════════════════════
 
 # config.ExecSpec.mode=Literal['docker_exec','ssh','host'] vs DESIGN mock/local/ssh
-# vs 13 §1 local/ssh — 정본 어휘로 통일: 'docker_exec'·'local'·'host' → LocalBackend.
+# vs 13 §1 local/ssh — 정본 어휘로 통일: 'docker_exec'·'local'·'host' -> LocalBackend.
 _MODE_TO_BACKEND: dict[str, str] = {
     "docker_exec": "local",  # config 기본값 == LocalBackend
     "local": "local",
@@ -385,9 +385,9 @@ _MODE_TO_BACKEND: dict[str, str] = {
 
 
 def resolve_backend_kind(mode: str) -> str:
-    """exec.mode(config/DESIGN/문서13 3중 어휘) → 백엔드 종류('local'|'ssh'|'mock').
+    """exec.mode(config/DESIGN/문서13 3중 어휘) -> 백엔드 종류('local'|'ssh'|'mock').
 
-    미확정 어휘 정합점: 'docker_exec'↔'local' 동의어, 'host' 는 LocalBackend 흡수.
+    미확정 어휘 정합점: 'docker_exec'<->'local' 동의어, 'host' 는 LocalBackend 흡수.
     """
     kind = _MODE_TO_BACKEND.get(mode)
     if kind is None:

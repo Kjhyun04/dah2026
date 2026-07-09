@@ -5,7 +5,7 @@
 #   텔레메트리/ACK는 복호되어 14550으로 돌아온다(다운링크).
 #   기체: ArduCopter (quad). 홈 37.5665,126.9780.
 #
-# ★ 지속 연결(REPL) 모드 — 링크를 끊지 않아 빠르고, GCS 하트비트 유지로 페일세이프 방지.
+# 지속 연결(REPL) 모드 — 링크를 끊지 않아 빠르고, GCS 하트비트 유지로 페일세이프 방지.
 #   python3 gcs_cmd.py                # 대화형: 프롬프트에 명령 타이핑
 #   명령: status | mode <M> | arm | disarm | takeoff <alt> | goto <lat> <lon> <alt>
 #         | rtl | land | nofs (GCS 페일세이프 완화) | watch [sec] | help | quit
@@ -17,7 +17,7 @@ from pymavlink import mavutil
 CONN = 'udpin:0.0.0.0:14550'
 mav = mavutil.mavlink_connection(CONN, source_system=255, source_component=190)
 
-# ── 최신 텔레메트리 캐시(수신 스레드가 갱신) ──────────────────────────────
+# 최신 텔레메트리 캐시. 수신 스레드가 계속 갱신한다.
 STATE = {'mode': '?', 'armed': False, 'volt': 0.0, 'lat': 0.0, 'lon': 0.0,
          'alt': 0.0, 'rel': 0.0, 'hb_seen': False}
 _run = True
@@ -39,7 +39,7 @@ def _rx_loop():
             STATE['alt'] = msg.alt / 1000.0; STATE['rel'] = msg.relative_alt / 1000.0
 
 def _hb_loop():
-    """★ GCS 하트비트 1Hz 지속 송신 — 링크 유지로 GCS 페일세이프 방지."""
+    """GCS 하트비트 1Hz 지속 송신 — 링크 유지로 GCS 페일세이프 방지."""
     while _run:
         mav.mav.heartbeat_send(mavutil.mavlink.MAV_TYPE_GCS,
             mavutil.mavlink.MAV_AUTOPILOT_INVALID, 0, 0, 0)

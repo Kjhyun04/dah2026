@@ -312,18 +312,18 @@ def test_viewer_panels_and_failclosed():
 
 
 def test_classify_view_standing_vs_attack():
-    """표현계층 분류(2026-07): 상시(구조적) 시그니처는 로그 밴드에서 제외 → 평시,
-    비-상시 공격 시그니처만 위험/주의를 유발. (탐지 엔진 출력은 불변; 순수 표현계층)"""
-    # 상시조건만 → 평시(Green), attack_signals 비어있음
+    """표현계층 분류(2026-07): 상시(구조적) 시그니처는 로그 밴드에서 제외하여 평시로 두고,
+    비-상시 공격 시그니처만 위험/주의를 유발한다. (탐지 엔진 출력은 불변; 순수 표현계층)"""
+    # 상시조건만 있으면 평시(Green), attack_signals 비어있음
     assert viewer._classify_view(["Unauthorized_Command"]) == ([], "Green")
     assert viewer._classify_view(["Port_5762_State", "BACKDOOR_5762"]) == ([], "Green")
     assert viewer._classify_view([]) == ([], "Green")
-    # 상시 + 실제 공격 → 위험(Red), attack_signals 는 공격만 남김
+    # 상시 + 실제 공격이면 위험(Red), attack_signals 는 공격만 남김
     atk, band = viewer._classify_view(["Unauthorized_Command", "PFCP_Delete_Attempt"])
     assert band == "Red" and atk == ["PFCP_Delete_Attempt"]
-    # 저심각(정찰) 단독 → 주의(Yellow)
+    # 저심각(정찰) 단독이면 주의(Yellow)
     assert viewer._classify_view(["Recon"]) == (["Recon"], "Yellow")
-    # 저심각 + 상시 → 주의 (상시 제거 후 저심각만 남으므로)
+    # 저심각 + 상시면 주의 (상시 제거 후 저심각만 남으므로)
     assert viewer._classify_view(["Recon", "Port_5762_State"]) == (["Recon"], "Yellow")
 
 
@@ -354,7 +354,7 @@ def _write_lines(path, lines):
 
 def test_recovery_panel_lifecycle_and_flight():
     """Phase 7: load_panels emits a `recovery` panel — per-incident lifecycle
-    (탐지→대응→집행→확인→회복) from ledger/worldstate.applied/view_band + a rel_alt/flight_mode
+    (탐지 -> 대응 -> 집행 -> 확인 -> 회복) from ledger/worldstate.applied/view_band + a rel_alt/flight_mode
     flight series. S2-shaped run: attack(Red, alt 12) -> operator-auto enforce -> confirm/recover
     (Green, alt 30)."""
     with tempfile.TemporaryDirectory() as d:
@@ -372,7 +372,7 @@ def test_recovery_panel_lifecycle_and_flight():
             # The incident member is the REAL command-hijack signature (Unauthorized_Command),
             # which is a STANDING_SIGNAL: view_band strips it to Green, so the recovery card MUST
             # source its band from the engine impact_band / incident presence (not view_band) —
-            # else the flight-hijack scenario renders as 밴드 Green→Green (no attack). Regression
+            # else the flight-hijack scenario renders as 밴드 Green-to-Green (no attack). Regression
             # for the Phase 7 headline S2 deliverable.
             ("sense", {"tick_i": 1, "evidence": [_tele("rel_alt", 12), _tele("flight_mode", "LAND")],
                        "incidents": [{"members": ["Unauthorized_Command"]}]}),
@@ -402,7 +402,7 @@ def test_recovery_panel_lifecycle_and_flight():
         # the 집행 step carries the sandbox auto flag; band + altitude recover
         enf = next(s for s in e["steps"] if s["label"] == "집행")
         assert enf["auto"] is True
-        # the recovery card MUST show 탐지→회복 as a band transition even though the attack
+        # the recovery card MUST show 탐지-to-회복 as a band transition even though the attack
         # signature is a STANDING signal that view_band strips to Green (the real defect).
         assert e["band_before"] == "Red" and e["band_after"] == "Green"
         assert e["alt_before"] == 12.0 and e["alt_after"] == 30.0
@@ -416,7 +416,7 @@ def test_recovery_panel_lifecycle_and_flight():
 
 def test_recovery_panel_signed_mechanism_annotations():
     """Item C: the send_signed_mode (S2 물리 복귀) recovery event renders its mechanism —
-    대응(operator-select) → 집행(gcs_c2 위임) → 확인(rel_alt 30m) — as per-step notes, and the
+    대응(operator-select) -> 집행(gcs_c2 위임) -> 확인(rel_alt 30m) — as per-step notes, and the
     event is flagged ``signed`` so the card shows the S2 physical-return context. The base labels
     (탐지/대응/집행/확인/회복) are unchanged (presentation-only enrichment)."""
     with tempfile.TemporaryDirectory() as d:

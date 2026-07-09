@@ -16,7 +16,7 @@ Mechanism reconciliation (locked, P2-Q1): the gap note (A-1) phrased stage-2 as
 proxy. Only the TRANSPORT is replaced; the observation semantics are preserved. The
 sanctioned equivalent is the netns entry that already backs every air-side tap:
 ``nsenter --target <pid> --net -- ip -4 addr show <iface>`` (nsenter_helper), routed
-through the safe-exec Backend (불변식②, the sole subprocess path). This enters the
+through the safe-exec Backend (불변식2., the sole subprocess path). This enters the
 container's NETWORK namespace only (mount ns stays mdg's, so mdg's ``ip`` binary runs —
 neutralising B-2) and needs no docker exec. Zero state change; a non-allow_live Backend
 returns DRY-RUN so the live scan is operator-go reserved (IP stays unresolved -> inert).

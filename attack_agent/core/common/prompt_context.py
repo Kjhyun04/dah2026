@@ -1,7 +1,7 @@
 """core.common.prompt_context — Jinja2 렌더 어댑터 (P3, 과제 §12-2).
 
 WorldState(kb.py) + ToolStatus 목록 + Goal 을 prompts/default.yaml 의 뷰 변수로
-**명시 매핑**한다(문서 gap: legality 반환 ToolStatus 엔 layer/produces 없음 → spec 과 합성):
+**명시 매핑**한다(문서 gap: legality 반환 ToolStatus 엔 layer/produces 없음 -> spec 과 합성):
 
   agent.goal_text
   agent.kb.{signing, mode, c2, reach_list, artifact_list, prov_notes}
@@ -12,7 +12,7 @@ WorldState(kb.py) + ToolStatus 목록 + Goal 을 prompts/default.yaml 의 뷰 �
     **예외**(필드 어긋남 조기 검출). (과제 §12-2)
   - tool_status 는 REGISTRY 22 ∩ goal.scope 필터(scope 미지정=22 전량)로 빌드하며,
     orchestrator 의 _tools 필터와 **동일 닫힌 집합**이어야 함(yaml 상단 규율).
-    → RECON 계층은 **상시 포함**(scope 로 정찰을 봉쇄하지 않음, gap 해소).
+    -> RECON 계층은 **상시 포함**(scope 로 정찰을 봉쇄하지 않음, gap 해소).
 
 레시피 금지: 이 어댑터는 상태를 '표시'만 하며 순서/조합을 처방하지 않는다.
 작성 2026-07-05.
@@ -56,7 +56,7 @@ def scoped_tool_ids(goal: Goal) -> list[ToolId]:
     """노출·실행할 닫힌 tool 집합. scope 미지정(None/빈)=22 전량. RECON 은 항상 포함.
 
     goal.scope(정식 필드, kb.Goal) = Layer 문자값 목록(예: ['A','B','C','D']).
-    None 또는 빈 리스트 → REGISTRY 22 전량. 지정 시 해당 계층 tool 만 통과시키되
+    None 또는 빈 리스트 -> REGISTRY 22 전량. 지정 시 해당 계층 tool 만 통과시키되
     RECON 계층(정찰=전 계층 공용)은 scope 와 무관하게 상시 포함(gap 해소).
     """
     ids = list(REGISTRY.keys())
@@ -115,7 +115,7 @@ class AgentView:
 
 
 def _goal_text(goal: Goal) -> str:
-    """선언적 목표 → 사람이 읽는 1줄(레시피 아님, 목표 표시)."""
+    """선언적 목표 -> 사람이 읽는 1줄(레시피 아님, 목표 표시)."""
     t = goal.type
     tgt = goal.target or {}
     if t in ("mode_set", "signing_bypass"):
@@ -128,14 +128,14 @@ def _goal_text(goal: Goal) -> str:
 
 
 def _fmt_effect_eval(ee: EffectEval) -> str:
-    """EffectEval → 'SetMode' / 'Blocked(signing)' 등 표시 문자열."""
+    """EffectEval -> 'SetMode' / 'Blocked(signing)' 등 표시 문자열."""
     if ee.blocked_by is not None:
         return f"Blocked({ee.blocked_by.value})"
     return ee.kind.value
 
 
 def _fmt_missing(missing: list[Missing]) -> list[str]:
-    """Missing 목록 → detail 문자열 목록(백워드체이닝 힌트 표시)."""
+    """Missing 목록 -> detail 문자열 목록(백워드체이닝 힌트 표시)."""
     return [m.detail for m in missing]
 
 
@@ -182,7 +182,7 @@ def _kb_view(kb: WorldState) -> KBView:
 
 
 def build_tool_status(statuses: dict[str, ToolStatus]) -> list[ToolStatusView]:
-    """{tool_id: ToolStatus} → 뷰 목록. spec(layer/produces)과 합성.
+    """{tool_id: ToolStatus} -> 뷰 목록. spec(layer/produces)과 합성.
 
     statuses 키가 곧 닫힌 집합(orchestrator 가 scoped_tool_ids 로 만든 것과 동일해야).
     """
@@ -234,7 +234,7 @@ class AgentPrompt:
 
 
 def _default_prompts_path() -> Path:
-    # core/common/prompt_context.py → attack_agent/prompts/default.yaml
+    # core/common/prompt_context.py -> attack_agent/prompts/default.yaml
     return Path(__file__).resolve().parents[2] / "prompts" / "default.yaml"
 
 

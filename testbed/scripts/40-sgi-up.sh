@@ -10,7 +10,7 @@ log "net_sgi + sgi_test 기동"
 docker compose -f "$C" up -d
 sleep 3
 
-# .1은 Docker 브리지 GW 예약 → epc는 172.30.0.2 사용
+# .1은 Docker 브리지 게이트웨이용으로 예약되어 있어, epc는 172.30.0.2를 쓴다.
 log "epc(UPF)를 net_sgi에 연결 (172.30.0.2, SGi측 라우팅 게이트웨이)"
 if docker exec epc ip -o -4 addr show 2>/dev/null | grep -q '172\.30\.0\.2'; then
   log "  epc 이미 net_sgi 연결됨"

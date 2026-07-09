@@ -8,7 +8,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 log(){ printf '\033[1;35m[BUILD]\033[0m %s\n' "$*"; }
 
-# ── 버전 pin (조정 지점) ──
+# 버전 pin (여기서 조정한다)
 UBUNTU="${UBUNTU:-22.04}"
 OPEN5GS_VER="${OPEN5GS_VER:-}"                 # 비우면 PPA 최신(설치본 버전 기록됨)
 SRSRAN_TAG="${SRSRAN_TAG:-release_23_11}"

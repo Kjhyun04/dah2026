@@ -1,4 +1,4 @@
-"""Conditional edge branch functions (불변식① — DETERMINISTIC ROUTING).
+"""Conditional edge branch functions (불변식1. — DETERMINISTIC ROUTING).
 
 These read ONLY numeric/bool state fields:
   impact.band, chosen_action_risk, chosen_action_reversible, chosen_action is None.
@@ -24,7 +24,7 @@ def route_after_impact(state: MDGState) -> str:
 
 def route_after_decide(state: MDGState) -> str:
     """decide -> act | escalate | END. Reads ONLY risk/reversible/chosen_action + the env-sourced
-    ``operator_auto`` bool (Phase 1). NEVER an LLM-derived field (불변식① — deterministic routing;
+    ``operator_auto`` bool (Phase 1). NEVER an LLM-derived field (불변식1. — deterministic routing;
     ``operator_auto`` is a numeric/bool env input, not advice, and verify_routing allows it).
 
       legal ∧ risk in {LOW,MED} ∧ reversible          -> act

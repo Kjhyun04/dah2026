@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# down-all.sh — DAH v2 전체 종료 (이미지·mongo 볼륨 유지). ⚠ --remove-orphans 사용 금지.
+# down-all.sh — DAH v2 전체 종료 (이미지와 mongo 볼륨은 유지). 주의: --remove-orphans 는 쓰지 말 것.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 log(){ printf '\033[1;34m[DOWN]\033[0m %s\n' "$*"; }

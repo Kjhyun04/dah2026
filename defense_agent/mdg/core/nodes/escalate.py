@@ -39,7 +39,7 @@ def escalate(state: MDGState, ledger=None, clock=None, gate=None,
         config_version=state.get("config_version", ""),
         operator_gate=True,
         command_digest=digest, nonce=nonce, expiry=expiry,
-        # ① carry operator-select provenance into the operator-gate ledger Intent so the OperatorGate
+        # 1. carry operator-select provenance into the operator-gate ledger Intent so the OperatorGate
         # authorization records WHO chose the (HIGH/flight) command. "" for the autonomous path.
         authority=getattr(chosen, "authority", ""),
     )

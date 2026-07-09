@@ -3,7 +3,7 @@
 # 00-server-setup.sh — DAH testbed v2 · P0 서버 셋업 (idempotent, 재실행 안전)
 #   docker + docker compose + SCTP(부팅영속) + TUN + docker 그룹.
 #   대상: Ubuntu 22.04 / 24.04. 사용: bash scripts/00-server-setup.sh
-#   이후: 재로그인(또는 newgrp docker) → bash scripts/01-preflight.sh
+#   이후: 재로그인(또는 newgrp docker) 한 다음 bash scripts/01-preflight.sh
 # ============================================================================
 set -euo pipefail
 log(){ printf '\033[1;36m[SETUP]\033[0m %s\n' "$*"; }

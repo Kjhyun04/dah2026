@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 21-provision.sh — 가입자 등록 (CONFIG_SPEC 값). open5gs-dbctl → epc_mongo.
+# 21-provision.sh — 가입자 등록 (CONFIG_SPEC 값 사용). open5gs-dbctl 로 epc_mongo 에 넣는다.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 log(){ printf '\033[1;34m[PROV]\033[0m %s\n' "$*"; }

@@ -1,6 +1,6 @@
 """verify_grep0 — 완전분리(grep0) 불변식 검증 (doc17 §3·§8).
 
-★ 방어심층(defense-in-depth) 게이트 — 완전성 증명은 아니다. 공격 agent(core/**)가 감독
+방어심층(defense-in-depth) 게이트 — 완전성 증명은 아니다. 공격 agent(core/**)가 감독
   (supervisor) **모듈을 import** 하거나 **산출(evaluation.json/supervisor.jsonl)을 read** 하지
   않음을 정적·동적 양면으로 강제:
   1. core/**/*.py 어느 것도 `supervisor` 를 import 하지 않는다 —
@@ -58,7 +58,7 @@ for py in _CORE.rglob("*.py"):
         elif isinstance(node, ast.ImportFrom):
             if (node.module or "").split(".")[0] == "supervisor":
                 bad.append(f"{py.name}: from {node.module}")
-            # from . import supervisor  (module 상대·None → names 확인)
+            # from . import supervisor (module 상대·None -> names 확인)
             for a in node.names:
                 if a.name == "supervisor":
                     bad.append(f"{py.name}: from . import supervisor")

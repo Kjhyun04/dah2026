@@ -6,7 +6,7 @@ ValueError/TimeoutError into CRSError) or the exception leaks. def_tool_wrap run
 pre_hooks (e.g. legality) then the body then post_hooks (e.g. world_update).
 
 This is the form core. Actual subprocess side effects live behind
-``mdg.safe_exec.backend.Backend.run`` (불변식②) — tools never spawn processes here.
+``mdg.safe_exec.backend.Backend.run`` (불변식2.) — tools never spawn processes here.
 """
 from __future__ import annotations
 

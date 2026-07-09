@@ -6,7 +6,7 @@ danger signal (Port_5762_State = ESTAB_PRESENT); LISTEN with no ESTAB is normal.
 
 pool=1 (G4): ss on 5762 is serialized through a dedicated PrioritySemaphore(1) so the
 probe never fans out / contends. The probe issues exactly one ss invocation per cycle
-through the safe-exec Backend (불변식②).
+through the safe-exec Backend (불변식2.).
 """
 from __future__ import annotations
 
@@ -95,5 +95,5 @@ class WebProbeCollector(BaseCollector):
         return [{
             "metric": "Port_5762_State", "value": "ESTAB_PRESENT", "band": "danger",
             "domain": "command", "channel": "port_5762_read", "confidence": 0.90,
-            "source": peer,                                # peer IP → attribution selector
+            "source": peer,                                # peer IP를 attribution selector로 사용
         }]

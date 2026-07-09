@@ -224,10 +224,10 @@ INPUT_SPEC: dict[str, object] = {
         {"role": "web_backend", "container": "web_backend", "netns": True,
          "cellular_network": None, "tun_iface": None,
          # 5762 LISTEN/ESTAB는 web_backend netns가 아니라 uav_ue netns에 존재(WebProbe도
-         # uav_ue netns로 이전 관측) → 이 role은 더 이상 5762 앵커를 소유하지 않는다. uav_ue의
+         # uav_ue netns로 이전 관측). 따라서 이 role은 더 이상 5762 앵커를 소유하지 않는다. uav_ue의
          # behavioral bit는 design-lock된 lo_14550_heartbeat_sys1(anti-spoof)로 확정되므로 5762
          # LISTEN을 uav_ue anchor로 합류시키지 않는다(heartbeat 없이 flip 방지). web8080-native
-         # 앵커 부재 → fail-closed "" (behaviorally_verified positive-only, False는 무해).
+         # 앵커가 없으면 fail-closed "" (behaviorally_verified positive-only, False는 무해).
          "verify_anchor": "", "reach": ["uav5762", "web8080"]},
         {"role": "uav_proxy", "container": "uav_proxy", "netns": False,
          "cellular_network": None, "tun_iface": None,

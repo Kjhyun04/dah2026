@@ -9,14 +9,14 @@ the collector HEARTBEAT via Watchdog sensor_loss) is NOT emitted as a TrustObj �
 out of the returned dict entirely. This activates compute_impact's already-wired present-set
 exclusion (``if t is None: continue``) with ZERO change to compute_impact. The verdict is
 READ from state (computed upstream against now); this node stays a pure, clock-free function
-of state (불변식①). Absent field -> empty set -> all-present fallback (existing behavior).
+of state (불변식1.). Absent field -> empty set -> all-present fallback (existing behavior).
 
 Distrust-input contract (P3-Q4 lock — the real accuracy anchor for the crit_floor, NOT the
 71/45 magnitude): command-domain distrust maps to the Red-floor trigger (>=71) ONLY on a real
 unauthenticated-actuation observation (5762-bypass command / a CONFIRMED_OFF unsigned command
 reaching SITL; same P3-Q3 latch anchor). Mere suspicion / signing=UNKNOWN stays in the 40-70
 band (mid-Yellow floor 45), so an injected doubt cannot auto-confirm Red and self-DoS (PS-7).
-A signature-verify-fail DROP (uav_proxy '⛔ 서명검증 실패 → SITL 차단 (누적 N)') is defense
+A signature-verify-fail DROP (uav_proxy '서명검증 실패 -> SITL 차단 (누적 N)') is defense
 SUCCESS, NOT a compromise -> it adds ZERO distrust (the drop counter is a P3-Q2 activity metric,
 not a posture signal; it must never fire the floor alone). The actuation-observation SOURCE
 (uav_signing collector / 5762 vantage) is D-2 un-wired -> operator-go deferred; until it is

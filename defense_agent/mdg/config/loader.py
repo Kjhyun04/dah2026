@@ -20,7 +20,7 @@ The keys that ARE live-consumed via this loader:
   - mission_profile(): config_version and mission scalars (below)
   - recovery_priors(), models(), input_spec(): consumed by recovery/llm/recon
 Do NOT wire the loader into the scoring path to "fix" this — that would move calibration
-onto the YAML surface and change the determinism path (불변식①).
+onto the YAML surface and change the determinism path (불변식1.).
 """
 from __future__ import annotations
 

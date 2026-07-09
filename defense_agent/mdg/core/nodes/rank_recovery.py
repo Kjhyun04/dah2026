@@ -39,7 +39,7 @@ def rank_recovery(state: MDGState) -> dict:
         return {"chosen_action": None, "chosen_action_risk": "LOW",
                 "chosen_action_reversible": True}
 
-    # ① OPERATOR-SELECT (env->STATE, DETERMINISTIC, 불변식①): when the operator explicitly picks a
+    # 1. OPERATOR-SELECT (env->STATE, DETERMINISTIC, 불변식1.): when the operator explicitly picks a
     # candidate (MDG_OPERATOR_PICK -> state['operator_pick'], seeded by live_autorun like
     # operator_auto), promote the MATCHING legal Action to chosen_action, bypassing the autonomous
     # ranking that permanently demotes the reversible-blockade tools below send_signed_mode. Match is
@@ -79,7 +79,7 @@ def rank_recovery(state: MDGState) -> dict:
     # PP-1 binding contract (panel-1 step d + risk-note 3): sort on an EXPLICIT deterministic
     # key tuple, NOT on a single score with sort-stability. recovery_score compresses to
     # ~0.14-0.38 so ties are common; relying on input order would break replay reproducibility
-    # (불변식①). Order = recovery_score desc, then lower risk, then reversible-first, then
+    # (불변식1.). Order = recovery_score desc, then lower risk, then reversible-first, then
     # recovery_type name — total order independent of legal_actions permutation.
     def _sort_key(a: Action) -> tuple:
         return (-score(a), _RISK_ORDER[a.risk], 0 if a.reversible else 1, a.recovery_type)
@@ -96,7 +96,7 @@ def rank_recovery(state: MDGState) -> dict:
         top = ranked[0]
 
     # Phase 2 (B3/PS-7) provenance/debounce relaxation — DETERMINISTIC (env bool + config, no LLM,
-    # 불변식①). Under operator_auto (sandbox demo) the strict trusted-source hold on an injected
+    # 불변식1.). Under operator_auto (sandbox demo) the strict trusted-source hold on an injected
     # high-severity recovery is RECORDED-THEN-PASSED: stamp provenance_relaxed=True on the chosen
     # Intent so the ledger/trace shows the waiver (response.py separately shrinks the debounce to
     # demo_mode.debounce_ticks). Production (operator_auto off) -> False, strict posture retained.
@@ -108,7 +108,7 @@ def rank_recovery(state: MDGState) -> dict:
     # P4-Q1 — carry the OPAQUE VALIDATED SELECTOR from the ranked candidate's params into the
     # chosen Intent. This is the load-bearing wiring that was missing: rank_recovery previously
     # dropped top.params, so chosen_action lost the target and dispatch had to GUESS. We copy the
-    # selector as data ONLY — NO live resolution here (this node holds no backend/netns; 불변식②).
+    # selector as data ONLY — NO live resolution here (this node holds no backend/netns; 불변식2.).
     # (pid, src_ip) binding happens at dispatch as a pure lookup into the verified WorldState map.
     intent = Intent(
         rule=top.recovery_type, tool_id=top.tool_id,
@@ -117,11 +117,11 @@ def rank_recovery(state: MDGState) -> dict:
         target=str(top.params.get("target", "")),
         target_kind=str(top.params.get("target_kind", "")),
         # P4-2 — carry the ENFORCEMENT chokepoint selector alongside the source selector so dispatch
-        # can resolve two DISTINCT verified endpoints. Data ONLY (no live resolution here; 불변식②).
+        # can resolve two DISTINCT verified endpoints. Data ONLY (no live resolution here; 불변식2.).
         enforce_at=str(top.params.get("enforce_at", "")),
         # Phase 2 (B3) — record-then-pass waiver marker (demo only; False in production).
         provenance_relaxed=provenance_relaxed,
-        # ① operator-select provenance: mark WHO chose this action so the ledger/trace shows the
+        # 1. operator-select provenance: mark WHO chose this action so the ledger/trace shows the
         # human authorization (vs the autonomous ranking). "" for the autonomous path (회귀 0).
         authority="operator-select" if operator_selected is not None else "",
     )

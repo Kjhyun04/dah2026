@@ -70,7 +70,7 @@ def record_update(fh, seq: int, update: dict) -> int:
         try:
             fh.write(canonical_line(seq, node, update[node]) + "\n")
         except Exception:
-            # recording must never crash the run (불변식②: side effects already happened)
+            # recording must never crash the run (불변식2.: side effects already happened)
             pass
         seq += 1
     return seq
@@ -80,7 +80,7 @@ def record_stream(graph, inp: Any, cfg: dict, path: str, *, seq_start: int = 0) 
     """Drive EXACTLY ONE graph execution via stream_mode='updates' and record each node
     update to ``path`` (append). Returns the next seq (carry across ticks for a monotonic
     index). The single stream pass is the execution — there is no separate invoke (that
-    would double the act side effect, 불변식②). Requires ``graph`` to expose ``.stream``.
+    would double the act side effect, 불변식2.). Requires ``graph`` to expose ``.stream``.
     """
     seq = seq_start
     fh = None

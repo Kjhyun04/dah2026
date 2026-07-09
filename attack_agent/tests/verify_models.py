@@ -1,7 +1,7 @@
 ﻿"""verify_models.py — A5 MODEL_MAP 오프라인 검증 (네트워크 0·litellm 미호출).
 
 검증: (1) configs/models.yaml 로드·스키마, (2) resolve_model 우선순위(override/role/default),
-  (3) config.live.yaml 이 models_path 로 friendly名→routable 해석, (4) 비밀 미포함(모델 문자열만).
+  (3) config.live.yaml 이 models_path 로 friendly名->routable 해석, (4) 비밀 미포함(모델 문자열만).
 회귀 0: config.testbed.yaml(models_path 미지정)은 cfg.llm.model 그대로여야 함.
 
 사용: python verify_models.py   (exit 0 = PASS). 전부 오프라인.
@@ -13,7 +13,7 @@ _import_sys=__import__('sys'); _import_os=__import__('os')
 from pathlib import Path as _Path
 _REPO=_Path(__file__).resolve().parents[1]
 if str(_REPO) not in _import_sys.path: _import_sys.path.insert(0,str(_REPO))
-_import_os.chdir(_REPO)  # cwd=repo root → cwd-relative paths resolve
+_import_os.chdir(_REPO)  # cwd=repo root -> cwd-relative paths resolve
 
 import sys
 from pathlib import Path
@@ -49,17 +49,17 @@ def main() -> int:
         mm.models.get("AttackOrchestrator", "<none>"),
     )
 
-    # 3. resolve 우선순위: override(friendly) → alias 라우팅
+    # 3. resolve 우선순위: override(friendly) -> alias 라우팅
     r_over = resolve_model("AttackOrchestrator", mm, override="claude-opus-4-8")
     _check(
         "3. override(friendly) alias 라우팅",
         r_over == mm.aliases.get("claude-opus-4-8"),
         r_over,
     )
-    # 4. override 없음 → role 등록값
+    # 4. override 없음 -> role 등록값
     r_role = resolve_model("AttackOrchestrator", mm, override=None)
     _check("4. role 해석", r_role == mm.route(mm.models["AttackOrchestrator"]), r_role)
-    # 5. 미등록 role → default
+    # 5. 미등록 role -> default
     r_def = resolve_model("Nonexistent", mm, override=None)
     _check("5. 미등록 role→default", r_def == mm.route(mm.default), r_def)
 
@@ -70,7 +70,7 @@ def main() -> int:
         not any(s in blob for s in ("key", "secret", "token", "sk-", "bearer")),
     )
 
-    # 7. 회귀: config.testbed.yaml(models_path 미지정) → cfg.llm.model 그대로
+    # 7. 회귀: config.testbed.yaml(models_path 미지정) -> cfg.llm.model 그대로
     try:
         from core.common.config import load_config
 
@@ -80,7 +80,7 @@ def main() -> int:
             cfg_t.llm.models_path is None and cfg_t.llm.model == "claude-opus-4-8",
             f"model={cfg_t.llm.model} models_path={cfg_t.llm.models_path}",
         )
-        # 8. config.live.yaml → models_path 지정 + live
+        # 8. config.live.yaml -> models_path 지정 + live
         cfg_l = load_config("configs/config.live.yaml")
         live_model = resolve_model(
             "AttackOrchestrator",

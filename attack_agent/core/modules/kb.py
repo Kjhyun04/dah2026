@@ -1,10 +1,10 @@
 """core.modules.kb — 상태정보(WorldState) + tool 상태 판정(Legality) (11).
 
 조합 창발의 런타임 엔진. 전부 **결정론**(LLM 아님, 11 §5).
-  ① WorldState — '지금 아는 사실'의 타입된 저장소 (11 §1).
-  ② legality(spec, kb) → {runnable, missing, effect_eval} (11 §2, Legality 하드게이트).
-  ③ kb_update(kb, result) — 결과로 KB 갱신 (11 §3-A).
-  ④ goal_reached(kb, goal) — 목표 도달 판정 (11 §3-B).
+  1. WorldState — '지금 아는 사실'의 타입된 저장소 (11 §1).
+  2. legality(spec, kb) -> {runnable, missing, effect_eval} (11 §2, Legality 하드게이트).
+  3. kb_update(kb, result) — 결과로 KB 갱신 (11 §3-A).
+  4. goal_reached(kb, goal) — 목표 도달 판정 (11 §3-B).
 
 A12(18): KB=pydantic, 내부 set / 경계에서 정렬 list. B1: DB 없음(in-memory).
 작성 2026-07-05.
@@ -235,7 +235,7 @@ _ResultT = Union[ReconResult, CollectResult, InjectResult]
 
 
 def _parse_reach(token: str) -> Optional[Fact]:
-    """'role@ip:port' 또는 'role' → reach(role) Fact. 닫힌 어휘만 수용."""
+    """'role@ip:port' 또는 'role' -> reach(role) Fact. 닫힌 어휘만 수용."""
     from core.common.types import ReachTarget
 
     role = token.split("@", 1)[0].strip()
@@ -249,9 +249,9 @@ def _parse_reach(token: str) -> Optional[Fact]:
 def kb_update(kb: WorldState, result: _ResultT) -> WorldState:
     """결과 종류별로 KB in-place 갱신 (11 §3-A). 모든 갱신은 prov 기록.
 
-    ReconResult  → reach 사실 · signing scalar · unauth.
-    CollectResult→ artifacts += produced.
-    InjectResult → effect(mode/c2) · blocked_by(signing 확증). (완전분리: ground-truth 없음)
+    ReconResult  -> reach 사실 · signing scalar · unauth.
+    CollectResult-> artifacts += produced.
+    InjectResult -> effect(mode/c2) · blocked_by(signing 확증). (완전분리: ground-truth 없음)
     """
     if isinstance(result, ReconResult):
         for tok in result.reach:
@@ -283,11 +283,11 @@ def kb_update(kb: WorldState, result: _ResultT) -> WorldState:
             kb.prov[art.value] = "effect"
 
     elif isinstance(result, InjectResult):
-        # blocked_by=signing → signing=on 확증(정보 획득, 상태변경 없음) (11 §3-A)
+        # blocked_by=signing -> signing=on 확증(정보 획득, 상태변경 없음) (11 §3-A)
         if result.blocked_by == "signing":
             kb.scalars.signing = Signing.ON
             kb.prov["signing"] = "asserted"
-        # ★ blocked_by 가드 (19 PART1-3): accepted AND blocked_by is None 일 때만 effect 적용.
+        # blocked_by 가드 (19 PART1-3): accepted AND blocked_by is None 일 때만 effect 적용.
         #   차단된 InjectResult(=blocked_by 세팅됨)는 mode/c2/flags 를 절대 바꾸지 않음(불변).
         if result.accepted and result.blocked_by is None:
             eff = result.effect or {}
@@ -300,7 +300,7 @@ def kb_update(kb: WorldState, result: _ResultT) -> WorldState:
             if eff.get("c2") == "disrupted":
                 kb.scalars.c2 = C2.DISRUPTED
                 kb.prov["c2"] = "asserted"
-            # SetFlag 효과(subscriber_written 등): mode/c2 외 truthy 키 → 세계상태 플래그
+            # SetFlag 효과(subscriber_written 등): mode/c2 외 truthy 키 -> 세계상태 플래그
             for k, v in eff.items():
                 if k in ("mode", "c2"):
                     continue

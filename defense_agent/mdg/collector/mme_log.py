@@ -8,7 +8,7 @@ is fixed via ``parse_epc_ts``.
 
 This is the P4-5 member of the parser set that ``tests/verify_parsers.py`` exercises. Pure
 observation, state-change-0; the ``docker logs`` read is routed through the safe-exec Backend
-(불변식②) exactly like the SMF/Mongo log collectors. A dry/mock Backend yields no lines
+(불변식2.) exactly like the SMF/Mongo log collectors. A dry/mock Backend yields no lines
 (the collector simply emits nothing).
 
 Boundaries: no docker sdk import, no sock/proxy URL literal here (verify_grep0). Null-safe:
@@ -82,7 +82,7 @@ class MmeLogTail(BaseCollector):
     correlation layer; this collector is pure attach-event observation.
 
     Not part of the default 6-collector set (opt-in EPC log-tail, P1-Q3); subprocess goes
-    through the safe-exec Backend only (불변식②). A dry/mock backend yields no lines."""
+    through the safe-exec Backend only (불변식2.). A dry/mock backend yields no lines."""
     source_id = "mme_log"
     domain = "identity_access"
 

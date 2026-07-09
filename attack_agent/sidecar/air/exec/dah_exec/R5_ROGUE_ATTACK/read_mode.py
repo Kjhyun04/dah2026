@@ -44,7 +44,7 @@ def main() -> int:
                 break
         if found:
             break
-    # signing 은 수동 관측 불가 → unknown(정직). 오라클 도달 여부만 로깅 목적.
+    # signing 은 수동 관측 불가 -> unknown(정직). 오라클 도달 여부만 로깅 목적.
     print(json.dumps({"signing": "unknown", "oracle_reachable": found}))
     return 0
 

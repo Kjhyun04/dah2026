@@ -5,9 +5,9 @@
   B. SidecarManager: container_of(순수 해석) · run_argv/exists_argv/reap 조립(금지패턴 부재) ·
      ensure/teardown 오프라인 no-op(mock backend).
   C. build_backend(local) 배선: container_of=SidecarManager 주입 정상.
-  D. TargetResolver 연결: config.tgt→role 매핑 + backend 경유.
-  E. recon-only 폐루프 dry-run(no_llm seed-only): MockBackend canned recon → KB 시드 →
-     CampaignResult → JSONL. 주입 tool 미노출(scope RECON) 확인.
+  D. TargetResolver 연결: config.tgt->role 매핑 + backend 경유.
+  E. recon-only 폐루프 dry-run(no_llm seed-only): MockBackend canned recon -> KB 시드 ->
+     CampaignResult -> JSONL. 주입 tool 미노출(scope RECON) 확인.
   F. recon-only ReAct 루프(replay LLM · llm.completion 오프라인 강제): step 기록 검증.
 
 통과 시 exit 0.
@@ -18,7 +18,7 @@ _import_sys=__import__('sys'); _import_os=__import__('os')
 from pathlib import Path as _Path
 _REPO=_Path(__file__).resolve().parents[1]
 if str(_REPO) not in _import_sys.path: _import_sys.path.insert(0,str(_REPO))
-_import_os.chdir(_REPO)  # cwd=repo root → cwd-relative paths resolve
+_import_os.chdir(_REPO)  # cwd=repo root -> cwd-relative paths resolve
 
 import asyncio
 import json
@@ -182,7 +182,7 @@ print("=" * 70)
 print("E · recon-only 폐루프 dry-run (no_llm seed-only · MockBackend canned)")
 print("=" * 70)
 
-# canned recon 출력(tool_id 키). reach 에 net_core 포함 → recon_session 도 시드.
+# canned recon 출력(tool_id 키). reach 에 net_core 포함 -> recon_session 도 시드.
 _reach = [
     f"{t}@10.50.0.1:0"
     for t in ("net_core", "mongo", "sgi", "gcs14556", "gcs14555", "web8080", "uav5762", "s1u", "pivot")
@@ -200,7 +200,7 @@ drv = D.build_driver(
     cfg, goal, backend_kind="mock", recon_only=True, no_llm=True, mock_table=mock_table,
     workdir=Path(_ROOT / ".cache_verify"),
 )
-# recon-only scope → 노출 tool 이 RECON 계층뿐(주입 tool 미노출)
+# recon-only scope -> 노출 tool 이 RECON 계층뿐(주입 tool 미노출)
 _ids = drv.orch._ids  # noqa: SLF001
 from core.modules.registry import get_spec  # noqa: E402
 from core.common.types import Layer  # noqa: E402
@@ -247,7 +247,7 @@ def _offline_completion(**kw):
     return _Err(_CRSError("offline: live LLM 차단(verify)"))
 
 
-# orchestrator 는 `from core.common import llm; llm.completion(...)` 로 호출 → 모듈속성 치환.
+# orchestrator 는 `from core.common import llm; llm.completion(...)` 로 호출 -> 모듈속성 치환.
 _llm.completion = _offline_completion  # type: ignore[assignment]
 try:
     replay = D.recon_replay([("recon_reach", "{}"), ("recon_defense", "{}")])
@@ -255,7 +255,7 @@ try:
         cfg, goal, backend_kind="mock", recon_only=True, no_llm=False,
         mock_table=mock_table, replay=replay, workdir=Path(_ROOT / ".cache_verify"),
     )
-    # recon_defense precond=reach(sgi) → seed_recon(recon_reach) 로 먼저 열림.
+    # recon_defense precond=reach(sgi) -> seed_recon(recon_reach) 로 먼저 열림.
     result2 = asyncio.run(drv2.run())
     check("run() → CampaignResult (ReAct)", isinstance(result2, CampaignResult))
     tool_ids = [s.tool_id for s in result2.chain]

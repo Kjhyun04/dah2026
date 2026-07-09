@@ -1,5 +1,5 @@
-"""verify_models — role→model routing alignment (DEFENSE_AGENT_DEV_WORKFLOW line 202:
-'verify_models(role→model 라우팅 Orient=Sonnet·Decide=Opus·폴백리스트)').
+"""verify_models — role-to-model routing alignment (DEFENSE_AGENT_DEV_WORKFLOW line 202:
+'verify_models(role-to-model 라우팅 Orient=Sonnet·Decide=Opus·폴백리스트)').
 
 Static check (no langgraph/pydantic/pyyaml required) that the config side (models.yaml
 roles) and the code side (make_orient_llm/make_decide_llm factories + graph llm_orient/
@@ -150,7 +150,7 @@ def _check() -> Report:
 
 
 def test_verify_models_alignment():
-    """pytest entry: config↔code role→model routing must align (no swap)."""
+    """pytest entry: config<->code role-to-model routing must align (no swap)."""
     rep = _check()
     assert not rep.fails, "; ".join(rep.fails)
 

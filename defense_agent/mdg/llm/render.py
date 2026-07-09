@@ -21,7 +21,7 @@ _PROMPT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "prompts"
 class LLMUnavailable(RuntimeError):
     """The LLM advice path cannot run (missing dep/key/template, render/empty guard,
     or model error). orient/decide nodes CATCH this and fall back to the deterministic
-    decision table (G6). Never propagates into routing (불변식①)."""
+    decision table (G6). Never propagates into routing (불변식1.)."""
 
 
 def jinja_available() -> bool:

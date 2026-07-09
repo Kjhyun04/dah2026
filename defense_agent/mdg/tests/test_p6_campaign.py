@@ -29,7 +29,7 @@ def _run(out_dir: str):
 
 
 def test_campaign_six_attacks_detected_and_zero_live():
-    """All 6 attacks replay + detect; NO live state change (불변식②/operator-go)."""
+    """All 6 attacks replay + detect; NO live state change (불변식2./operator-go)."""
     with tempfile.TemporaryDirectory() as d:
         c = _run(d)
         assert c.total == 6, c.total

@@ -6,7 +6,7 @@ non-blocking. Collectors are NOT graph nodes: the graph stays synchronous and
 deterministic while observation runs asynchronously here.
 
 Invariant boundaries honoured:
-  - 불변식②: subprocess-based observation (tcpdump/ss/docker logs/nsenter) is issued
+  - 불변식2.: subprocess-based observation (tcpdump/ss/docker logs/nsenter) is issued
     ONLY through the injected ``Backend`` (safe-exec). Pure network polling (httpx)
     and config reads do not spawn processes and are done directly.
   - PS-2 : every envelope is HMAC-signed here (source keyring) so ``sense`` can verify
@@ -115,7 +115,7 @@ class BaseCollector(threading.Thread):
     # -- helper for subprocess-observation collectors --------------------- #
     def _observe(self, argv: list[str], timeout_s: float = 8.0):
         """Route a read-only observation command through the safe-exec Backend
-        (불변식②). Returns an ExecResult or None if no backend is wired."""
+        (불변식2.). Returns an ExecResult or None if no backend is wired."""
         if self.backend is None:
             return None
         from ..safe_exec.backend import ExecRequest

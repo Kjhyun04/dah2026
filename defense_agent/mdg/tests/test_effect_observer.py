@@ -4,8 +4,8 @@ The read-only effect observer (``make_effect_observer``) that ``effect_confirm``
 to flip ``applied[rule].confirmed`` once a recovery has TAKEN EFFECT. Docker inspect / ss /
 telemetry are all FAKE-injected (no live daemon/netns), so these tests assert the True/False
 confirmation logic per response-tool mechanism plus the fail-safe (missing dep / DRY / error ->
-False, never a spurious confirm). 불변식②: the observer probes read-only only; the only spawn is
-through the injected Backend (asserted via a recording fake). 불변식①: deterministic given inputs.
+False, never a spurious confirm). 불변식2.: the observer probes read-only only; the only spawn is
+through the injected Backend (asserted via a recording fake). 불변식1.: deterministic given inputs.
 
 Runnable standalone as ``python mdg/tests/test_effect_observer.py``.
 """
@@ -39,7 +39,7 @@ class _ScriptedBackend:
 
     The observer's backdoor_drop path issues up to TWO probes — PRIMARY ``iptables -S INPUT``
     (rule-existence) then SECONDARY ``ss`` (ESTAB-absence) — so the fake dispatches on argv.
-    Asserts 불변식② — the ONLY exec path the observer uses is Backend.run."""
+    Asserts 불변식2. — the ONLY exec path the observer uses is Backend.run."""
     def __init__(self, *, ipt: ExecResult = None, ss: ExecResult = None):
         self._ipt = ipt if ipt is not None else ExecResult(ok=True, code=0, stdout="")
         self._ss = ss if ss is not None else ExecResult(ok=True, code=0, stdout="")
@@ -104,7 +104,7 @@ def test_drop_confirmed_via_estab_gone_secondary():
                           ss=ExecResult(ok=True, code=0, stdout=_SS_NO_5762))
     obs = make_effect_observer(netns_prefix_map=_NETNS, backend=be)
     assert obs("backdoor_drop") is True
-    # both probes ran; the ss fallback is read_only + inside the uav_ue netns (불변식②)
+    # both probes ran; the ss fallback is read_only + inside the uav_ue netns (불변식2.)
     assert len(be.calls) == 2
     ss_req = be.calls[1]
     assert ss_req.read_only is True and ss_req.argv[:5] == _NETNS["uav_ue"] and "ss" in ss_req.argv

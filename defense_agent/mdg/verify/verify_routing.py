@@ -1,4 +1,4 @@
-"""verify_routing — 불변식① + PA-7 (static AST of edges.py + nodes).
+"""verify_routing — 불변식1. + PA-7 (static AST of edges.py + nodes).
 
 Enforces:
   - route_after_impact / route_after_decide read ONLY the allowed numeric/bool keys
@@ -52,7 +52,7 @@ DECISION_MODULES = ("gate.py", "legality.py", "rank_recovery.py", "select_policy
 def _condition_subtrees(tree: ast.AST):
     """Yield every control-flow CONDITION expression: the ``test`` of if/while/ternary plus
     comprehension guard clauses (``for ... if <cond>``). These are the ONLY positions where a
-    key influences which branch runs (불변식① deterministic control flow). Assignments, dict
+    key influences which branch runs (불변식1. deterministic control flow). Assignments, dict
     values, call args, return payloads and for-loop iterables are deliberately excluded — a
     node may carry a forbidden selector as data without steering on it."""
     for node in ast.walk(tree):
@@ -92,7 +92,7 @@ def _check() -> Report:
         rep.check(bool(consts & ALLOWED_STATE_KEYS),
                   f"edges.{fn.name} reads no allowed routing key")
 
-    # Q-A 불변식① regression guard: the decision-relevant gates/nodes must NEVER branch on a
+    # Q-A 불변식1. regression guard: the decision-relevant gates/nodes must NEVER branch on a
     # FORBIDDEN (LLM-advisory / trust / opaque-selector) key. Scoped to control-flow conditions
     # only (see _condition_subtrees) so DATA carriage of selectors does not false-positive.
     for base in DECISION_MODULES:

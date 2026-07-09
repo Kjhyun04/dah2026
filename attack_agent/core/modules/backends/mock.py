@@ -1,12 +1,12 @@
 """core.modules.backends.mock — MockBackend(개발·replay·로컬 검증 전용).
 
 두 역할(도커 무접속):
-  (1) 결정론 replay : table[tool_id] → canned ExecOutput 반환. 오프라인 재현.
-  (2) 로컬 실증     : live_local=True → req.argv 를 **로컬 subprocess**(docker 미경유)로
+  (1) 결정론 replay : table[tool_id] -> canned ExecOutput 반환. 오프라인 재현.
+  (2) 로컬 실증     : live_local=True -> req.argv 를 **로컬 subprocess**(docker 미경유)로
                      supervise_subprocess 에 그대로 태운다. 종료계약(하드타임아웃 +
                      프로세스트리 강제종료 + 자원회수)을 dev 머신에서 실제로 실증.
 
-★ DESIGN 경고 계승: mock 통과 ≠ 배포안전(실환경 누수·연결한계 미모사) →
+DESIGN 경고 계승: mock 통과 ≠ 배포안전(실환경 누수·연결한계 미모사) ->
   배포안전은 게이트1 통합테스트로만 판정. (2)는 '종료 프리미티브가 실제로 죽는가'만
   검증하는 용도이지 컨테이너 누수를 모사하지 않는다.
 작성 2026-07-05.
@@ -37,7 +37,7 @@ from core.modules.backends.base import (
 class MockBackend(Backend):
     """개발/replay/로컬-검증 백엔드. 실 docker/ssh 무접속.
 
-    table      : tool_id → canned ExecOutput(결정론 replay). 히트 시 딥카피 반환.
+    table      : tool_id -> canned ExecOutput(결정론 replay). 히트 시 딥카피 반환.
     live_local : True 면 table 미스 시 req.argv 를 로컬 subprocess 로 실행
                  (docker 래핑 없음) — timeout/kill 실증용.
     default    : table 미스 & live_local=False 일 때 반환할 기본 출력(성공 no-op).
@@ -89,7 +89,7 @@ class MockBackend(Backend):
                 )
             return Ok(out)
 
-        # (3) 미스 & 비실증 → 기본 no-op 성공(결정론).
+        # (3) 미스 & 비실증 -> 기본 no-op 성공(결정론).
         return Ok(copy.deepcopy(self._default))
 
     async def teardown(self) -> None:

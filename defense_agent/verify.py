@@ -14,7 +14,7 @@ GitHub 클론 직후 `pip install -e .` 후 바로 실행 가능.
   verify_grep0                방어 core ⟂ verifier(trust-root) 완전분리
   verify_keys                 키/비밀 리터럴 0 (env 이름으로만 주입)
   verify_tools                tool 레지스트리 계약·바인딩
-  verify_models               role→model 라우팅
+  verify_models               role-to-model 라우팅
   verify_d11_collector_disjoint  6 collector vantage disjoint(귀속 정합)
 """
 from __future__ import annotations

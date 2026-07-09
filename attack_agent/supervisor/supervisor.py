@@ -1,13 +1,13 @@
-"""supervisor — Independent Verifier(감독): 14555 ARIA 복호 tap → ground-truth 독립 판정.
+"""supervisor — Independent Verifier(감독): 14555 ARIA 복호 tap -> ground-truth 독립 판정.
 
 doc17 정합. **완전 수동**(패킷 송신 0)·**소유자 특권**(키=env). gcs_proxy netns 공유 사이드카에서
-`--cap-add NET_RAW`로 14555 UDP를 raw 캡처(AF_PACKET·무의존, PoC 검증) → C2Cipher 복호 →
-pymavlink 파싱 → 판정. **완전분리(grep0):** 이 패키지를 공격 agent(core)가 절대 import/read 안 함.
+`--cap-add NET_RAW`로 14555 UDP를 raw 캡처(AF_PACKET·무의존, PoC 검증) -> C2Cipher 복호 ->
+pymavlink 파싱 -> 판정. **완전분리(grep0):** 이 패키지를 공격 agent(core)가 절대 import/read 안 함.
 산출(evaluation.json·supervisor.jsonl)은 사용자/viewer 전용 — agent out.log 와 별개 sink.
 
 파이프라인(단일 프로세스):
-  sniff_14555 → C2Cipher.unwrap → MAVLink parse → GroundTruth(mode timeline·signing·uplink cmds)
-  → judge(goal 도달·autonomy_accuracy) → emit.
+  sniff_14555 -> C2Cipher.unwrap -> MAVLink parse -> GroundTruth(mode timeline·signing·uplink cmds)
+  -> judge(goal 도달·autonomy_accuracy) -> emit.
 작성 2026-07-06.
 """
 from __future__ import annotations
@@ -38,7 +38,7 @@ class Datagram:
 
 
 # 커널 BPF: Ethernet "udp port 14555"(0x38DB) — 커널이 비대상 패킷을 enqueue 전 폐기
-#   → 공유 netns 에서 비-C2 트래픽의 clone/queue 비용 ~0(비간섭 footprint 상한, adversary 무증폭).
+# -> 공유 netns 에서 비-C2 트래픽의 clone/queue 비용 ~0(비간섭 footprint 상한, adversary 무증폭).
 _BPF_UDP14555 = [
     (0x28, 0, 0, 0x0000000C), (0x15, 0, 10, 0x00000800), (0x30, 0, 0, 0x00000017),
     (0x15, 0, 8, 0x00000011), (0x28, 0, 0, 0x00000014), (0x45, 6, 0, 0x00001FFF),
@@ -62,15 +62,15 @@ def _attach_bpf(s: socket.socket):
         s.setsockopt(socket.SOL_SOCKET, 26, fprog)  # SO_ATTACH_FILTER=26
         return buf
     except OSError:
-        return None  # 필터 미부착 → 유저스페이스 필터로 계속(캡처는 유지)
+        return None  # 필터 미부착 -> 유저스페이스 필터로 계속(캡처는 유지)
 
 
 def sniff_udp14555(*, duration_s: float, max_pkts: int = 100000):
     """gcs_proxy netns 안에서 14555 UDP 를 수동 캡처(bind 안 함·송신 0). Datagram yield.
 
-    ★ 14555 를 bind 하지 않는다(프록시 소유). AF_PACKET raw 로 wire 만 읽는다(read-only).
-    ★ 비간섭: 커널 BPF(udp 14555)로 비대상 폐기 + SO_RCVBUF 상한 → footprint 캡(adversary 무증폭).
-    ★ 정확성: IP total_length/UDP length 로 payload 경계 정확 산정 + fragment(MF/offset) 스킵.
+    14555 를 bind 하지 않는다(프록시 소유). AF_PACKET raw 로 wire 만 읽는다(read-only).
+    비간섭: 커널 BPF(udp 14555)로 비대상 폐기 + SO_RCVBUF 상한 -> footprint 캡(adversary 무증폭).
+    정확성: IP total_length/UDP length 로 payload 경계 정확 산정 + fragment(MF/offset) 스킵.
     """
     s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.ntohs(0x0003))
     try:
@@ -96,7 +96,7 @@ def sniff_udp14555(*, duration_s: float, max_pkts: int = 100000):
             if ip[9] != 17 or ihl < 20:  # UDP
                 continue
             frag = struct.unpack("!H", ip[6:8])[0]
-            if (frag & 0x2000) or (frag & 0x1FFF):  # MF set or offset!=0 → 조각(폐기)
+            if (frag & 0x2000) or (frag & 0x1FFF):  # MF set or offset!=0 -> 조각(폐기)
                 continue
             total_len = struct.unpack("!H", ip[2:4])[0]
             udp = ip[ihl:]
@@ -115,7 +115,7 @@ def sniff_udp14555(*, duration_s: float, max_pkts: int = 100000):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 2. 파싱 → ground-truth 이벤트 (pymavlink)
+# 2. 파싱 -> ground-truth 이벤트 (pymavlink)
 # ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -130,7 +130,7 @@ class MavEvent:
 
 
 class Parser:
-    """복호 평문 1프레임 → MavEvent. autopilot HEARTBEAT(comp==1)만 mode ground-truth."""
+    """복호 평문 1프레임 -> MavEvent. autopilot HEARTBEAT(comp==1)만 mode ground-truth."""
 
     def __init__(self) -> None:
         from pymavlink import mavutil
@@ -140,7 +140,7 @@ class Parser:
 
     @staticmethod
     def _safe_int(v) -> Optional[int]:
-        """유한 int/float 만 int 로. NaN/inf/bool/그외 → None (int(nan) ValueError 크래시 방지)."""
+        """유한 int/float 만 int 로. NaN/inf/bool/그외 -> None (int(nan) ValueError 크래시 방지)."""
         import math
         if isinstance(v, bool):
             return None
@@ -149,7 +149,7 @@ class Parser:
         return None
 
     def feed(self, pt: bytes, dg: Datagram) -> list[MavEvent]:
-        # 각 datagram = 완결 1프레임(프록시 1:1) → 파서 버퍼 리셋(프레임간 오염 방지).
+        # 각 datagram = 완결 1프레임(프록시 1:1) -> 파서 버퍼 리셋(프레임간 오염 방지).
         try:
             self._mav.buf = bytearray()
             self._mav.buf_index = 0
@@ -194,7 +194,7 @@ class GroundTruth:
 
 
 class Judge:
-    """복호 관측 → GroundTruth 축적 + goal 도달(§2) + autonomy_accuracy."""
+    """복호 관측 -> GroundTruth 축적 + goal 도달(§2) + autonomy_accuracy."""
 
     def __init__(self) -> None:
         self.gt = GroundTruth()
@@ -214,7 +214,7 @@ class Judge:
     def goal_truth(self, goal: dict) -> dict:
         """goal.type 별 ground-truth 도달(§2). target=최종상태 아니라 **도달여부**(transient 포함).
 
-        ★ 정직 스코프: mode 관측은 다운링크 HEARTBEAT(~1Hz) 표본이라 하트비트 간격 내 도달·원복
+        정직 스코프: mode 관측은 다운링크 HEARTBEAT(~1Hz) 표본이라 하트비트 간격 내 도달·원복
           (serial5762 transient)을 놓칠 수 있음(sampling 필드로 명시). signing_bypass 는 '링크에
           서명 강제됨(관측) AND target 도달' 을 뜻하며, 공격자가 서명을 우회했다는 attribution 증명이
           아니다(off-14555 경로 업링크는 안 보임). c2_disrupt 는 복호가 실동작(decrypted>0)일 때만 인정.
@@ -248,7 +248,7 @@ class Judge:
         return v
 
     def autonomy_accuracy(self, agent_claim: Optional[dict], truth: dict) -> dict:
-        """공격 agent 자기-ACK(agent_claim) ↔ 감독 ground-truth 대조(단방향 채점 입력).
+        """공격 agent 자기-ACK(agent_claim) <-> 감독 ground-truth 대조(단방향 채점 입력).
 
         agent_claim = out.log 의 campaign_result(공개·읽기전용). agent 흐름엔 안 돌아감(grep0).
         """
@@ -304,7 +304,7 @@ def build_evaluation(judge: Judge, goal: dict, agent_claim: Optional[dict]) -> d
 
 
 def emit(evaluation: dict, *, eval_path: str, agent_out_log: Optional[str]) -> None:
-    """evaluation.json 기록. ★ agent out.log 와 **다른 경로** 강제(완전분리·sink 분리).
+    """evaluation.json 기록. agent out.log 와 **다른 경로** 강제(완전분리·sink 분리).
 
     무조건 raise(assert 아님) — `python -O`/PYTHONOPTIMIZE 에서도 가드 유효. agent_out_log 미지정 시엔
     비교 대상이 없으므로, 호출자(runner)가 항상 agent out.log 를 넘겨 이 가드가 스킵되지 않게 한다.
@@ -317,7 +317,7 @@ def emit(evaluation: dict, *, eval_path: str, agent_out_log: Optional[str]) -> N
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 5. runner — 캡처→판정→emit (수동·소유자 특권)
+# 5. runner — 캡처->판정->emit (수동·소유자 특권)
 # ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -329,7 +329,7 @@ def run(
     eval_path: str = "evaluation.json",
     agent_out_log: Optional[str] = None,
 ) -> dict:
-    """감독 1회 실행: duration_s 동안 14555 복호 관측 → evaluation 산출·기록. 반환=evaluation."""
+    """감독 1회 실행: duration_s 동안 14555 복호 관측 -> evaluation 산출·기록. 반환=evaluation."""
     import contextlib
     cipher = C2Cipher(key)
     parser = Parser()

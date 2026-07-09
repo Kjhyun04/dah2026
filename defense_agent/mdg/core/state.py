@@ -118,7 +118,7 @@ class Intent(BaseModel):
     # raw ``iptables -s`` argument. It is only a KEY resolved against the verified WorldState
     # binding map at dispatch (response.py); a forged selector (operator IP / out-of-pool / unknown
     # role) fails the verified gate -> inert DRY (self-DoS closed, PS-7). No conditional edge may
-    # read these two fields (불변식① — enforced by verify_routing FORBIDDEN_KEYS).
+    # read these two fields (불변식1. — enforced by verify_routing FORBIDDEN_KEYS).
     target: str = ""                       # opaque selector (untrusted; never a raw -s arg)
     target_kind: Literal["role", "imsi", "ip", ""] = ""  # how to resolve the selector KEY
     # Two-endpoint containment (finding P4-2): a coherent netns DROP needs TWO DISTINCT endpoints —
@@ -129,7 +129,7 @@ class Intent(BaseModel):
     # near no-op that never stops the attacker's malicious OUTBOUND. dispatch (response.py) now builds
     # the DROP ONLY when enforce_at and the source resolve to two DISTINCT verified bindings, else
     # inert DRY (self-DoS closed, PS-7). ``enforce_at`` is ALSO an opaque KEY (untrusted; never a raw
-    # arg) and edge-invisible (불변식① — verify_routing FORBIDDEN_KEYS).
+    # arg) and edge-invisible (불변식1. — verify_routing FORBIDDEN_KEYS).
     enforce_at: str = ""                   # enforcement-netns role KEY (chokepoint/victim; ≠ source)
     # PS-9 command-bound OperatorRequest fields (NON-secret: the binding, NOT the HMAC key
     # or signed token — those never leave signer_shim.OperatorGate / MDGState secret-free).
@@ -204,16 +204,16 @@ class MDGState(TypedDict, total=False):
     dry_streak: int
     goal_reached: bool
     # Phase 1 (sandbox demo) routing input: env-sourced bool. When True the decide-edge routes an
-    # otherwise-escalated OPER response to act (deterministic — a bool, never an LLM field, 불변식①)
+    # otherwise-escalated OPER response to act (deterministic — a bool, never an LLM field, 불변식1.)
     # and act records the enforcement as operator-auto-confirmed. Absent/False -> unchanged posture.
     operator_auto: bool
     operator_auto_confirmed: bool
-    # ① operator-select routing input: env-sourced string (recovery_type or tool_id) the operator
+    # 1. operator-select routing input: env-sourced string (recovery_type or tool_id) the operator
     # explicitly picks from the legal candidate set. When it matches a legal Action, rank_recovery
     # promotes THAT action to chosen_action (overriding the autonomous ranking) and marks
     # authority="operator-select"; blank/non-matching -> autonomous ranking stands (fail-safe).
     # Seeded into state0 by live_autorun (like operator_auto) and carried each tick (LastValue).
-    # Deterministic (a string, never an LLM field, 불변식①).
+    # Deterministic (a string, never an LLM field, 불변식1.).
     operator_pick: str
 
 

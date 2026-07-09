@@ -1,41 +1,41 @@
 """core.modules.backends.local — LocalBackend(정본 배포) + SshBackend(원격 옵션).
 
-DESIGN §4.3 · 13 §1(V2-D30, SSH 제거→local 정본). docker.sock 로 로컬
+DESIGN §4.3 · 13 §1(V2-D30, SSH 제거->local 정본). docker.sock 로 로컬
 `docker exec <sidecar> <script> <args>` 실행. 안티패턴 전량 회피(DESIGN §4.1):
 
-  ✗ 도구별 `docker run --rm` 단명 컨테이너 → ✓ 장수 사이드카 + `docker exec`.
-  ✗ subprocess.run(capture_output, timeout) PIPE 데드락 → ✓ 파일 캡처 + 워치독.
-  ✗ dockerd 소유 컨테이너를 killpg 로 죽인다 가정 → ✓ 컨테이너 내부 `timeout -k`(R1).
+  X 도구별 `docker run --rm` 단명 컨테이너 -> OK 장수 사이드카 + `docker exec`.
+  X subprocess.run(capture_output, timeout) PIPE 데드락 -> OK 파일 캡처 + 워치독.
+  X dockerd 소유 컨테이너를 killpg 로 죽인다 가정 -> OK 컨테이너 내부 `timeout -k`(R1).
 
 이중 종료 보증:
-  (1) 로컬 워치독 : supervise_subprocess 의 asyncio.timeout → docker exec 클라이언트
+  (1) 로컬 워치독 : supervise_subprocess 의 asyncio.timeout -> docker exec 클라이언트
       프로세스 트리 강제종료(로컬 자원회수).
-  (2) 컨테이너 내부: `timeout -k <grace> <t>` 래핑 → dockerd 소유 프로세스 확정 종료(R1·PRIMARY).
+  (2) 컨테이너 내부: `timeout -k <grace> <t>` 래핑 -> dockerd 소유 프로세스 확정 종료(R1·PRIMARY).
       로컬 클라이언트가 먼저 죽어도 컨테이너 내부는 timeout 이 스스로 상한(T+G) 내 회수.
 
-★ 종료 모델(테스트베드 실측 반영 · FACT1~4):
+종료 모델(테스트베드 실측 반영 · FACT1~4):
   · wrap = `setsid sh -c ': DAH_JOB=<uuid>; timeout -k <G> <T> "$@";
             __rc=$?; echo $__rc > /tmp/dah_rc_<uuid>; exit $__rc' _ <argv>`.
-    - `setsid` : sh 를 **새 세션/프로세스그룹 리더**로 승격(PGID == sh PID) → per-job reap 이
+    - `setsid` : sh 를 **새 세션/프로세스그룹 리더**로 승격(PGID == sh PID) -> per-job reap 이
       `kill -TERM -<PGID>`(process-group kill)로 그룹 통째 회수 가능(FACT3). docker exec -i(무 TTY)
-      의 자식은 프로세스그룹 리더가 아니므로 busybox setsid 는 setsid() 성공→**fork 없이 직접 exec**
-      → docker exec 가 sh 종료까지 대기하며 exit code 를 정확히 회수한다.
-    - `timeout -k` 를 **마지막 명령이 아니게**(`; __rc=$?; echo …; exit $__rc`) 배치 → busybox ash 의
-      exec 최적화(마지막 외부명령을 sh 자리에 덮어씀, FACT1)를 차단 → sh 가 **부모로 상주**하여
+      의 자식은 프로세스그룹 리더가 아니므로 busybox setsid 는 setsid() 성공->**fork 없이 직접 exec**
+      -> docker exec 가 sh 종료까지 대기하며 exit code 를 정확히 회수한다.
+    - `timeout -k` 를 **마지막 명령이 아니게**(`; __rc=$?; echo …; exit $__rc`) 배치 -> busybox ash 의
+      exec 최적화(마지막 외부명령을 sh 자리에 덮어씀, FACT1)를 차단 -> sh 가 **부모로 상주**하여
       마커(DAH_JOB=<uuid>)가 실행 내내 cmdline 에 존재(reap 의 PGID 조회 앵커).
-    - ★ **rc-file fallback(강건 exit-code 회수)**: 특정 busybox 빌드에서 setsid 가 fork/즉시반환
+    - **rc-file fallback(강건 exit-code 회수)**: 특정 busybox 빌드에서 setsid 가 fork/즉시반환
       (_exit 0)하면 docker exec 가 **항상 0** 을 반환해 killed/preflight 오판이 난다. 이를 없애기
       위해 wrap 이 실제 rc 를 `echo $__rc > /tmp/dah_rc_<uuid>` 로 컨테이너 파일에 기록하고, 백엔드가
       docker exec 반환 후 그 파일을 read(파일 캡처 규약과 동일·PIPE 금지)하여 **setsid fork 여부와
       무관하게** 실제 rc 를 확정한다(_recover_rc). fork 로 docker exec 가 조기반환한 경우엔 컨테이너
       내부에서 rc 파일 등장을 유계 폴링(T+G 상한) 후 읽는다. `exit $__rc` 전파는 무-fork 빌드용
       빠른 경로로 남긴다(파일과 값 일치).
-  · per-job teardown(R2·컨테이너-스코프): 마커→PGID 그룹 kill(FACT2·3 whack-a-mole: busybox
-    `timeout` 이 자기 PGID 로 탈출/pid1 reparent → 마커 상실 → 생존)을 **폐기**. 대신
+  · per-job teardown(R2·컨테이너-스코프): 마커->PGID 그룹 kill(FACT2·3 whack-a-mole: busybox
+    `timeout` 이 자기 PGID 로 탈출/pid1 reparent -> 마커 상실 -> 생존)을 **폐기**. 대신
     `_reap_all_script` = 사이드카 안에서 **pid1(+리퍼 자기트리) 제외 전 프로세스 kill**
-    (TERM→grace→KILL). SIGKILL·per-pid 라 pgid-escape 무관하게 탈출한 timeout 까지 확실 회수.
+    (TERM->grace->KILL). SIGKILL·per-pid 라 pgid-escape 무관하게 탈출한 timeout 까지 확실 회수.
     **PID 네임스페이스 private 가드**(pid1=sleep 확인, fail-closed)로 호스트 광역 kill 차단.
-    teardown 이 (container,job) 을 컨테이너로 dedupe → 사이드카당 1회. **sem 획득**으로 in-flight
+    teardown 이 (container,job) 을 컨테이너로 dedupe -> 사이드카당 1회. **sem 획득**으로 in-flight
     run/rc-recovery 와 비중첩(직렬 불변식 강제). 안전 전제 = 우리 사이드카는 pid1=`sleep infinity`
     + ephemeral 잡, 상주 데몬 없음.
   · teardown(캠페인 종료·R2): 우리 라벨 사이드카를 `docker rm -f`(SidecarManager/safeexec.reap_labeled)
@@ -43,9 +43,9 @@ DESIGN §4.3 · 13 §1(V2-D30, SSH 제거→local 정본). docker.sock 로 로�
     본 백엔드의 in-place 스윕은 그 상보(사이드카 상보·컨테이너 상주 시 잔여 회수)다.
 
 비밀(R6): secret_params 값은 argv/env 가 아니라 stdin(bytes)로만 — ExecRequest.stdin
-  → `docker exec -i … <script>` 표준입력. 스크립트는 baked 규약대로 stdin 을 읽는다.
+  -> `docker exec -i … <script>` 표준입력. 스크립트는 baked 규약대로 stdin 을 읽는다.
 작성 2026-07-05 · 종료모델 재구현(setsid+PGID killpg) 2026-07-06 ·
-  reap 교체(PGID 그룹 kill → 컨테이너-스코프 kill-all-but-pid1 스윕, whack-a-mole 종결) 2026-07-06.
+  reap 교체(PGID 그룹 kill -> 컨테이너-스코프 kill-all-but-pid1 스윕, whack-a-mole 종결) 2026-07-06.
 """
 
 from __future__ import annotations
@@ -72,8 +72,8 @@ from core.modules.backends.base import (
     supervise_subprocess,
 )
 
-# sidecar 리터럴 → 실행 컨테이너 이름 해석기(SidecarManager.ensure 주입점).
-# dict 도 허용 → 정규화 시 callable 로 감쌈. host 는 컨테이너 없음(호출 안 됨).
+# sidecar 리터럴 -> 실행 컨테이너 이름 해석기(SidecarManager.ensure 주입점).
+# dict 도 허용 -> 정규화 시 callable 로 감쌈. host 는 컨테이너 없음(호출 안 됨).
 type ContainerResolver = Callable[[str], str] | Mapping[str, str]
 
 _JOB_MARK = "DAH_JOB"         # 고유 마커 토큰(정확 대상 reap 앵커 · cmdline 상주)
@@ -81,7 +81,7 @@ _RC_VAR = "__dah_rc"          # timeout exit code 포착 변수(마커 상주 + 
 _WATCHDOG_MARGIN_S = 5.0      # 로컬 워치독은 컨테이너 내부 timeout 보다 이 폭만큼 늦게 발화
 
 # rc-file fallback(강건 exit-code 회수). wrap 이 실제 rc 를 컨테이너 파일에 기록하고 백엔드가
-#   그 파일을 read → busybox setsid 가 fork/즉시반환(_exit 0)해 docker exec 가 항상 0 을 반환하는
+# 그 파일을 read -> busybox setsid 가 fork/즉시반환(_exit 0)해 docker exec 가 항상 0 을 반환하는
 #   빌드에서도 **실제 rc** 를 확정한다(setsid fork 여부와 무관). 파일 캡처 규약과 동일(PIPE 금지).
 _RC_DIR = "/tmp"              # 사이드카(alpine/busybox) 임시 경로 — IP/컨테이너명 아님(config 대상 아님)
 _RC_PREFIX = "dah_rc_"        # rc 파일 접두(우리 소유 식별) · 파일명 = <prefix><uuid>
@@ -111,10 +111,10 @@ def _wrap_in_container(
 
       sh -c ': DAH_JOB=<job>; timeout -k <G> <T> "$@"; __rc=$?; echo $__rc > <rcfile>; exit $__rc' _ <script> <args...>
 
-    ★ setsid 제거(2026-07-06): 구 모델은 `setsid` 로 sh 를 새 프로세스그룹 리더로 만들어 per-job
+    setsid 제거(2026-07-06): 구 모델은 `setsid` 로 sh 를 새 프로세스그룹 리더로 만들어 per-job
       PGID 그룹 kill 을 앵커했으나, reap 이 **컨테이너-스코프 kill-all-but-pid1 스윕**(`_reap_all_script`)
       으로 교체되면서 setsid/PGID/마커가 **불필요**해졌다. 게다가 **util-linux setsid(ubuntu 사이드카)는
-      fork** 하여(busybox setsid 는 exec) docker exec 가 자식의 stdout 생성 전에 조기반환 → **stdout 유실**
+      fork** 하여(busybox setsid 는 exec) docker exec 가 자식의 stdout 생성 전에 조기반환 -> **stdout 유실**
       (recon JSON 소실) 버그를 유발했다(2026-07-06 실측). setsid 제거로 docker exec 가 sh 종료까지
       대기하며 stdout·실제 rc 를 정상 회수한다.
 
@@ -125,20 +125,20 @@ def _wrap_in_container(
       (1) `exit` 로 전파(setsid 없이 docker exec 가 실제 rc 회수) + (2) rc 파일에 기록(_recover_rc
       belt·이제 무-fork 라 exit 전파와 항상 일치). `: DAH_JOB=<job>` 는 **debug breadcrumb**(reap 미사용).
     - "$@" 는 $1.. 위치인자(= script+args). $0='_'(자리 채움).
-    - 비밀 stdin 은 sh→timeout→script 로 상속(argv 노출 0, R6).
+    - 비밀 stdin 은 sh->timeout->script 로 상속(argv 노출 0, R6).
     """
     marker = f"{_JOB_MARK}={job}"  # debug breadcrumb(reap 미사용 — kill-all-but-pid1 은 마커 불요)
-    rc_file = _rc_path(job)  # job=hex uuid → 셸 특수문자 없음(안전)
+    rc_file = _rc_path(job)  # job=hex uuid -> 셸 특수문자 없음(안전)
     inner = (
         f": {marker}; "
         f'timeout -k {int(kill_grace_s)} {int(timeout_s)} "$@"; '
         f"{_RC_VAR}=$?; echo ${_RC_VAR} > {rc_file}; exit ${_RC_VAR}"
     )
-    return ["sh", "-c", inner, "_", *argv]  # setsid 제거(util-linux fork→stdout 유실 방지)
+    return ["sh", "-c", inner, "_", *argv]  # setsid 제거(util-linux fork->stdout 유실 방지)
 
 
 def _rc_path(job: str) -> str:
-    """job(hex uuid) → 컨테이너 rc 파일 경로. 파일명은 우리 접두로 소유 식별."""
+    """job(hex uuid) -> 컨테이너 rc 파일 경로. 파일명은 우리 접두로 소유 식별."""
     return f"{_RC_DIR}/{_RC_PREFIX}{job}"
 
 
@@ -146,7 +146,7 @@ def _recover_rc_script(job: str, wait_iters: int) -> str:
     """rc 파일이 나타날 때까지 **유계 대기** 후 rc 를 stdout 으로 출력하고 파일을 제거하는 셸.
 
     busybox setsid 가 fork/즉시반환하면 docker exec 가 잡 완료 전에 반환할 수 있어(레이스) rc 파일이
-    아직 없을 수 있다 → 컨테이너 내부에서 `timeout -k` 상한(T+G) 범위로 파일 등장을 폴링(sleep 1,
+    아직 없을 수 있다 -> 컨테이너 내부에서 `timeout -k` 상한(T+G) 범위로 파일 등장을 폴링(sleep 1,
     정수초라 busybox 이식성 안전)한 뒤 읽는다. 무-fork(정상) 빌드에선 파일이 이미 있어 첫 반복에서
     즉시 반환(대기 0). 읽은 뒤 `rm -f` 로 잔여 0.
     """
@@ -160,7 +160,7 @@ def _recover_rc_script(job: str, wait_iters: int) -> str:
 
 
 def _parse_rc(text: str) -> Optional[int]:
-    """rc 파일 stdout → int. 마지막 비어있지 않은 라인을 정수로 해석. 실패 시 None(폴백)."""
+    """rc 파일 stdout -> int. 마지막 비어있지 않은 라인을 정수로 해석. 실패 시 None(폴백)."""
     lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
     if not lines:
         return None
@@ -176,33 +176,33 @@ def _rc_wait_iters(timeout_s: float, kill_grace_s: float, margin_s: float) -> in
 
 
 def _reap_all_script(grace_s: float) -> str:
-    """컨테이너-스코프 리퍼 셸: pid1(+리퍼 자기트리) 제외 **전 프로세스** kill(TERM→grace→KILL).
+    """컨테이너-스코프 리퍼 셸: pid1(+리퍼 자기트리) 제외 **전 프로세스** kill(TERM->grace->KILL).
 
     §4 미결 해소(마커/PGID 모델의 구조적 구멍 제거): busybox `timeout` 이 자기 프로세스그룹으로
     탈출하거나 setsid-fork 로 pid1 에 reparent 되어 마커를 잃어도, per-pid /proc 스윕이 직접
-    죽인다. SIGKILL 은 uncatchable·pgid-escape 무관 → 탈출한 timeout 도 확실 회수.
+    죽인다. SIGKILL 은 uncatchable·pgid-escape 무관 -> 탈출한 timeout 도 확실 회수.
 
     설계·적대검증 근거(alpine BusyBox 1.37.0 실증):
-      · `kill`/`read`/`[`/`set` = ash 빌트인 → 스윕 루프가 **fork 0**(리퍼 자기 자식 레이스 없음).
-      · `$$` 는 subshell 에서도 불변(POSIX) → SELF 로 리퍼 트리 식별 가능(alpine 은 BASHPID 없음).
+      · `kill`/`read`/`[`/`set` = ash 빌트인 -> 스윕 루프가 **fork 0**(리퍼 자기 자식 레이스 없음).
+      · `$$` 는 subshell 에서도 불변(POSIX) -> SELF 로 리퍼 트리 식별 가능(alpine 은 BASHPID 없음).
       · `/proc/<pid>/stat` 은 comm 이 공백/`)` 를 담을 수 있어 **마지막 ')' 이후**(`${st##*)}`)만
         파싱해야 ppid 를 안전 추출.
 
     안전 가드(적대검증 채택):
       · **pid1 정체 확인(fail-closed)**: `/proc/1/comm` 이 keepalive(sleep — SidecarManager
         `_SLEEP_CMD`)가 아니면 스윕 중단(exit 3). 공유/호스트 PID 네임스페이스(`--pid=host`
-        `--pid=container:`)에선 pid1=호스트 init → 불일치 → **호스트 광역 kill 원천 차단**.
+        `--pid=container:`)에선 pid1=호스트 init -> 불일치 -> **호스트 광역 kill 원천 차단**.
       · **is_mine**: SELF($$) 검사를 `-le 1` 가드보다 **먼저** 수행(리퍼가 pid1일 때 자식 오살
         방지) + stat read 는 `2>/dev/null` 선행. 리퍼 자기 트리(subshell·grace sleep)를 ppid
         조상 추적으로 제외.
 
-    ★ 안전 전제(우리 모델): 이 무차별 스윕은 **우리 소유 사이드카**(pid1=`sleep infinity` +
+    안전 전제(우리 모델): 이 무차별 스윕은 **우리 소유 사이드카**(pid1=`sleep infinity` +
       ephemeral docker-exec 잡, **상주 비-pid1 데몬 없음**)에 대해서만 안전하다. sem=1 +
       teardown 전용(호출자가 teardown 시 sem 획득) 불변식이 근거 — 라이브 잡/rc-recovery 와
       스윕이 겹치지 않는다. 캠페인 종료 원자 회수의 **정본은 여전히 우리 라벨 `docker rm -f`**
       (FACT4) — 이 스윕은 사이드카 상주 시의 in-place 상보다.
 
-    ★ 좀비 잔여(정직성): pid1=`sleep infinity` 는 wait() 를 하지 않으므로, 스윕이 죽인
+    좀비 잔여(정직성): pid1=`sleep infinity` 는 wait() 를 하지 않으므로, 스윕이 죽인
       프로세스 중 사망 전 pid1 로 reparent 된 것은 **defunct(Z) 좀비로 /proc 에 남는다**. 좀비는
       자원(CPU·메모리·5762 연결) 0 의 inert 엔트리이며, 캠페인 종료 `docker rm -f`(PRIMARY)로
       원자 회수된다. gate-1 실측(2026-07-06): 탈출 timeout 포함 **모든 LIVE 프로세스 0**,
@@ -243,7 +243,7 @@ def _reap_all_script(grace_s: float) -> str:
 
 
 def _as_resolver(r: Optional[ContainerResolver]) -> Optional[Callable[[str], str]]:
-    """dict|callable|None → callable|None 정규화."""
+    """dict|callable|None -> callable|None 정규화."""
     if r is None:
         return None
     if callable(r):
@@ -263,7 +263,7 @@ def _as_resolver(r: Optional[ContainerResolver]) -> Optional[Callable[[str], str
 class LocalBackend(Backend):
     """정본 배포 백엔드. 로컬 docker.sock 경유 `docker exec`(SSH 불필요).
 
-    container_of : sidecar 리터럴(ue/core/sgi) → 장수 사이드카 컨테이너 이름 해석.
+    container_of : sidecar 리터럴(ue/core/sgi) -> 장수 사이드카 컨테이너 이름 해석.
                    (실제 배선은 SidecarManager.ensure 를 주입 — 이 백엔드는 해석만 소비.)
                    host 벤티지는 컨테이너 미해석(호스트 직접 실행).
     docker_bin   : docker CLI 경로/이름(하드코딩 0 — 주입 가능).
@@ -343,8 +343,8 @@ class LocalBackend(Backend):
             self._jobs.add((container, job))
 
         # 공유 한정자원(5762 등) 직렬화 sem 을 **run 스코프**에서 잡는다(supervise 엔 sem 미주입).
-        #   → busybox setsid fork 로 docker exec 가 조기반환해도 rc 파일 회수 대기 동안 sem 을 유지
-        #     → '다중 연결 금지(세마포어=1)' 불변식이 fork 빌드에서도 보존된다.
+        # -> busybox setsid fork 로 docker exec 가 조기반환해도 rc 파일 회수 대기 동안 sem 을 유지
+        # -> '다중 연결 금지(세마포어=1)' 불변식이 fork 빌드에서도 보존된다.
         guard = self._sem if self._sem is not None else contextlib.nullcontext()
         async with guard:
             try:
@@ -365,7 +365,7 @@ class LocalBackend(Backend):
                     )
                 )
             # rc-file fallback: docker exec 반환 rc 는 busybox setsid fork 시 항상 0 이라 신뢰 불가.
-            #   killed/timed_out(로컬 워치독 발화)은 우리가 죽인 것이라 그 판정을 신뢰 → rc 회수 생략.
+            # killed/timed_out(로컬 워치독 발화)은 우리가 죽인 것이라 그 판정을 신뢰 -> rc 회수 생략.
             #   그 외엔 컨테이너 rc 파일에서 **실제 rc** 를 회수해 확정(sem 유지 중).
             if container is not None and not out.killed and not out.timed_out:
                 rc = await self._recover_rc(container, job, timeout_s)
@@ -413,8 +413,8 @@ class LocalBackend(Backend):
         make_runner_factory 가 팩토리 스코프 1회 호출·캐시. 프로브 실패/무접속 시 Err
         (fail-open: orchestrator 는 ToolError 로 진행). container_of 미배선이면 통과(호스트/mock 무관).
 
-        ★ 실행은 **self.run(ExecRequest) 경유** — 직접 docker subprocess 호출 없음(종료계약
-          일관: setsid + timeout -k 래핑 + JOB 마커 상주 → per-job PGID reap). 오프라인 무실행.
+        실행은 **self.run(ExecRequest) 경유** — 직접 docker subprocess 호출 없음(종료계약
+          일관: setsid + timeout -k 래핑 + JOB 마커 상주 -> per-job PGID reap). 오프라인 무실행.
         """
         if self._container_of is None:
             return Ok(None)
@@ -439,12 +439,12 @@ class LocalBackend(Backend):
     async def teardown(self) -> None:
         """각 사이드카를 **컨테이너-스코프**로 회수(pid1 제외 전 프로세스 sweep). best-effort·멱등.
 
-        (container,job) 을 **컨테이너로 dedupe** → 사이드카 1개당 리퍼 exec 1회(잡 수 무관·GRACE
+        (container,job) 을 **컨테이너로 dedupe** -> 사이드카 1개당 리퍼 exec 1회(잡 수 무관·GRACE
         중복 지불 없음). 스윕은 컨테이너 PID 네임스페이스 전체를 비우므로 잡 단위 반복이 불필요.
 
-        ★ sem 획득: run()/rc-recovery 와 스윕이 **겹치지 않도록** 직렬 불변식을 '가정'이 아니라
-          '강제'(적대검증 이슈③). 우리 흐름은 teardown 이 run 완료 후라 sem 이 이미 free.
-        ★ 캠페인 종료 회수의 정본은 우리 라벨 사이드카 `docker rm -f`(FACT4·원자적 회수,
+        sem 획득: run()/rc-recovery 와 스윕이 **겹치지 않도록** 직렬 불변식을 '가정'이 아니라
+          '강제'(적대검증 이슈3.). 우리 흐름은 teardown 이 run 완료 후라 sem 이 이미 free.
+        캠페인 종료 회수의 정본은 우리 라벨 사이드카 `docker rm -f`(FACT4·원자적 회수,
           SidecarManager/safeexec.reap_labeled 소유)다. 이 in-place 스윕은 사이드카 상주 시의 상보.
         """
         grouped: dict[str, list[str]] = {}
@@ -608,7 +608,7 @@ class SshBackend(Backend):
     async def _recover_rc(
         self, container: str, job: str, timeout_s: float
     ) -> Optional[int]:
-        """원격 컨테이너 rc 파일에서 실제 exit code 회수(ssh→docker exec, 파일 캡처·PIPE 금지).
+        """원격 컨테이너 rc 파일에서 실제 exit code 회수(ssh->docker exec, 파일 캡처·PIPE 금지).
 
         setsid fork/즉시반환으로 원격 docker exec 가 조기반환해도 컨테이너 내부 유계 폴링으로 실제 rc
         확정. 회수 셸 출력은 임시파일로 캡처. 실패 시 None(폴백).
@@ -641,9 +641,9 @@ class SshBackend(Backend):
     async def teardown(self) -> None:
         """원격 각 사이드카를 **컨테이너-스코프**로 회수(pid1 제외 전 프로세스 sweep, best-effort).
 
-        LocalBackend 와 동일 모델: (container,job) 을 컨테이너로 dedupe → 원격
+        LocalBackend 와 동일 모델: (container,job) 을 컨테이너로 dedupe -> 원격
         `docker exec <container> sh -c '<kill-all-but-pid1 스윕>'` 을 컨테이너별 1회, 단일 ssh
-        세션에 묶어 실행. 넓은 pkill 금지. sem 획득으로 in-flight run 과 비중첩(적대검증 이슈③).
+        세션에 묶어 실행. 넓은 pkill 금지. sem 획득으로 in-flight run 과 비중첩(적대검증 이슈3.).
         (캠페인 종료 원자 회수의 정본은 원격 라벨 사이드카 `docker rm -f` — FACT4.)
         """
         grouped: dict[str, list[str]] = {}

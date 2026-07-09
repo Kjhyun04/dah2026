@@ -13,7 +13,7 @@ Topology (in-graph cycles = 0, all loop-backs -> END):
   escalate -> END
 
 Conditional branch functions live in edges.py and read numeric/bool fields ONLY
-(불변식①). recon is boot-only (not a node). recursion_limit=16 is passed at invoke
+(불변식1.). recon is boot-only (not a node). recursion_limit=16 is passed at invoke
 (driver) as a cycle guard.
 
 SINGLE-SOURCED TOPOLOGY (PA-9): the node roster, the linear spine, the two conditional
@@ -63,7 +63,7 @@ def build_graph(deps: Optional[dict[str, Any]] = None):
     d = deps or {}
     # Phase 0 wiring: normalize the sandbox OPER auto-confirm flag to a guaranteed bool so the
     # Phase 1 gate/edge can read it without re-parsing. No routing effect yet — topology.BIND does
-    # not reference 'operator_auto' until Phase 1, so control flow is unchanged (불변식① 무손상,
+    # not reference 'operator_auto' until Phase 1, so control flow is unchanged (불변식1. 무손상,
     # 회귀 0). Shallow-copy so the caller's deps dict is not mutated.
     d = {**d, "operator_auto": bool(d.get("operator_auto"))}
 
@@ -82,7 +82,7 @@ def build_graph(deps: Optional[dict[str, Any]] = None):
     g.add_edge(START, topology.ENTRY)              # set_entry_point('sense')
     for src, dst in topology.LINEAR_EDGES.items():  # linear spine (loop-backs already -> END)
         g.add_edge(src, _target(dst))
-    for src, (fn_name, mapping) in topology.COND_EDGES.items():  # numeric/bool routing only (불변식①)
+    for src, (fn_name, mapping) in topology.COND_EDGES.items():  # numeric/bool routing only (불변식1.)
         g.add_conditional_edges(
             src, _BRANCH[fn_name],
             {label: _target(target) for label, target in mapping.items()},

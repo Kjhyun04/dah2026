@@ -1,10 +1,10 @@
-"""P0 실행검증 (mock 없음) — 실제 import + WorldState → legality → kb_update → goal_reached.
+"""P0 실행검증 (mock 없음) — 실제 import + WorldState -> legality -> kb_update -> goal_reached.
 
 재현 시나리오 = 11 §4 예시 트레이스: `mode=GUIDED under signing=on` (signing_bypass).
 registry = 22 원시 전량(04 §5). SetMode 미차단 경로 = forge_sign(signkey_leak 소비).
   oracle/forge_aria=Blocked(signing), replay=Blocked(timestamp), naive=baseline.
 통과 기준 = 각 단계의 runnable/missing/effect_eval/goal_reached 가 설계(11 §4)와 일치 + 수정검증:
-  (a) 미등록 id → KeyError  (b) forge_sign args_template 에 {sign_key} 부재 + secret_params
+  (a) 미등록 id -> KeyError  (b) forge_sign args_template 에 {sign_key} 부재 + secret_params
   (c) blocked InjectResult 는 mode 불변(가드)  (d) string target '4' 도 goal_reached True(양변 int).
 """
 
@@ -13,7 +13,7 @@ _import_sys=__import__('sys'); _import_os=__import__('os')
 from pathlib import Path as _Path
 _REPO=_Path(__file__).resolve().parents[1]
 if str(_REPO) not in _import_sys.path: _import_sys.path.insert(0,str(_REPO))
-_import_os.chdir(_REPO)  # cwd=repo root → cwd-relative paths resolve
+_import_os.chdir(_REPO)  # cwd=repo root -> cwd-relative paths resolve
 
 import sys
 
@@ -99,7 +99,7 @@ check("reach(sgi) now in facts", reach(RT.SGI) in kb.facts)
 check("reach(gcs14556) now in facts", reach(RT.GCS14556) in kb.facts)
 check("prov[reach(sgi)]=recon", kb.prov.get("reach(sgi)") == "recon")
 
-# recon_defense (이제 runnable) → signing=on 확정 (defense:on 시드 등가, 19 PART1-1)
+# recon_defense (이제 runnable) -> signing=on 확정 (defense:on 시드 등가, 19 PART1-1)
 st = status_of("recon_defense", kb)
 check("recon_defense runnable after reach(sgi)", st.runnable is True)
 kb_update(kb, ReconResult(signing="on"))
@@ -195,7 +195,7 @@ check("(c) prov[mode] 미기록", "mode" not in kb_blk.prov)
 kb_blk2 = WorldState.initial()
 kb_update(kb_blk2, InjectResult(accepted=False, effect={"mode": "4"}))
 check("(c) not accepted → mode 불변", kb_blk2.scalars.mode is None)
-# SetFlag(subscriber_written): accepted+미차단 → flags 갱신
+# SetFlag(subscriber_written): accepted+미차단 -> flags 갱신
 kb_flag = WorldState.initial()
 kb_update(kb_flag, InjectResult(accepted=True, effect={"subscriber_written": "true"}))
 check("SetFlag: subscriber_written in flags", "subscriber_written" in kb_flag.flags)
@@ -257,7 +257,7 @@ _expected = {
     "oracle", "webcmd", "forge_sign", "forge_aria", "replay", "peer_flood", "forceland", "naive",
 }
 check("23 원시 id 전량 일치 (04 §5)", set(REGISTRY.keys()) == _expected)
-# (a) 미등록 id → KeyError
+# (a) 미등록 id -> KeyError
 try:
     get_spec("nonexistent_tool")
     check("(a) unknown id rejected", False)
@@ -298,25 +298,25 @@ kb_update(kb_c, ReconResult(reach=[f"{t}@10.50.0.1:0" for t in
           ("net_core", "mongo", "sgi", "uav5762", "s1u", "pivot",
            "gcs14555", "gcs14556", "web8080")]))
 kb_update(kb_c, ReconResult(signing="on"))
-# serial5762: reach(uav5762) 충족 → runnable, effect SET_MODE (서명 관통)
+# serial5762: reach(uav5762) 충족 -> runnable, effect SET_MODE (서명 관통)
 st = status_of("serial5762", kb_c)
 check("serial5762 runnable + effect_eval SET_MODE (서명 관통)",
       st.runnable and st.effect_eval.kind == EffectEvalKind.SET_MODE)
-# webcmd: reach(web8080) 있으나 unauth(web) 없음 → NOT runnable
+# webcmd: reach(web8080) 있으나 unauth(web) 없음 -> NOT runnable
 st = status_of("webcmd", kb_c)
 check("webcmd NOT runnable (missing unauth(web))",
       not st.runnable and any("unauth(web)" in m.detail for m in st.missing))
-# forge_aria: signing=on → Blocked(signing) (aria_key 미보유이므로 runnable=False 이나 effect_eval 예측)
+# forge_aria: signing=on -> Blocked(signing) (aria_key 미보유이므로 runnable=False 이나 effect_eval 예측)
 st = status_of("forge_aria", kb_c)
 check("forge_aria effect_eval Blocked(signing) [서명계층이 막음]",
       st.effect_eval.kind == EffectEvalKind.BLOCKED
       and st.effect_eval.blocked_by.value == "signing")
-# replay: signing=on → Blocked(timestamp)
+# replay: signing=on -> Blocked(timestamp)
 st = status_of("replay", kb_c)
 check("replay effect_eval Blocked(timestamp)",
       st.effect_eval.kind == EffectEvalKind.BLOCKED
       and st.effect_eval.blocked_by.value == "timestamp")
-# nonce_scan: ciphertext/pcap 없음 → NOT runnable (require_any_artifact)
+# nonce_scan: ciphertext/pcap 없음 -> NOT runnable (require_any_artifact)
 st = status_of("nonce_scan", kb_c)
 check("nonce_scan NOT runnable (missing ciphertext|pcap)",
       not st.runnable and any("ciphertext" in m.detail and "pcap" in m.detail for m in st.missing))
@@ -328,15 +328,15 @@ check("nonce_scan runnable after +ciphertext (OR 그룹 ≥1)", st.runnable)
 st = status_of("subdb_canary", kb_c)
 check("subdb_canary effect_eval SET_FLAG (subscriber_written)",
       st.effect_eval.kind == EffectEvalKind.SET_FLAG)
-# pfcp_delete: precond reach(net_core) 충족되나 seid 미보유 → NOT runnable (consumes 미충족)
+# pfcp_delete: precond reach(net_core) 충족되나 seid 미보유 -> NOT runnable (consumes 미충족)
 st = status_of("pfcp_delete", kb_c)
 check("pfcp_delete NOT runnable (reach(net_core) 충족·seid 미보유)", not st.runnable)
-# forceland: in_flight 없음 → NOT runnable, HIGH risk
+# forceland: in_flight 없음 -> NOT runnable, HIGH risk
 check("forceland risk == HIGH (HITL)", get_spec("forceland").risk.value == "HIGH")
 st = status_of("forceland", kb_c)
 check("forceland NOT runnable (missing in_flight)",
       not st.runnable and any("in_flight" in m.detail for m in st.missing))
-# HITL 게이트 표식(절대규칙5·DESIGN §8): 기본 hitl_enabled → HIGH risk 는 requires_confirm=True
+# HITL 게이트 표식(절대규칙5·DESIGN §8): 기본 hitl_enabled -> HIGH risk 는 requires_confirm=True
 check("forceland requires_confirm True (HITL-on 기본)", st.requires_confirm is True)
 check("forceland requires_confirm False when hitl_enabled=False (opt-out)",
       legality(get_spec("forceland"), kb_c, hitl_enabled=False).requires_confirm is False)

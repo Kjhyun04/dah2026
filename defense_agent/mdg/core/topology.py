@@ -22,7 +22,7 @@ each consumer (which already imports ``edges`` and ``nodes``). ``END`` mirrors `
 (and the langgraph END sentinel) — verify_graph asserts the two spellings stay equal.
 
 불변식 preservation is structural: this module encodes ONLY node order + branch-point names +
-kwarg→dep-key names. It carries NO LLM field, NO secret, NO subprocess — control flow still
+kwarg-to-dep-key names. It carries NO LLM field, NO secret, NO subprocess — control flow still
 routes solely through ``edges.route_after_*`` (numeric/bool), and side effects still live in the
 nodes (leak-0). Changing the graph is now a one-file edit both execution paths inherit.
 """
@@ -58,7 +58,7 @@ LINEAR_EDGES: dict[str, str] = {
 
 # Conditional branch points: node -> (branch_fn_name in edges.py, {branch_label -> target}).
 # The interpreter/build resolve the fn NAME via their own edges registry; the label set is
-# exactly what edges.route_after_* can return. Control flow reads numeric/bool ONLY (불변식①).
+# exactly what edges.route_after_* can return. Control flow reads numeric/bool ONLY (불변식1.).
 COND_EDGES: dict[str, tuple[str, dict[str, str]]] = {
     "compute_impact": ("route_after_impact", {"orient": "orient", END: END}),
     "decide": ("route_after_decide", {"act": "act", "escalate": "escalate", END: END}),
@@ -68,7 +68,7 @@ COND_EDGES: dict[str, tuple[str, dict[str, str]]] = {
 # (functools.partial) and e2e._TickExecutor (kwargs at call) bind from THIS map, so a new dep
 # is added in exactly one place. Note kwarg 'llm' maps to distinct slots (llm_orient/llm_decide)
 # — verify_models cross-checks that routing. escalate's 'gate' is included here to CLOSE the
-# graph.py↔executor divergence (both paths now pass gate=deps['gate']).
+# graph.py<->executor divergence (both paths now pass gate=deps['gate']).
 BIND: dict[str, dict[str, str]] = {
     "sense": {"inbox": "inbox", "verify": "verify", "clock": "clock",
               "source_domains": "source_domains"},

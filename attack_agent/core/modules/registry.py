@@ -11,11 +11,11 @@
   C: key_extract · signkey_leak · nonce_scan
   D: oracle · webcmd · forge_sign · forge_aria · replay · peer_flood · forceland · naive
 
-비자명 체인 실증(19): signkey_leak(produces sign_key) → forge_sign(consumes sign_key),
+비자명 체인 실증(19): signkey_leak(produces sign_key) -> forge_sign(consumes sign_key),
   signing=on 하에서 SetMode 미차단 경로(oracle/forge_aria/replay=Blocked, naive=baseline).
 
 비밀 라우팅(R6·ADV-F5): forge_sign/forge_aria/replay 의 소비 비밀은 args_template 원문이
-  아니라 exec_binding.secret_params(vault→stdin) 로 선언 — argv 누수 차단.
+  아니라 exec_binding.secret_params(vault->stdin) 로 선언 — argv 누수 차단.
 작성 2026-07-05. 확장(22 전량) 2026-07-05.
 """
 
@@ -98,7 +98,7 @@ _SPECS: list[ToolSpec] = [
         layer=Layer.RECON,
         kind=ToolKind.PROBE,
         precond=(reach(RT.SGI),),
-        # signing/ciphering_order 는 scalar → ReconResult.signing 으로 kb_update
+        # signing/ciphering_order 는 scalar -> ReconResult.signing 으로 kb_update
         risk=Risk.LOW,
         reversible=True,
         exec_binding=ExecBinding(
@@ -111,7 +111,7 @@ _SPECS: list[ToolSpec] = [
         layer=Layer.RECON,
         kind=ToolKind.PROBE,
         precond=(reach(RT.NET_CORE),),
-        produces=(Artifact.SEID,),  # F-SEID → pfcp_delete 소비
+        produces=(Artifact.SEID,),  # F-SEID -> pfcp_delete 소비
         risk=Risk.LOW,
         reversible=True,
         exec_binding=ExecBinding(
@@ -215,10 +215,10 @@ _SPECS: list[ToolSpec] = [
         id="pfcp_delete",
         layer=Layer.B,
         kind=ToolKind.INJECT,
-        # precond 통일: reach(NET_CORE) (recon_reach.produces_facts 가 NET_CORE 산출 → 활성).
+        # precond 통일: reach(NET_CORE) (recon_reach.produces_facts 가 NET_CORE 산출 -> 활성).
         #   과거 reach(UPF_PFCP) 는 어떤 tool 도 산출하지 않아 dead(도달불가)였음.
         precond=(reach(RT.NET_CORE),),
-        consumes=(Artifact.SEID,),  # ← recon_session 산출 소비
+        consumes=(Artifact.SEID,),  # <- recon_session 산출 소비
         effect=Disrupt(),           # c2 := disrupted
         risk=Risk.MED,              # 가용성 (04 §4)
         reversible=True,            # 재attach
@@ -248,7 +248,7 @@ _SPECS: list[ToolSpec] = [
         layer=Layer.B,
         kind=ToolKind.INJECT,
         precond=(reach(RT.PIVOT), weakcred("pivot")),
-        produces_facts=(reach(RT.NET_CORE),),  # 측면이동 → 코어망 도달(창발 게이트)
+        produces_facts=(reach(RT.NET_CORE),),  # 측면이동 -> 코어망 도달(창발 게이트)
         risk=Risk.MED,
         reversible=True,
         win_cause="config-flaw",
@@ -310,7 +310,7 @@ _SPECS: list[ToolSpec] = [
         layer=Layer.D,
         kind=ToolKind.INJECT,
         precond=(reach(RT.GCS14556),),
-        # IF signing=off → SetMode ELSE blocked(signing)  (04 §3 · 06 §3 Cond)
+        # IF signing=off -> SetMode ELSE blocked(signing) (04 §3 · 06 §3 Cond)
         effect=Cond(
             when=CondWhen.SIGNING_OFF,
             then=SetMode(),
@@ -331,7 +331,7 @@ _SPECS: list[ToolSpec] = [
         layer=Layer.D,
         kind=ToolKind.INJECT,
         precond=(reach(RT.WEB8080), unauth("web")),
-        effect=SetMode(),  # 웹이 서명 대행 → 우회 (signing 무관 성립)
+        effect=SetMode(),  # 웹이 서명 대행 -> 우회 (signing 무관 성립)
         params=dict(_MODE_PARAM),
         risk=Risk.LOW,
         reversible=True,
@@ -347,8 +347,8 @@ _SPECS: list[ToolSpec] = [
         layer=Layer.D,
         kind=ToolKind.INJECT,
         precond=(reach(RT.GCS14556),),
-        consumes=(Artifact.SIGN_KEY,),  # ← 계층C 산출 소비 (창발 엣지, 06 §5)
-        effect=SetMode(),               # 서명 위조 → 우회 (signing 무관 성립)
+        consumes=(Artifact.SIGN_KEY,),  # <- 계층C 산출 소비 (창발 엣지, 06 §5)
+        effect=SetMode(),               # 서명 위조 -> 우회 (signing 무관 성립)
         params=dict(_MODE_PARAM),
         risk=Risk.LOW,
         reversible=True,
@@ -357,7 +357,7 @@ _SPECS: list[ToolSpec] = [
             sidecar="sgi",
             script="ext_exec/N6_SIGNKEY/sign_forge.py",
             args_template="{oracle_ip}:14556 mode {mode}",  # IP 동적화·{sign_key} 원문 제거
-            secret_params=("sign_key",),                    # vault→stdin (R6)
+            secret_params=("sign_key",),                    # vault->stdin (R6)
         ),
     ),
     ToolSpec(
@@ -365,8 +365,8 @@ _SPECS: list[ToolSpec] = [
         layer=Layer.D,
         kind=ToolKind.INJECT,
         precond=(reach(RT.GCS14555),),
-        consumes=(Artifact.ARIA_KEY,),  # ← key_extract 산출 소비
-        # IF signing=off → SetMode ELSE blocked(signing) — ARIA 위조는 서명계층이 막음
+        consumes=(Artifact.ARIA_KEY,),  # <- key_extract 산출 소비
+        # IF signing=off -> SetMode ELSE blocked(signing) — ARIA 위조는 서명계층이 막음
         effect=Cond(
             when=CondWhen.SIGNING_OFF,
             then=SetMode(),
@@ -380,7 +380,7 @@ _SPECS: list[ToolSpec] = [
             sidecar="sgi",
             script="dah_exec/C_TM3_V1_V4_V5/v4_forge.py",
             args_template="{cipher_ip}:14555 mode {mode}",  # IP 동적화·{aria_key} 원문 제거
-            secret_params=("aria_key",),                    # vault→stdin (R6)
+            secret_params=("aria_key",),                    # vault->stdin (R6)
         ),
     ),
     ToolSpec(
@@ -389,7 +389,7 @@ _SPECS: list[ToolSpec] = [
         kind=ToolKind.INJECT,
         precond=(),
         consumes=(Artifact.CIPHERTEXT,),  # 캡처 명령 재전송
-        # IF signing=off → SetMode ELSE blocked(timestamp) — 서명이 타임스탬프로 막음
+        # IF signing=off -> SetMode ELSE blocked(timestamp) — 서명이 타임스탬프로 막음
         effect=Cond(
             when=CondWhen.SIGNING_OFF,
             then=SetMode(),
@@ -403,7 +403,7 @@ _SPECS: list[ToolSpec] = [
             sidecar="sgi",
             script="dah_exec/C_TM3_V1_V4_V5/v1_replay.py",
             args_template="{cipher_ip}:14555 mode {mode}",  # IP 동적화·{ciphertext} 원문 제거
-            secret_params=("ciphertext",),                  # vault→stdin (R6)
+            secret_params=("ciphertext",),                  # vault->stdin (R6)
         ),
     ),
     ToolSpec(
@@ -431,7 +431,7 @@ _SPECS: list[ToolSpec] = [
         effect=SetMode(),  # physical: mode := LAND(9)
         params=dict(_LAND_PARAM),
         risk=Risk.HIGH,     # 물리 (04 §6-2: HITL 필수)
-        reversible=False,   # 재이륙 필요(◐) → 보수적으로 비가역 표기
+        reversible=False,   # 재이륙 필요(◐) -> 보수적으로 비가역 표기
         win_cause="config-flaw",
         exec_binding=ExecBinding(
             sidecar="sgi",
@@ -444,7 +444,7 @@ _SPECS: list[ToolSpec] = [
         layer=Layer.D,
         kind=ToolKind.INJECT,
         precond=(reach(RT.GCS14555),),
-        # 대조군: 항상 차단 (baseline). effect_eval=Blocked(baseline) → LLM 회피 유도
+        # 대조군: 항상 차단 (baseline). effect_eval=Blocked(baseline) -> LLM 회피 유도
         effect=Cond(
             when=CondWhen.NEVER,
             then=SetMode(),
@@ -463,7 +463,7 @@ _SPECS: list[ToolSpec] = [
 ]
 
 
-# id → ToolSpec (닫힌 화이트리스트). Planner는 이 키만 고를 수 있음.
+# id -> ToolSpec (닫힌 화이트리스트). Planner는 이 키만 고를 수 있음.
 _REGISTRY: dict[ToolId, ToolSpec] = {s.id: s for s in _SPECS}
 
 # 무결성 불변식 (04 §6-1): 중복/누락 없음 확인
@@ -477,7 +477,7 @@ REGISTRY: Mapping[ToolId, ToolSpec] = MappingProxyType(_REGISTRY)
 
 
 def get_spec(tool_id: ToolId | str) -> ToolSpec:
-    """id → ToolSpec. 화이트리스트 밖이면 KeyError(닫힘 강제)."""
+    """id -> ToolSpec. 화이트리스트 밖이면 KeyError(닫힘 강제)."""
     if tool_id not in REGISTRY:
         raise KeyError(tool_id)
     return REGISTRY[cast(ToolId, tool_id)]

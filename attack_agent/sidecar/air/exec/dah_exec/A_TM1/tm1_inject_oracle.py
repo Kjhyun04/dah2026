@@ -102,7 +102,7 @@ def main() -> int:
     try:
         log(f"평문 오라클 {conn} UNSIGNED DO_SET_MODE={mode}")
         m = mavutil.mavlink_connection(conn, source_system=255, source_component=190)
-        baseline, sysid = read_mode(m, None, 6.0)   # 평문 오라클은 telemetry fan-out → 관측 가능
+        baseline, sysid = read_mode(m, None, 6.0)   # 평문 오라클은 telemetry fan-out -> 관측 가능
         log(f"baseline custom_mode={baseline} sysid={sysid}")
         injected = True
         send_mode(m, mode)

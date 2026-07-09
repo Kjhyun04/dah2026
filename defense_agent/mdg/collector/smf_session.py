@@ -173,7 +173,7 @@ class SmfSessionCollector(BaseCollector):
     Wired opt-in (not part of the default 6-collector set) via ``build_epc_collectors``;
     the table it maintains is shared with ``correlate`` (join) and target ``resolve``
     (pause reverse-map). Subprocess (docker logs) goes through the safe-exec Backend
-    only (불변식②); a dry/mock backend yields no live lines (table simply stays empty).
+    only (불변식2.); a dry/mock backend yields no live lines (table simply stays empty).
     """
     source_id = "smf_session"
     domain = "session_network"

@@ -11,7 +11,7 @@ docker build -t dahv2/web:latest images/web
 log "web_backend 기동 (net_sgi 172.30.0.20, 호스트 8080)"
 docker compose -f compose/docker-compose.web.yml up -d
 
-# gcs_proxy fan-out(→web_backend) 반영 위해 GCS측 재기동(ARIA 키 유지)
+# gcs_proxy 의 fan-out(web_backend 로 내보내기)을 반영하려고 GCS측을 재기동한다(ARIA 키는 유지).
 export ARIA_KEY_HEX="$(cat .env-aria)"
 log "gcs_proxy fan-out 갱신(→web_backend)"
 docker compose -f compose/docker-compose.gcs.yml up -d --force-recreate

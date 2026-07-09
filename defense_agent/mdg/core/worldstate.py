@@ -31,8 +31,8 @@ class SigningObs(str, Enum):
     PS-7 self-DoS).
 
     Transition authority (locked): enforcement changes ONLY on a uav_proxy authoritative
-    signal collected at P3+ (drop-log line ``⛔ 서명검증 실패 → SITL 차단 (누적 N)`` or a
-    ``🔒 서명 강제 ON`` boot banner / ``/api/signing`` enforced). gcs_proxy env, uav env,
+    signal collected at P3+ (drop-log line ``서명검증 실패 -> SITL 차단 (누적 N)`` or a
+    ``서명 강제 ON`` boot banner / ``/api/signing`` enforced). gcs_proxy env, uav env,
     docker inspect, and drop-ABSENCE never transition it (MEMORY 오판 가드 코드화).
     """
     UNKNOWN = "unknown"            # boot default; NOT off — no authoritative signal yet

@@ -96,7 +96,7 @@ def test_present_set_renormalization():
     assert overall == 36                                   # 30*60/50 = 36 (not 18 = /100)
 
 
-# --- monotonicity: raising any distrust never lowers overall (PS-7/불변식①) ------
+# --- monotonicity: raising any distrust never lowers overall (PS-7/불변식1.) ------
 def test_monotone_non_decreasing():
     base = {"command": 30.0, "communication": 20.0, "identity_access": 10.0,
             "session_network": 15.0, "mission": 5.0}

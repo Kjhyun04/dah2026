@@ -36,7 +36,7 @@ def main() -> None:
     duration_s = float(os.environ.get("OBSERVE_S", "6"))
     try:
         s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.ntohs(0x0003))
-    except Exception as e:  # NET_RAW 없음 등 → 미관측(보수)
+    except Exception as e:  # NET_RAW 없음 등 -> 미관측(보수)
         _emit(None, 0, [], f"no_raw_socket:{type(e).__name__}")
         return
     try:
@@ -59,7 +59,7 @@ def main() -> None:
                 raw, _ = s.recvfrom(65535)
             except socket.timeout:
                 continue
-            # Ethernet(14) → IPv4(0x0800) → UDP(17)
+            # Ethernet(14) -> IPv4(0x0800) -> UDP(17)
             if len(raw) < 42 or struct.unpack("!H", raw[12:14])[0] != 0x0800:
                 continue
             ip = raw[14:]

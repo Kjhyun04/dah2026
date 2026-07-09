@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 60-c2-up.sh — P6 평문 C2 종단. SITL→GCS(셀룰러) + gcs_c2(SGi).
+# 60-c2-up.sh — P6 평문 C2 종단. SITL 에서 GCS 로(셀룰러 경유) 잇고, gcs_c2 는 SGi 로 붙는다.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 log(){ printf '\033[1;34m[C2]\033[0m %s\n' "$*"; }

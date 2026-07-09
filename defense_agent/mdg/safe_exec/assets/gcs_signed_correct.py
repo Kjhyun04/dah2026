@@ -24,7 +24,7 @@ defense_agent codebase stays statically key-free (verify_signer_no_keyopen): the
 touches the key is this in-container sender.
 
 Behaviour (S2 physical return): open a SIGNED MAVLink2 link to the local SITL bridge
-(``udpout:127.0.0.1:14550`` → ARIA cipher proxy 14555 → uav_proxy signature verify → SITL), then
+(``udpout:127.0.0.1:14550`` -> ARIA cipher proxy 14555 -> uav_proxy signature verify -> SITL), then
   (a) DO_SET_MODE GUIDED  — take command authority back into a mode that accepts guided targets, and
   (b) return to a <alt> m RELATIVE-altitude hover over the current position
       (SET_POSITION_TARGET_GLOBAL_INT, MAV_FRAME_GLOBAL_RELATIVE_ALT_INT),
@@ -40,7 +40,7 @@ import time
 from pymavlink import mavutil
 
 SIGN_KEYFILE = "/sign.key"          # gcs_c2-local signing key (SAME key /gcs.py uses) — never leaves gcs_c2
-LINK = "udpout:127.0.0.1:14550"     # local signed uplink → ARIA proxy → uav_proxy verify → SITL
+LINK = "udpout:127.0.0.1:14550"     # local signed uplink -> ARIA proxy -> uav_proxy verify -> SITL
 COPTER_GUIDED_CUSTOM_MODE = 4       # ArduCopter GUIDED custom_mode
 
 # --- blocking-time budget (HISTORICAL — this standalone sender is SUPERSEDED; see the header) ------
@@ -78,7 +78,7 @@ def _wait_target(master: "mavutil.mavfile", timeout: float = HEARTBEAT_TIMEOUT_S
     Returns the HEARTBEAT msg (or None). We log LOUDLY whether telemetry actually reached this
     sender: if no heartbeat arrives, ``target_system`` stays 0 (broadcast) and the correction
     degrades to a best-effort broadcast — that must be VISIBLE in the spawn stdout (a missing
-    gcs.py→client telemetry relay is otherwise silent). The sender still proceeds best-effort."""
+    gcs.py-to-client telemetry relay is otherwise silent). The sender still proceeds best-effort."""
     hb = master.wait_heartbeat(timeout=timeout)
     if hb is None or getattr(master, "target_system", 0) == 0:
         print(f"gcs_signed_correct: WARNING no HEARTBEAT within {timeout:.0f}s "

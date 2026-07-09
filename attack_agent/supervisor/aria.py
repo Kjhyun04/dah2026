@@ -1,6 +1,6 @@
 """supervisor.aria — ARIA-256-GCM 복호 vendor (감독 전용·복호 방향만 사용).
 
-★ COPIED VERBATIM from testbed/proxy/mav_aria_proxy.py — KCMVP 검증모듈 교체 지점 = AriaGCM.
+COPIED VERBATIM from testbed/proxy/mav_aria_proxy.py — KCMVP 검증모듈 교체 지점 = AriaGCM.
   재구현 금지(doc18 D8). 감독은 encrypt() 미사용(완전 수동). unwrap 만 사용.
   원본: /home/ubuntu/testbed/proxy/mav_aria_proxy.py (AriaGCM + C2Cipher).
 """
@@ -67,7 +67,7 @@ class AriaGCM:
             L.EVP_CIPHER_CTX_ctrl(ctx, GCM_SET_TAG, 16, tag)
             fin = create_string_buffer(16); fl = c_int(0)
             if L.EVP_DecryptFinal_ex(ctx, fin, byref(fl)) != 1:
-                return None  # 인증 실패(변조/타키) → 조용히 폐기(프록시와 동일 규율)
+                return None  # 인증 실패(변조/타키) -> 조용히 폐기(프록시와 동일 규율)
             return pt + fin.raw[:fl.value]
         finally:
             L.EVP_CIPHER_CTX_free(ctx)
@@ -90,7 +90,7 @@ class C2Cipher:
 def load_key(env_name: str) -> bytes:
     """소유자 ARIA 키를 env(hex)에서 로드(감독 프로세스 내에서만). 32바이트 강제.
 
-    ★ 소유자 특권 — 공격 agent 에는 절대 주지 않는다(완전분리). 값은 이 프로세스 밖으로 안 나감.
+    소유자 특권 — 공격 agent 에는 절대 주지 않는다(완전분리). 값은 이 프로세스 밖으로 안 나감.
     """
     raw = os.environ.get(env_name, "").strip()
     if not raw:

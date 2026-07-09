@@ -21,7 +21,7 @@ docker run --rm dahv2/epc:latest sh -c 'command -v open5gs-mmed >/dev/null && co
 log "3) srsRAN 바이너리 + ZMQ 링크"
 docker run --rm dahv2/ran:latest sh -c 'command -v srsenb >/dev/null && command -v srsue >/dev/null' \
   && ok "srsenb/srsue 존재" || bad "srsRAN 바이너리 없음"
-# ZMQ는 별도 RF 플러그인(libsrsran_rf_zmq.so → libzmq)로 빌드됨. srsue는 런타임 로드(ldd엔 안 보임=정상)
+# ZMQ는 별도 RF 플러그인(libsrsran_rf_zmq.so, libzmq에 의존)으로 빌드된다. srsue는 이를 런타임에 로드하므로 ldd에는 안 보이는 것이 정상이다.
 docker run --rm dahv2/ran:latest sh -c 'ldconfig -p | grep -q libsrsran_rf_zmq' \
   && ok "ZMQ RF 플러그인(libsrsran_rf_zmq) 빌드됨" || bad "ZMQ RF 미빌드"
 

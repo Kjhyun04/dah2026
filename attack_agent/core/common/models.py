@@ -1,6 +1,6 @@
 """core.common.models — MODEL_MAP 로더 (A5 · 07 §4 · 08 litellm · aixcc configs/models-final.toml).
 
-역할: agent-role → **litellm-routable 모델 id** 매핑을 config 밖(`configs/models.yaml`)으로
+역할: agent-role -> **litellm-routable 모델 id** 매핑을 config 밖(`configs/models.yaml`)으로
   외부화한다(하드코딩 0). live 캠페인에서 `driver.build_orchestrator` 가 이 맵으로
   AttackOrchestrator 의 실제 모델 문자열을 해석한다.
 
@@ -9,7 +9,7 @@
   - LLM 은 1곳(AttackOrchestrator, 07 §1.5). Planner/Evidence 분리 시 확장 슬롯만 추가.
   - 비밀 0: API 키는 여기 없다. `config.llm.api_key_env` 가 가리키는 **env 이름**으로만
     (litellm 이 런타임에 그 env 를 읽어 provider 인증). 모델 문자열엔 비밀 미포함.
-  - friendly名(예: 'claude-opus-4-8') → provider-routable('openrouter/anthropic/...') 는
+  - friendly名(예: 'claude-opus-4-8') -> provider-routable('openrouter/anthropic/...') 는
     `aliases` 로 해석(config.llm.model 이 friendly名이어도 live 에서 라우팅 가능).
 
 정직한 한계(A5 미결 유래): OpenRouter/Anthropic 의 정확한 provider slug 는 런타임 카탈로그
@@ -58,9 +58,9 @@ class ModelMap(BaseModel):
 
 
 def load_model_map(path: str | Path) -> ModelMap:
-    """`configs/models.yaml` → ModelMap. 설정됐는데 파일 부재 → FileNotFoundError(명시 실패).
+    """`configs/models.yaml` -> ModelMap. 설정됐는데 파일 부재 -> FileNotFoundError(명시 실패).
 
-    스키마 위반 → pydantic ValidationError(열린값/오타 거부). 비밀 미포함(모델 문자열만).
+    스키마 위반 -> pydantic ValidationError(열린값/오타 거부). 비밀 미포함(모델 문자열만).
     """
     p = Path(path)
     if not p.exists():
@@ -74,10 +74,10 @@ def load_model_map(path: str | Path) -> ModelMap:
 def resolve_model(
     role: str, mm: ModelMap, *, override: Optional[str] = None
 ) -> str:
-    """role → routable 모델 id. 해석 우선순위(결정론):
+    """role -> routable 모델 id. 해석 우선순위(결정론):
 
-    ① override(=config.llm.model) 가 주어지면 그것을 alias 라우팅해 우선(운영자 명시 존중).
-    ② 아니면 models[role] → ③ 없으면 default. 전부 alias 라우팅.
+    1. override(=config.llm.model) 가 주어지면 그것을 alias 라우팅해 우선(운영자 명시 존중).
+    2. 아니면 models[role] -> 3. 없으면 default. 전부 alias 라우팅.
     """
     if override:
         return mm.route(override)
