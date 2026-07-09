@@ -295,7 +295,7 @@ try:
         {
             "testbed": {"host": "h", "user": "u", "ssh_key": "k"},
             "exec": {"vantage": {"ue": "attacker_ue", "sgi": "net_sgi"}},
-            "tools": {"image": {"air": "dahv2/air-tools"}},
+            "tools": {"image": {"air": "dahv2/air"}},
             "llm": {"mode": "replay", "model": "m", "api_key_env": "K"},
             "tgt": {"unknown_role": "x"},
         }

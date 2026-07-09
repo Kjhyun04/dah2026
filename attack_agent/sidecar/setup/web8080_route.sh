@@ -33,7 +33,7 @@ WEB_C="${WEB_C:-web_backend}"          # 대상 컨테이너(응답경로가 없
 UPF_GW="${UPF_GW:-172.30.0.2}"         # UE풀 복귀 게이트웨이(epc_upf SGi)
 UE_POOL="${UE_POOL:-10.45.0.0/16}"     # UE 주소 풀(복귀 대상 프리픽스)
 HELPER="${HELPER:-dah_route_web}"      # netns 공유 헬퍼 컨테이너명
-HELPER_IMG="${HELPER_IMG:-dahv2/air-tools}"   # iproute2(ip) 포함 이미지
+HELPER_IMG="${HELPER_IMG:-dahv2/air}"   # iproute2(ip) 포함 이미지
 LABEL="dahv2.owner=attack_agent"           # 회수 라벨(불변식 R2)
 STATE_DIR="${STATE_DIR:-$HOME/.dah/web8080_route}"
 BASELINE="$STATE_DIR/baseline.routes"  # ip route show 덤프(선-read 게이트)

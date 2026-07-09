@@ -209,7 +209,7 @@ reward 는 배포 환경서도 계산 가능한 공격자 신호만 사용한다
 | 테스트베드 서버 | Ubuntu, Python **3.12+**, Docker(무-sudo 권장), `sudo nsenter`(감독용) |
 | 실행 위치 | **온-호스트 LocalBackend** — 에이전트를 테스트베드 서버에서 실행(로컬 SSH 백엔드 아님) |
 | Python 패키지 | `pip install -e .`(litellm·pymavlink·fastapi·uvicorn·pydantic·PyYAML — `pyproject.toml`) |
-| 컨테이너 | 테스트베드 컨테이너 다수(19~20) Up + `dahv2/air-tools` 이미지(정찰/주입 사이드카) |
+| 컨테이너 | 테스트베드 컨테이너 다수(19~20) Up + `dahv2/air` 이미지(정찰/주입 사이드카) |
 | 네트워크 | 대시보드 `127.0.0.1:8080`(SSH 터널), 뷰어 `127.0.0.1:8090` |
 
 **환경변수(비밀 2개 + 자동 기본값):**
@@ -465,7 +465,7 @@ cp -a run*.jsonl evaluation*.json supervisor*.jsonl runs/archive_$(date +%Y%m%d_
 | `verify_hygiene FAIL: .cache_verify` | p2/parsers 스크래치 잔여 | `dah.sh verify` 가 전후 자동정리(수동 시 `rm -rf .cache_verify`) |
 | campaign LLM 전 호출 실패(402) | OpenRouter 크레딧 0 | 크레딧 충전(`.env.openrouter` 키 유효 확인) |
 | land TARGET unreachable | UE풀 IP 변동/미도달 | dah.sh land 가 `docker exec` 로 IP 재해석 + 주입기 discover 폴백 |
-| `status` 드론 읽기 실패 | `dahv2/air-tools` 이미지 부재 | 이미지 빌드/확인 |
+| `status` 드론 읽기 실패 | `dahv2/air` 이미지 부재 | 이미지 빌드/확인 |
 
 > **드론 상태 주의:** 착륙 데모 후 `mode9/disarmed/landed`(복구 안 함). 재이륙하려면 GUIDED→arm→takeoff.
 

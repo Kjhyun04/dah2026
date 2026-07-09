@@ -19,7 +19,7 @@ exec:
 
 tools:
   image:
-    air: dahv2/air-tools
+    air: dahv2/air
     pfcp: dahv2/pfcp-poc
 
 tgt:

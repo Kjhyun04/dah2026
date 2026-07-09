@@ -73,7 +73,7 @@ case "$cmd" in
     ( for i in $(seq 1 26); do echo "$(date -u +%H:%M:%S) $(curl -s -m3 http://127.0.0.1:8080/stats)"; sleep 5; done ) > runs/land_dash.log 2>&1 &
     POLL=$!; sleep 2
     echo "INJECT_LAUNCH $(date -u +%H:%M:%S)"
-    docker run --rm -i --network "container:$ATTACKER" dahv2/air-tools python3 - "$UAV_IP" < land_demo.py > runs/land_inject.log 2>&1
+    docker run --rm -i --network "container:$ATTACKER" dahv2/air python3 - "$UAV_IP" < land_demo.py > runs/land_inject.log 2>&1
     echo "INJECT_EXIT=$? $(date -u +%H:%M:%S)"
     wait "$POLL" 2>/dev/null || true
     [ -n "$SUP" ] && { wait "$SUP" 2>/dev/null || true; }
@@ -88,7 +88,7 @@ case "$cmd" in
   status)   # 컨테이너 + 드론 상태
     echo "== 컨테이너 =="; docker ps --format '{{.Names}}\t{{.Status}}' 2>/dev/null | head -25
     echo "== 드론 (5762 readback) =="
-    docker run --rm --network container:uav_ue dahv2/air-tools python3 -c "
+    docker run --rm --network container:uav_ue dahv2/air python3 -c "
 from pymavlink import mavutil; import time
 m=mavutil.mavlink_connection('tcp:127.0.0.1:5762'); m.wait_heartbeat(timeout=8)
 hb=gp=None; end=time.time()+5

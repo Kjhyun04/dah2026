@@ -14,7 +14,7 @@ exec:
 
 tools:
   image:
-    air: dahv2/air-tools         # ★ 방금 빌드한 baked 툴링 이미지
+    air: dahv2/air         # ★ 방금 빌드한 baked 툴링 이미지
     pfcp: dahv2/pfcp-poc
 
 tgt:
