@@ -167,13 +167,13 @@ class _SpyBackend:
 # CORE NEGATIVE TEST — 위조 고-severity 는 act 에 절대 도달하지 않음(체인 불변식)
 # --------------------------------------------------------------------------- #
 def test_forged_high_severity_signal_never_reaches_act():
-    # 두 개의 위조 command-domain DANGER 신호(인증되면 command distrust>=71 ->
-    # criticality 하한 -> Red -> orient/act 로 라우팅하는 바로 그 번들)
+    # 두 개의 위조 DANGER 신호(인증되면 PFCP+Unauthorized_Command CR01 시간창 상관 ->
+    # band bump -> Red -> orient/act 로 라우팅하는 바로 그 번들)
     forged = [
         _forge(_env("Unauthorized_Command", "col_gcs", domain="command",
                     value=CANARY, statustext=CANARY)),
-        _forge(_env("Port_5762_State", "col_uav", domain="command",
-                    value="ESTAB_PRESENT", statustext=CANARY)),
+        _forge(_env("PFCP_Delete_Attempt", "col_net", domain="session_network",
+                    value=CANARY, statustext=CANARY)),
     ]
     state, r_impact, r_decide = _drive(_base_state(), forged)
 
@@ -261,7 +261,7 @@ def test_value_field_is_a_real_leak_path_so_canary_check_is_load_bearing():
 def test_authentic_same_signal_would_reach_act():
     authentic = [
         _sign(_env("Unauthorized_Command", "col_gcs", domain="command")),
-        _sign(_env("Port_5762_State", "col_uav", domain="command", value="ESTAB_PRESENT")),
+        _sign(_env("PFCP_Delete_Attempt", "col_net", domain="session_network")),
     ]
     state, r_impact, r_decide = _drive(
         _base_state(role_verified_target=True), authentic)

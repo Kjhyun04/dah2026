@@ -76,19 +76,6 @@ STANDING_SIGNALS = {
         "detail": "signing=unknown — 미서명 MAVLink 명령이 통과(§9-B 서명 미확정). "
                   "테스트베드에서 서명 강제(드롭로그 생성)해야 해소.",
     },
-    "Port_5762_State": {
-        "node": "SITL 5762 백도어", "kind": "sitl_backdoor",
-        "detail": "5762 시리얼 노출(LISTEN 0.0.0.0:5762) — ARIA/서명 우회 직결 가능. "
-                  "테스트베드에서 포트 차단해야 해소.",
-    },
-    "BACKDOOR_5762": {
-        "node": "SITL 5762 백도어", "kind": "sitl_backdoor",
-        "detail": "5762 백도어 프로브 탐지 — 노출 상태 지속.",
-    },
-    "Port_5762_Probe": {
-        "node": "SITL 5762 백도어", "kind": "sitl_backdoor",
-        "detail": "5762 백도어 프로브 탐지 — 노출 상태 지속.",
-    },
 }
 # 주의(Yellow)로 볼 저심각(정찰/열화) 공격 시그니처. 그 외 비-상시 시그니처는 위험(Red).
 WARN_SIGNALS = {"Recon", "Port_Scan", "Telemetry_Degraded", "GPS_Jitter", "Rogue_Probe"}
@@ -111,8 +98,8 @@ def _detect_band(signals: list[str]) -> str:
     """복구(recovery) lifecycle 전용 '탐지 밴드'. `_classify_view`(로그용)와 달리 상시(구조적)
     시그니처를 제외하지 **않는다**.
 
-    이유: command-hijack / 5762-LAND 의 실제 공격 서명은 config 지표(Unauthorized_Command,
-    Port_5762_State)이며 이는 STANDING_SIGNALS 에 속한다. view_band 는 이들을 걷어내 Green 으로
+    이유: command-hijack 의 실제 공격 서명은 config 지표(Unauthorized_Command)이며 이는
+    STANDING_SIGNALS 에 속한다. view_band 는 이들을 걷어내 Green 으로
     보이므로, 그 값으로 복구 카드를 그리면 실제 비행 하이재킹 틱이 '밴드가 Green에서 Green으로'(공격 없음)
     렌더된다. 복구 서사(탐지에서 회복까지)는 상시 시그니처를 포함한 밴드로 판정해야 한다.
     상시/일반 구분 없이: 시그니처 없음은 평시, 저심각(WARN)만이면 주의, 그 외는 위험."""
@@ -200,7 +187,7 @@ def _recovery_events(ticks: list, band_by_tick: dict, flight: list[dict]) -> lis
 
     여기서 ``band_by_tick`` 은 복구 탐지밴드(엔진 impact_band / 사건 존재, ``_recovery_band`` 가
     구성)이며, 상시조건을 걷어낸 view_band 가 **아니다** — 그래서 사건 멤버가 상시(STANDING) config
-    지표인 command-hijack / 5762-LAND 도 여전히 공격밴드를 보인다.
+    지표인 command-hijack 도 여전히 공격밴드를 보인다.
 
     detect = 첫 non-Green 틱(공격 가시화); respond = 해당 rule 의 첫 ledger Intent;
     enforce = 첫 실행된(EXECUTED) Intent(operator_gate falsy — operator_auto 로 넓혀진 OPER 도구가
@@ -430,8 +417,8 @@ def load_panels(run_path: str) -> dict:
     # 카드 + 고도 스파크라인의 뷰모델. 기존 상시패널/view_band 와 공존(표현계층 추가일 뿐).
     flight = _flight_series(comm_panel)
     # 복구 lifecycle 밴드는 view_band(상시조건 제외, 로그 전용)가 아니라 엔진 impact_band(권위)
-    # /사건 기반 탐지밴드를 쓴다 — 실제 공격 서명이 상시 시그니처(Unauthorized_Command/
-    # Port_5762_State)인 command-hijack/5762-LAND 틱도 '탐지에서 회복까지' 서사가 성립하도록.
+    # /사건 기반 탐지밴드를 쓴다 — 실제 공격 서명이 상시 시그니처(Unauthorized_Command)인
+    # command-hijack 틱도 '탐지에서 회복까지' 서사가 성립하도록.
     band_by_tick = {row["tick"]: _recovery_band(row) for row in action_panel}
     recovery = {
         "events": _recovery_events(ticks, band_by_tick, flight),

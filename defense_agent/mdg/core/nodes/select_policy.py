@@ -32,18 +32,9 @@ _INCIDENT_RECOVERY = {
     # 부스트 없음) — 동등 후보 하에서 backdoor_pause(succ 0.95, MED)가 여전히 signed_guided(0.90, HIGH)를
     # 앞서므로, signed_guided 를 허용해도 S1 선택은 절대 교란되지 않는다. recovery_priors.yaml 참조.
     "single-signal": ["backdoor_pause", "signed_guided"],
-    # row D (step 5) — 전용 5762 backdoor kind(correlate 는 Port_5762_State 에 대해서만
-    # 방출). KEY 가 5762 신호를 격리하여 다른 트립 메트릭이
-    # nsenter DROP 으로 라우팅되지 못하게 한다. Step 7 이 recovery-type 값을 안착시킨다:
-    # "backdoor_drop" 은 recovery_priors 에 response_tool=nsenter_input_drop +
-    # enforce_at="uav_ue"(5762 LISTEN netns)로 등록된(steps 8/9) 전용 rtype 이다. inc.target(step 6
-    # peer IP)는 아래 _candidates 가 Action.params.target 으로 실어 나른다; DROP 은
-    # target 셀렉터와 enforce_at role-key 가 dispatch 에서 VERIFIED+DISTINCT
-    # 바인딩으로 모두 해석되지 않는 한 inert DRY 로 유지된다(fail-closed).
-    "BACKDOOR_5762": ["backdoor_drop"],
 }
 
-# Phase 3 패널 수정 — flight-actuator 도메인 가드. correlate 는 5762 아닌 모든 트립 메트릭
+# Phase 3 패널 수정 — flight-actuator 도메인 가드. correlate 는 트립 메트릭
 # (RTT/mongo/NAS/telemetry/PFCP)에 대해 일반적인
 # "single-signal" kind 를 방출하므로, kind 만으로는 command-hijack 을 identity_access 나
 # communication blip 과 구분할 수 없다. signed_guided(send_signed_mode)는 HIGH/OPER *비가역 비행
@@ -83,10 +74,9 @@ def _incident_domains(inc) -> set[str]:
 # 일관된다(공격자 자신의 netns 에 들어가 자기 ip 를 드롭하는 것은 no-op). 키는
 # dispatch 에서 VERIFIED 바인딩으로 해석되어야 하며 아니면 계획은 inert DRY 로 유지된다(fail-closed);
 # 라이브 집행점 라우팅은 GATE2/operator-go RESERVED — 해석 안 되는 키는 절대 오DROP 하지 않는다.
-# backdoor_drop 의 enforce_at 은 recovery_priors(steps 8/9)에 의해 container "uav_ue"(5762 LISTEN netns)로
-# 고정되며, 이는 아래 default_enforce_at=gcs_proxy 폴백을 재정의한다; 그 config
-# row 가 안착하기 전까지 backdoor_drop 은 빈 priors -> gcs_proxy 기본값(잘못된 초크포인트)이며, 이것이
-# config 등록이 올바른 5762 집행의 단일 진실 소스인 이유이다.
+# 예: pfcp_firewall 의 enforce_at 은 recovery_priors(steps 8/9)에 의해 container "gcs_proxy" 로
+# 고정되며, 이는 아래 default_enforce_at=gcs_proxy 폴백과 일치한다; config 등록이 올바른
+# 집행 chokepoint 의 단일 진실 소스인 이유이다.
 
 
 def _classify_target(t: str) -> str:
@@ -130,9 +120,8 @@ def _candidates(state: MDGState) -> list[Action]:
                 params={"recovery_type": rtype, "target": inc.target,
                         "target_kind": _classify_target(inc.target),
                         # 집행 초크포인트(finding P4-2) — 공격자 소스와 구분됨.
-                        # Config-sourced CONTAINER KEY(core 리터럴 없음, P2-3/A-1). backdoor_drop 은
-                        # priors 가 enforce_at="uav_ue"(steps 8/9)를 실으므로 p.get 이 이기고
-                        # 5762 DROP 에 대해 default_enforce_at=gcs_proxy 폴백이 우회된다.
+                        # Config-sourced CONTAINER KEY(core 리터럴 없음, P2-3/A-1). priors 가
+                        # enforce_at 을 실으면 p.get 이 이기고, 없으면 default_enforce_at 폴백이 쓰인다.
                         "enforce_at": str(p.get("enforce_at") or default_enforce_at)},
                 risk=str(p.get("risk", "MED")),
                 reversible=bool(p.get("reversible", True)),

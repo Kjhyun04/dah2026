@@ -13,10 +13,6 @@
   3. core/driver.run_driver — 틱별 신규 thread_id (run_id-t<tick>), 틱당 정확히
      한 번(single stream 통과, invoke 이중 발화 없음)의 operator.add 누적, 그리고
      이전 thread 프루닝 시도.
-  4. core/nodes/correlate — Port_5762_State -> BACKDOOR_5762 kind + target=e.source;
-     5762 아닌 트립 신호는 전용 kind 를 절대 받지 않음.
-  5. collector/web.parse_ss_peer — 4열(State 필터링) 및 5열 ss 행 모두
-     피어 IP 를 산출; 비정상/빈 입력은 ""로 fail-closed.
   6. G-A verify_routing 스코프 확장('source' 금지 + 제어흐름 조건
      스코핑) 및 G-C 수정(mongo dedupe 타임버킷 재발행, air_side band 매핑).
 
@@ -34,10 +30,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from mdg.collector.air_side import AirCommandTap, AirTelemetryTap          # noqa: E402
 from mdg.collector.ingest import Keyring                                   # noqa: E402
 from mdg.collector.mongo import MongoLogCollector                          # noqa: E402
-from mdg.collector.web import parse_ss_peer                                # noqa: E402
 from mdg.core.driver import run_driver                                     # noqa: E402
-from mdg.core.nodes.correlate import correlate                            # noqa: E402
-from mdg.core.state import SensorEv                                        # noqa: E402
 from mdg.safe_exec.backend import (Backend, ExecRequest, ExecResult,       # noqa: E402
                                    PrioritySemaphore, is_read_only_argv)
 
@@ -77,9 +70,9 @@ def _drain(q: "queue.Queue") -> list:
 # 1. is_read_only_argv — read_only 신뢰경계 허용목록(backend.py 미러)
 # =========================================================================== #
 def test_is_read_only_argv_accepts_known_observers():
-    # nsenter ... ss ... (표준 WebProbe 5762 프로브) — read-only 관측
+    # nsenter ... ss ... (표준 소켓 상태 프로브) — read-only 관측
     ss = _NSPREFIX + ["ss", "-H", "-tan", "state", "established",
-                      "( sport = :5762 or dport = :5762 )"]
+                      "( sport = :8080 or dport = :8080 )"]
     assert is_read_only_argv(ss) is True
     # nsenter ... tcpdump 에 -w/-W/-G/-z 플래그 전무 — air-side 탭
     tcp = _NSPREFIX + ["tcpdump", "-l", "-n", "-q", "-c", "20", "-i", "eth0",
@@ -252,56 +245,6 @@ def test_run_driver_prune_is_best_effort_when_no_delete_thread():
     final = run_driver(g, "run", max_iters=10, max_pivots=10, k_dry=10)
     assert final["tick_i"] == 2 and final["ledger"] == ["e1", "e2"]
     assert _thread_ids(g) == ["run-t0", "run-t1"]
-
-
-# =========================================================================== #
-# 4. correlate — Port_5762_State -> BACKDOOR_5762 직접 유닛
-# =========================================================================== #
-def test_correlate_5762_yields_backdoor_kind_with_source_target():
-    ev = SensorEv(source_id="web_5762_probe", metric="Port_5762_State",
-                  value="ESTAB_PRESENT", band="danger", domain="command",
-                  source="10.45.0.13")
-    out = correlate({"evidence": [ev], "tick_i": 2})
-    b = [i for i in out.get("incidents", []) if i.kind == "BACKDOOR_5762"]
-    assert len(b) == 1, [i.kind for i in out.get("incidents", [])]
-    assert b[0].target == "10.45.0.13"               # target = e.source (피어 IP)
-    assert b[0].members == ["Port_5762_State"]
-
-
-def test_correlate_non_5762_tripped_signal_is_not_backdoor():
-    # 트립된(danger) 5762 아닌 메트릭은 single-signal 로 유지되어야 하며 전용
-    # BACKDOOR_5762 kind 가 되면 안 됨(uav_ue 5762 DROP 로 라우팅하면 자기 DoS).
-    ev = SensorEv(source_id="rtt", metric="RTT_ms", band="critical", source="10.45.0.99")
-    out = correlate({"evidence": [ev], "tick_i": 2})
-    assert out.get("incidents"), "expected a single-signal incident for the tripped metric"
-    assert all(i.kind != "BACKDOOR_5762" for i in out["incidents"])
-
-
-# =========================================================================== #
-# 5. parse_ss_peer — 4열 / 5열 형태 + fail-closed
-# =========================================================================== #
-def test_parse_ss_peer_four_column_state_filtered():
-    # `ss -H -tan state established` 는 State 열을 생략: Recv-Q Send-Q local peer
-    row = "0 0 10.45.0.2:5762 10.45.0.13:44321"
-    assert parse_ss_peer(row, 5762) == "10.45.0.13"
-
-
-def test_parse_ss_peer_five_column_state_present():
-    # 5열 형태(State 존재) 도 피어를 산출(마지막 두 토큰이 주소)
-    row = "ESTAB 0 0 10.45.0.2:5762 10.45.0.13:44321"
-    assert parse_ss_peer(row, 5762) == "10.45.0.13"
-
-
-def test_parse_ss_peer_strips_ipv6_brackets():
-    row = "0 0 [fd00::2]:5762 [fd00::13]:44321"
-    assert parse_ss_peer(row, 5762) == "fd00::13"
-
-
-def test_parse_ss_peer_fail_closed_on_malformed():
-    assert parse_ss_peer("", 5762) == ""                      # 빈 입력
-    assert parse_ss_peer("garbage", 5762) == ""               # 포트 토큰 없음, 열 없음
-    assert parse_ss_peer("only :5762 here", 5762) == ""       # <4 열 -> fail-closed
-    assert parse_ss_peer("no port token at all here", 5762) == ""
 
 
 # =========================================================================== #

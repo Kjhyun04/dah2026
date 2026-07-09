@@ -2,7 +2,7 @@
 # 규격: agents.<Name>.{system, user, tools:{<tool>:{summary, params}}}  (aixcc default.yaml 계승)
 # 원칙(엄수): 레시피 금지(예시 체인·"A 다음 B" 처방 없음) / 조합은 pre·effect·produces·consumes·missing로만 유도 /
 #            턴당 tool 1개 / 목록의 tool만 / 적응적 계획(창발 주장 아님, 목표지향 계획 + 방어변화 재계획).
-# 아래 tools 목록 = 원시 레지스트리 22 전량 노출[V2-D17/D36](webcmd·serial5762·forge_aria 등 포함).
+# 아래 tools 목록 = 원시 레지스트리 22 전량 노출[V2-D17/D36](webcmd·forge_sign·forge_aria 등 포함).
 #   goal.scope는 옵션 런타임 필터일 뿐(_tools = REGISTRY(22) ∩ goal.scope; scope 미지정 시 22 전량 가시).
 #   → 코드측: agent.tool_status도 동일 필터로 빌드해 system "목록의 tool만" 규칙과 매 턴 닫힌 집합이 일치하게 하라.
 
@@ -190,14 +190,6 @@ agents:
         params: {}
 
       # ── 계층 A · 무선/단말 ─────────────────────────────────
-      serial5762:
-        summary: |
-          주입/C2(가역). requires: reach(uav5762). consumes: 없음. produces: 없음.
-          effect: 지정 mode로 전환 — 직결 제어면이라 서명·ARIA 검증을 관통(우회)하며
-          signing 상태와 무관하게 SetMode 성립. 단일연결·수명관리(포화 금지).
-        params:
-          mode: "목표 비행모드 정수. 허용값: 0=STABILIZE, 4=GUIDED, 5=LOITER, 9=LAND. (그 외 금지)"
-
       s1u_capture:
         summary: |
           수집(상태불변, RO). requires: reach(s1u). consumes: 없음.

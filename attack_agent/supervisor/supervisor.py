@@ -215,7 +215,7 @@ class Judge:
         """goal.type 별 ground-truth 도달(§2). target=최종상태 아니라 **도달여부**(transient 포함).
 
         정직 스코프: mode 관측은 다운링크 HEARTBEAT(~1Hz) 표본이라 하트비트 간격 내 도달·원복
-          (serial5762 transient)을 놓칠 수 있음(sampling 필드로 명시). signing_bypass 는 '링크에
+          (주입 transient)을 놓칠 수 있음(sampling 필드로 명시). signing_bypass 는 '링크에
           서명 강제됨(관측) AND target 도달' 을 뜻하며, 공격자가 서명을 우회했다는 attribution 증명이
           아니다(off-14555 경로 업링크는 안 보임). c2_disrupt 는 복호가 실동작(decrypted>0)일 때만 인정.
         """
@@ -233,7 +233,7 @@ class Judge:
                 ok = ok and self.gt.signing_observed  # = 서명강제 관측 AND 도달(attribution 아님)
             v["truth_verdict"] = "success" if ok else "pending"
             v["reached_target"] = reached
-            v["reverted"] = reverted                       # 도달했으나 원복(serial5762 자가 revert)
+            v["reverted"] = reverted                       # 도달했으나 원복(주입 자가 revert)
             v["uplink_to_target_on_14555"] = uplink_to_target
             v["signing_enforced_on_link"] = self.gt.signing_observed
             if not reached and self.gt.heartbeats > 0:

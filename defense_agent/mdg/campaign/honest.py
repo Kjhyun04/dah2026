@@ -5,9 +5,6 @@
 
   * V4 (ARIA 키위조)는 탐지 불가 — 유효 서명 위조 명령은 per-packet 성공 로그가 없으므로
     (A-2) 봉쇄(CONTAIN)만 가능하고 탐지는 결코 불가하다.
-  * 5762 백도어 명령 ACTUATION은 blind — WebProbe는 ss-only/pool=1이고 5762 vantage는
-    D-2 미배선이라, ESTAB 소켓 상태만 관측되고 그 위로 흐르는 무인증 명령은 결코 관측되지
-    않는다.
   * Impact는 MISSION-WEIGHTED — 보상적 가중평균은 단일 안전-핵심 도메인을 희석할 수 있다;
     criticality floor(71/45, 밴드컷 파생, P3-Q4)가 이를 교정하나, weight는 config이며
     operator가 튜닝 가능하다.
@@ -63,25 +60,11 @@ HONEST_LIMITATIONS: list[HonestLimitation] = [
             "유효 서명을 위조한 명령은 uav_proxy에서 서명검증을 통과하므로 드롭로그가 "
             "찍히지 않고, 서명 '성공'은 per-packet 로그가 없다(A-2). 따라서 방어는 위조 "
             "명령을 개별 탐지할 수 없고, 채널·세션 수준 봉쇄(Incident.containment_only_flag)"
-            "로만 대응한다. 서명 ON은 5762 직결경로도 커버하지 못한다(P3-Q3)."
+            "로만 대응한다(P3-Q3)."
         ),
-        evidence=["A-2 (서명 성공 per-packet 로그 부재)", "P3-Q3 (5762 우회 독립 latch)"],
+        evidence=["A-2 (서명 성공 per-packet 로그 부재)", "P3-Q3 (서명 우회 독립 latch)"],
         report_chapter=6,
         blast_radius="탐지 공백 — 위조 명령은 telemetry가 정상으로 보여 agent가 nominal을 유지",
-    ),
-    HonestLimitation(
-        key="PORT_5762_BLIND",
-        title="5762 백도어 명령 actuation은 blind — ESTAB 상태만 관측",
-        severity="blind",
-        summary=(
-            "WebProbe collector는 ss-only·pool=1이며 5762 vantage는 D-2 미배선이라, 관측 "
-            "가능한 것은 소켓 ESTAB 상태(Port_5762_State)뿐이다. 그 소켓으로 흐르는 무인증 "
-            "명령 자체는 관측되지 않는다. command distrust≥71(Red floor) 매핑은 ESTAB+무인증 "
-            "명령 상관에서 추론될 뿐, 실 actuation은 GATE2 이전 미검증(P3-Q4)."
-        ),
-        evidence=["B-2 (air 이미지 curl/nc 부재)", "C-1 (효력 미측정)", "P3-Q4"],
-        report_chapter=6,
-        blast_radius="추론 기반 — 무인증 명령이 SITL에 도달했는지는 라이브 read-only로만 확정",
     ),
     HonestLimitation(
         key="MISSION_WEIGHTED_DILUTION",
@@ -104,7 +87,7 @@ HONEST_LIMITATIONS: list[HonestLimitation] = [
         summary=(
             "라이브 read-only로 지상진실이 확보된 관측은 2개뿐이다: (1) telemetry 교차탭 "
             "uav_ue lo:14550 평문 HEARTBEAT(D-1, 3패킷 실캡처), (2) PFCP s5c_rx_deletesession "
-            "단조 카운터 diff(B-1). 나머지 4공격(무인증 명령/14556·5762 backdoor·mongo 접속·"
+            "단조 카운터 diff(B-1). 나머지 3공격(무인증 명령/14556·mongo 접속·"
             "NAS/서명 위조)은 관측점은 실재하나 대응(nsenter DROP·docker pause)의 실효력은 "
             "코드 전 미측정(C-1). br_netfilter 미로드·DOCKER-USER 빈 체인으로 netns-INPUT 집행만 "
             "유효하며 그 차단 확정은 GATE2 가역 실측 이전 operator-go."
@@ -136,13 +119,11 @@ LIMITATION_INDEX: dict[str, HonestLimitation] = {h.key: h for h in HONEST_LIMITA
 # 공격별 honest-key 힌트: 주어진 공격이 어떤 공개를 드러내는지. 캠페인 러너가 이를 각
 # AttackOutcome에 붙여 보고서가 상호 링크하게 한다.
 _ATTACK_HONEST: dict[str, list[str]] = {
-    "A1_command_hijack_cr01": ["UNVERIFIED_RESPONSE_EFFICACY", "PORT_5762_BLIND",
+    "A1_command_hijack_cr01": ["UNVERIFIED_RESPONSE_EFFICACY",
                                "BLAST_RADIUS_SELF_DOS", "MISSION_WEIGHTED_DILUTION"],
     "A2_pfcp_teardown": ["BLAST_RADIUS_SELF_DOS"],           # PFCP diff는 검증된 탐지
     "A3_unauth_command": ["UNVERIFIED_RESPONSE_EFFICACY", "V4_KEY_FORGERY_UNDETECTABLE",
                           "BLAST_RADIUS_SELF_DOS"],
-    "A4_5762_backdoor": ["PORT_5762_BLIND", "UNVERIFIED_RESPONSE_EFFICACY",
-                         "BLAST_RADIUS_SELF_DOS"],
     "A5_mongo_dbaccess": ["UNVERIFIED_RESPONSE_EFFICACY", "BLAST_RADIUS_SELF_DOS"],
     "A6_telemetry_silence": ["V4_KEY_FORGERY_UNDETECTABLE", "MISSION_WEIGHTED_DILUTION"],
 }
@@ -162,7 +143,7 @@ def campaign_disclaimer() -> str:
         "이 캠페인은 DRY(operator-go 유보) — 라이브 상태변경 0. 탐지는 관측근거 위에서, "
         "대응은 fail-closed inert-DRY로 계획까지만 실행된다. 독립 Verifier(별 프로세스, "
         "replay 전용)가 링크 지상진실이며 agent의 posture는 진실이 아니다(agent≠truth). "
-        "대응 효력은 6공격 중 2공격만 관측-검증(telemetry D-1·PFCP B-1), 나머지는 미검증."
+        "대응 효력은 5공격 중 2공격만 관측-검증(telemetry D-1·PFCP B-1), 나머지는 미검증."
     )
 
 
@@ -174,7 +155,7 @@ def banner() -> dict:
         "live_state_changes": 0,
         "execution_mode": "DRY (operator-go 유보)",
         "verified_detections": 2,           # telemetry cross-tap (D-1) + PFCP counter diff (B-1)
-        "total_attacks": 6,
+        "total_attacks": 5,
         "limitations": [h.key for h in HONEST_LIMITATIONS],
     }
 

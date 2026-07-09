@@ -597,15 +597,15 @@ def test_p1_protected_infra_destructive_tool_inert():
             assert "protected" in plan.reason.lower() and enforce in plan.reason
 
 
-def test_p1_backdoor_drop_uav_ue_preserved():
-    """P1 보존: 실제 5762 위협 복구 backdoor_drop @ uav_ue (nsenter '-s
+def test_p1_pfcp_firewall_drop_preserved():
+    """P1 보존: 실제 위협 복구 pfcp_firewall @ gcs_proxy (nsenter '-s
     <attacker> DROP')는 파괴 도구가 아님 -> 쉴드가 건드리지 않음; 정밀 DROP 은
     두 개의 별개 verified 엔드포인트로 여전히 빌드됨 (DRY)."""
     ctrl = ResponseController(backend=Backend(allow_live=False))
-    intent = Intent(rule="backdoor_drop", tool_id="nsenter_input_drop", config_version=CFG,
-                    enforce_at="uav_ue", target="attacker_ue", target_kind="role")
-    w = _world(role_verified={"uav_ue": True, "attacker_ue": True},
-               pid={"uav_ue": 4242, "attacker_ue": 777}, ip_map={"attacker_ue": "10.45.0.55"})
+    intent = Intent(rule="pfcp_firewall", tool_id="nsenter_input_drop", config_version=CFG,
+                    enforce_at="gcs_proxy", target="attacker_ue", target_kind="role")
+    w = _world(role_verified={"gcs_proxy": True, "attacker_ue": True},
+               pid={"gcs_proxy": 4242, "attacker_ue": 777}, ip_map={"attacker_ue": "10.45.0.55"})
     plan = ctrl.plan(intent, w, 0, risk="MED", reversible=True)
     assert plan.exec_request is not None
     assert plan.exec_request.argv[:5] == ["nsenter", "--target", "4242", "--net", "--"]

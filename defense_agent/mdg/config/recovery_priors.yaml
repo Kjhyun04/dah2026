@@ -7,7 +7,6 @@ recovery_priors:
   signed_rtl:       {success_probability: 0.90, expected_trust_recovery: {command: 40},         risk: HIGH, reversible: false, response_tool: send_signed_mode, flight: true,  enforce_at: gcs_proxy}
   signed_guided:    {success_probability: 0.90, expected_trust_recovery: {command: 40},         risk: HIGH, reversible: false, response_tool: send_signed_mode, flight: true,  enforce_at: gcs_proxy}
   backdoor_pause:   {success_probability: 0.95, expected_trust_recovery: {command: 30},         risk: MED,  reversible: true,  response_tool: docker_pause,      flight: false, enforce_at: web_backend}
-  backdoor_drop:    {success_probability: 0.85, expected_trust_recovery: {command: 30},         risk: MED,  reversible: true,  response_tool: nsenter_input_drop, flight: false, enforce_at: uav_ue}
   # OPERATOR-ONLY / NON-AUTONOMOUS (Q-D-1, unresolvable-chokepoint). pfcp_firewall is a LIVE
   # rtype (select_policy _INCIDENT_RECOVERY["CR01"]) but its enforce_at=gcs_proxy CANNOT resolve
   # a real PFCP chokepoint: PFCP lives in net_core, gcs_proxy (command-plane entry) never carries
@@ -17,7 +16,7 @@ recovery_priors:
   # marked operator-only: a resolvable role (e.g. adding a upf role) is DELIBERATELY NOT added
   # because it would newly enable an AUTO-tier nsenter DROP (response_tool=nsenter_input_drop is
   # AUTO) through an UNVERIFIED PFCP chokepoint — a widening of the autonomous surface. Value/
-  # tier UNCHANGED; PFCP enforcement is operator-go. Does NOT touch the backdoor_drop path.
+  # tier UNCHANGED; PFCP enforcement is operator-go.
   pfcp_firewall:    {success_probability: 0.80, expected_trust_recovery: {session_network: 20}, risk: MED,  reversible: true,  response_tool: nsenter_input_drop, flight: false, enforce_at: gcs_proxy}
   # OPERATOR-ONLY / NON-AUTONOMOUS (Q-D-2, triple-dead: orphan + role-mismatch + unverified).
   # mongo_acl is an ORPHAN rtype: no _INCIDENT_RECOVERY kind maps to it, so select_policy never

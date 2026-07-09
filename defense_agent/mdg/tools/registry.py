@@ -1,9 +1,9 @@
-"""닫힌 도구 레지스트리 — 27개 도구 계약(H-A/G, DESIGN_DECISIONS §2).
+"""닫힌 도구 레지스트리 — 26개 도구 계약(H-A/G, DESIGN_DECISIONS §2).
 
 DefToolId 는 Literal 화이트리스트다: LLM 은 id 를 *선택*만 할 수 있고 절대 *발명*할 수
 없다. 모든 도구는 완전히 등록된다(requires/consumes/produces/effect/exec/risk/T)
 — ghost/dangling 도구 없음(E20). ``verify_tools`` 가 강제하는 것:
-  - DefToolId Literal == REGISTRY 키(정확히 27개, ghost 없음, 누락 없음)
+  - DefToolId Literal == REGISTRY 키(정확히 26개, ghost 없음, 누락 없음)
   - 모든 spec 이 모든 계약 필드를 채우고 있음
   - response 도구는 exec=safe-exec 를 바인딩; flight(send_signed_mode) risk=HIGH=operator
 """
@@ -13,10 +13,10 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-# --- 닫힌 id 화이트리스트(LLM 이 선택, 생성 불가) --- 27 ids ---
+# --- 닫힌 id 화이트리스트(LLM 이 선택, 생성 불가) --- 26 ids ---
 DefToolId = Literal[
-    # sensor (11)
-    "tap_mavlink_cmd", "tap_telemetry_14560", "tail_signing_drops", "read_port_state",
+    # sensor (10)
+    "tap_mavlink_cmd", "tap_telemetry_14560", "tail_signing_drops",
     "scrape_pfcp_metrics", "tail_pfcp_smflog", "tail_mme_log", "read_nas_cipher",
     "tail_upf_antispoof", "probe_rtt_loss", "tail_mongo_conn",
     # analysis (9)
@@ -56,7 +56,7 @@ def _s(**kw) -> DefToolSpec:
 
 
 REGISTRY: dict[str, DefToolSpec] = {t.id: t for t in [
-    # ---------------- sensor (11) ---------------- (RO, effect 없음, exec 없음) ----
+    # ---------------- sensor (10) ---------------- (RO, effect 없음, exec 없음) ----
     _s(id="tap_mavlink_cmd", owner="col_gcs", category="sensor", backend="pymavlink",
        requires=["reach.gcs14556"], consumes=["wire"], produces=["SensorEv"], T="SensorEv",
        tier="RO"),
@@ -65,8 +65,6 @@ REGISTRY: dict[str, DefToolSpec] = {t.id: t for t in [
        tier="RO"),
     _s(id="tail_signing_drops", owner="col_uav", category="sensor", backend="log-tail",
        requires=[], consumes=["log"], produces=["SensorEv"], T="SensorEv", tier="RO"),
-    _s(id="read_port_state", owner="col_uav", category="sensor", backend="ss",
-       requires=["reach.uav5762"], consumes=["ss"], produces=["SensorEv"], T="SensorEv", tier="RO"),
     _s(id="scrape_pfcp_metrics", owner="col_net", category="sensor", backend="prometheus",
        requires=["reach.net_core"], consumes=["metric"], produces=["SensorEv"], T="SensorEv", tier="RO"),
     _s(id="tail_pfcp_smflog", owner="col_net", category="sensor", backend="log-tail",
@@ -126,7 +124,7 @@ REGISTRY: dict[str, DefToolSpec] = {t.id: t for t in [
        secret="stdin", T="SensorEv"),
 ]}
 
-TOOL_COUNT = 27
+TOOL_COUNT = 26
 
 
 def get_spec(tool_id: str) -> DefToolSpec:

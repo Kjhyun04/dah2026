@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # dah.sh — attack_agent 단일 런처(유일한 셸 진입점). 나머지 .sh 는 사이드카 내부 공격도구일 뿐이다.
 #   에이전트 본체는 파이썬(run.py / run_live_gate5.py). 이 스크립트는 env 로딩 + 다중 netns 조율만 감싼다.
-#   사용: ./dah.sh <verify|build-tools|recon|campaign|land|viewer|status|help> [flags]
-#   ★ 라이브 캠페인/land 전 1회: ./dah.sh build-tools (툴링 사이드카 이미지 dahv2/air-tools 빌드).
+#   사용: ./dah.sh <verify|build-tools|recon|campaign|viewer|status|help> [flags]
+#   ★ 라이브 캠페인 전 1회: ./dah.sh build-tools (툴링 사이드카 이미지 dahv2/air-tools 빌드).
 set -uo pipefail
 cd "$(dirname "$0")"
 PY=.venv/bin/python; [ -x "$PY" ] || PY=python3
@@ -37,7 +37,7 @@ case "$cmd" in
     # ★ 테스트베드 SITL 이미지(dahv2/air, arducopter 포함)와 태그가 충돌하지 않도록 -tools 접미사.
     #   ★ P4 단일 설정원: 태그는 config.tools.image.air 를 정본으로 읽는다(아래 IMG). 리터럴은 폴백.
     # ★ pymavlink 는 host(.venv)와 동일 버전으로 핀(golden-frame 정합). vendor/aria_gcm.py 는
-    #   placeholder 라도 serial5762/forceland(직결 5762 — ARIA·서명 관통) 공방전엔 충분하다.
+    #   placeholder 라도 forceland(강제착륙·HITL) 공방전엔 충분하다.
     #   전 계층 ARIA 공격(forge_aria 등)까지 쓰려면 통제단계에서 실 vendor 를 채운 뒤 재빌드.
     PYMV="$($PY -c 'import pymavlink;print(pymavlink.__version__)' 2>/dev/null || echo 2.4.49)"
     # 정본: config.tools.image.air (config loader 로 읽어 env 치환까지 반영). 실패 시 리터럴 폴백.
@@ -53,10 +53,10 @@ case "$cmd" in
     # 감독 = gcs_proxy netns(nsenter)에서 14555 ARIA 복호  ·  캠페인 = 호스트 netns live LLM
     # (run_live_gate5 의 in-proc 감독은 netns 불일치라 반드시 분리 실행)
     _load_env
-    # 기본 goal=goal.land(mode_set mode=9 LAND) — 5762 백도어로 서명·ARIA 관통 LAND 강제.
-    # 방어가 탐지가능한 능동주입(uav_ue netns 5762 ESTAB)을 생성해 가시 공방전을 성립시킨다.
+    # 기본 goal=goal.example(mode_set mode=4 GUIDED) — 방어가 탐지가능한 능동주입으로
+    # 가시 공방전을 성립시킨다(D 계층 주입 tool: webcmd/forge_sign/oracle 등).
     # (goal.p4=signing_bypass mode=5 등 다른 목표는 GOAL=goals/goal.p4.yaml 로 오버라이드.)
-    CONFIG="${CONFIG:-configs/config.live.yaml}"; GOAL="${GOAL:-goals/goal.land.yaml}"
+    CONFIG="${CONFIG:-configs/config.live.yaml}"; GOAL="${GOAL:-goals/goal.example.yaml}"
     SUP_WINDOW="${SUP_WINDOW:-200}"; TAP="${TAP:-gcs_proxy}"
     # 활성 LLM 키 env = config.live.yaml api_key_env(=${LLM_API_KEY_ENV:-LLM_API_KEY}) 와 동일 규약.
     #   .env 에 그 이름의 키를 채우면 됨(아무 플랫폼). 관례키 재사용 시 LLM_API_KEY_ENV 로 이름 지정.
@@ -78,29 +78,6 @@ case "$cmd" in
     "$PY" -c "from viewer.ingest import frames_from_evaluation, load_evaluation; import json; ev=load_evaluation('evaluation_live.json'); fr=frames_from_evaluation(ev or {}); open('supervisor_live.jsonl','w',encoding='utf-8').write(chr(10).join(json.dumps(x,ensure_ascii=False) for x in fr)); print('COMMS_FRAMES='+str(len(fr)))" 2>&1
     echo "== 결과 =="; grep -hE 'CAMPAIGN:|SUP_DONE' runs/gate5_camp.log runs/gate5_sup.log 2>/dev/null | tail -3
     echo "GATE5_DONE → run_live.jsonl · evaluation_live.json · supervisor_live.jsonl" ;;
-
-  land)     # ── 지속 착륙 시각화 데모 (3중 증거) · 명시 승인 하 전용 ──
-    TAP="${TAP:-gcs_proxy}"; VICTIM="${VICTIM:-uav_ue}"; ATTACKER="${ATTACKER:-attacker_ue}"; SUP_WINDOW="${SUP_WINDOW:-120}"
-    mkdir -p runs; echo "LAND_START $(date -u +%H:%M:%S)"
-    ARIA="$(grep -oE '[0-9a-fA-F]{64}' "${_ARIA_F:-/nonexistent}" 2>/dev/null | head -1)"
-    GCS_PID="$(docker inspect -f '{{.State.Pid}}' "$TAP" 2>/dev/null)"
-    UAV_IP="$(docker exec "$VICTIM" ip -4 -o addr show tun_srsue 2>/dev/null | grep -oE '10\.45\.[0-9]+\.[0-9]+' | head -1)"
-    echo "resolved uav_ip=${UAV_IP:-<discover>} gcs_pid=${GCS_PID:-none}"
-    SUP=""
-    if [ -n "$GCS_PID" ] && [ -n "$ARIA" ]; then
-      sudo -n nsenter -t "$GCS_PID" -n env ARIA_KEY="$ARIA" \
-        "$PY" run_supervisor_standalone.py goals/goal.land.yaml "$SUP_WINDOW" > runs/land_sup.log 2>&1 &
-      SUP=$!
-    fi
-    ( for i in $(seq 1 26); do echo "$(date -u +%H:%M:%S) $(curl -s -m3 http://127.0.0.1:8080/stats)"; sleep 5; done ) > runs/land_dash.log 2>&1 &
-    POLL=$!; sleep 2
-    echo "INJECT_LAUNCH $(date -u +%H:%M:%S)"
-    docker run --rm -i --network "container:$ATTACKER" dahv2/air python3 - "$UAV_IP" < land_demo.py > runs/land_inject.log 2>&1
-    echo "INJECT_EXIT=$? $(date -u +%H:%M:%S)"
-    wait "$POLL" 2>/dev/null || true
-    [ -n "$SUP" ] && { wait "$SUP" 2>/dev/null || true; }
-    echo "== 착륙 결과 =="; grep -E 'BASELINE|INJECTED|LANDED' runs/land_inject.log 2>/dev/null | grep -vE 'Unable to find|Pulling|Digest' | head
-    echo "LAND_DONE → runs/land_{inject,dash,sup}.log" ;;
 
   viewer)   # 뷰어 3패널 (127.0.0.1:8090)
     _load_env
@@ -128,8 +105,7 @@ print('  mode', hb.custom_mode if hb else None, 'armed', bool(hb.base_mode&128) 
 attack_agent 런처 — ./dah.sh <명령>   (에이전트 본체는 python run.py / run_live_gate5.py)
   verify     8개 무결성 게이트 (오프라인·무해)
   recon      정찰 폐루프 (오프라인 mock)
-  campaign   라이브 캠페인 + 독립 감독 (기본 goal.land)   [.env: LLM_MODEL + LLM_API_KEY]
-  land       지속 착륙 시각화 데모 (대시보드 고도↓)  [명시 승인 하]
+  campaign   라이브 캠페인 + 독립 감독 (기본 goal.example)   [.env: LLM_MODEL + LLM_API_KEY]
   viewer     뷰어 3패널 (127.0.0.1:8090)
   status     컨테이너 + 드론 상태
 자세히: QUICKSTART.md

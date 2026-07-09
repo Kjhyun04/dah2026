@@ -35,7 +35,6 @@ cd ~/attack_agent
 | `./dah.sh verify` | 11개 게이트 전부 PASS/FAIL | verify.py(11게이트) |
 | `./dah.sh recon` | 정찰만 (오프라인·무해) | `run.py --config configs/config.testbed.yaml --goal goals/goal.testbed.yaml` |
 | `./dah.sh campaign` | **라이브 캠페인 + 감독** (헤드라인) | 내장 2-프로세스 오케스트레이션(nsenter 감독 + 캠페인) |
-| `./dah.sh land` | 착륙 시각화 데모 (대시보드 고도↓) | 내장(5762 직결 LAND + land_demo.py) |
 | `./dah.sh viewer` | 뷰어 3패널 (8090) | `viewer.server` |
 | `./dah.sh status` | 컨테이너 + 드론 상태 | docker ps + 5762 readback |
 
@@ -46,7 +45,7 @@ cd ~/attack_agent
 | 종류 | 실제 쓰는 것 | 변형(참고) |
 |---|---|---|
 | config | **`configs/config.live.yaml`** (라이브·서버) | `configs/config.testbed.yaml`(오프라인 베이스), `configs/config.example.yaml`(빈 템플릿) |
-| goal | **`goals/goal.land.yaml`** (캠페인 기본 · 5762 백도어 LAND) | `goals/goal.p4.yaml`(서명우회 mode=5), `goals/goal.testbed.yaml`(정찰), `goals/goal.example.yaml`(템플릿). `GOAL=` 오버라이드 |
+| goal | **`goals/goal.example.yaml`** (캠페인 기본 · mode_set mode=4 GUIDED 능동주입) | `goals/goal.p4.yaml`(서명우회 mode=5), `goals/goal.testbed.yaml`(정찰). `GOAL=` 오버라이드 |
 | models | **`configs/models.yaml`** (모델 라우팅·1개면 충분) | — |
 
 > config는 `테스트베드 접속·vantage·타깃 이름`, goal은 `공격 목표·방어 시드·계층 scope`만 담습니다. 하드코딩 0 — 값은 전부 여기서 주입.

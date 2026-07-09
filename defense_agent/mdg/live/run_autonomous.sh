@@ -3,7 +3,7 @@
 # run_autonomous.sh — 마스터 오케스트레이션 (S2~S5)
 #
 #   수정된 live_autorun.py 를 서버 배경 실행(recon+6 collector+build_graph+run_driver+
-#   Backend)하며, S3 공격(A2 PFCP → A4 5762 → A1 command)을 순차 주입하고 각 스텝 후
+#   Backend)하며, S3 공격(A2 PFCP → A1 command)을 순차 주입하고 각 스텝 후
 #   run.jsonl 탐지를 확인. 이어 S4 E4 자율 차단(operator 승인·allow_live=True 창)을 실증,
 #   S5 종료·누수-0 검증으로 마감.
 #
@@ -60,14 +60,12 @@ ro "mkdir -p $OUT_DIR/$RUN_ID && cd ~/mdg && nohup $PY -m mdg.live_autorun --out
 stop_autorun() {   # S5 종료 (EXIT trap)
   say "S5 종료·누수-0 검증 (read-only)"
   ro "pkill -f 'mdg.live_autorun' 2>/dev/null || true"
-  ro "pkill -f 'tm1_inject_oracle.py|serial5762.py|pfcp_delete.py' 2>/dev/null || true"
+  ro "pkill -f 'tm1_inject_oracle.py|pfcp_delete.py' 2>/dev/null || true"
   sleep 3
-  local cn_after proc_after est ipt
+  local cn_after proc_after
   cn_after=$(ro "docker ps -q | wc -l"); proc_after=$(ro "pgrep -c -f 'tcpdump|nsenter' || echo 0")
-  est=$(ro "ss -tnp state established '( sport = :5762 or dport = :5762 )' 2>/dev/null | grep -c ':5762'") || est=0
-  sub "AFTER 스냅샷: 컨테이너=$cn_after (BEFORE=$CN_BEFORE)  tcpdump/nsenter proc=$proc_after  5762_ESTAB=$est"
+  sub "AFTER 스냅샷: 컨테이너=$cn_after (BEFORE=$CN_BEFORE)  tcpdump/nsenter proc=$proc_after"
   [ "$cn_after" = "$CN_BEFORE" ] 2>/dev/null && sub "★ 누수-0: 컨테이너 diff 0" || sub "경고: 컨테이너 수 diff≠0 — 누수 조사"
-  [ "${est:-0}" -eq 0 ] 2>/dev/null && sub "★ 5762 ESTAB 0 복귀" || sub "경고: 5762 ESTAB 잔존"
   sub "testbed dahv2 컨테이너 최종 무변경 목표 — S5 완료"
 }
 trap 'stop_autorun' EXIT
@@ -90,11 +88,7 @@ say "S3-a A2 PFCP teardown"
 bash "$HERE/s3a_pfcp.sh" || sub "s3a 종료(내부 trap 복원 수행)"
 detect_check "A2-PFCP" 'PFCP_Delete_Attempt|s5c_rx_deletesession'
 
-say "S3-b A4 serial5762 백도어"
-bash "$HERE/s3b_5762.sh" || sub "s3b 종료(내부 trap 복원 수행)"
-detect_check "A4-5762" 'web_probe|5762|backdoor'
-
-say "S3-c A1 무서명 command 주입"
+say "S3-b A1 무서명 command 주입"
 bash "$HERE/s3c_command.sh" || sub "s3c 종료(내부 trap 복원 수행)"
 detect_check "A1-command" 'Unauthorized_Command'
 

@@ -13,7 +13,6 @@ metrics:
   PFCP_Delete_Attempt:   {domain: session_network, normal: [0, 0], warning: [1, 1], critical: [2, 3], danger: [4, .inf], weight: 0.55}  # mirror defaults.py (0.40->0.55): PFCP 단독 flood 가 session_network floor 넘어 orient 도달
   Unauthorized_Command:  {domain: command,         normal: [0, 0], warning: [1, 1], critical: [2, .inf], weight: 0.35}
   Signature_Verify_Fail: {domain: command,         warning: [1, 3], critical: [4, .inf], weight: 0.20}
-  Port_5762_State:       {domain: command,         normal: "LISTEN_NO_ESTAB", danger: "ESTAB_PRESENT", weight: 0.45}
   DB_Access:             {domain: identity_access, normal: [0, 0], warning: [1, 2], critical: [3, .inf], weight: 0.35}
   Packet_Loss:           {domain: communication,   normal: [0, 1], warning: [2, 5], critical: [6, 20], danger: [21, 100], weight: 0.30}
   RTT:                   {domain: communication,   normal: [0, 40], warning: [41, 80], critical: [81, 150], weight: 0.20}

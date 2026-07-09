@@ -18,24 +18,17 @@ def correlate(state: MDGState, clock=None) -> dict:
     # single-signal incident (트립된 band)
     tripped = [e for e in evidence if e.band in ("warning", "critical", "danger")]
     for e in tripped:
-        # row D — 5762 backdoor (metric Port_5762_State, uav_ue netns)는
-        # DEDICATED kind를 받아 select_policy가 이 신호만 nsenter DROP으로 라우팅.
-        # 다른 모든 트립된 metric (RTT/mongo/NAS/telemetry/PFCP)은 generic
-        # single-signal 유지; 한 kind로 뭉치면 그 회복이 uav_ue 5762 DROP으로
-        # 오라우팅됨 (self-DoS). 순전히 metric으로 식별; members가 metric을 실어
-        # 하류에서 5762 귀속을 확인할 수 있게 함.
-        # 5762 backdoor -> BACKDOOR_5762 (nsenter DROP@uav_ue). PFCP delete flood ->
-        # dedicated PFCP_DELETE로 select_policy가 pfcp_firewall로 라우팅 (uav_ue
-        # 5762 DROP 아님). 나머지는 모두 generic single-signal 유지.
-        kind = ("BACKDOOR_5762" if e.metric == "Port_5762_State"
-                else "PFCP_DELETE" if e.metric == "PFCP_Delete_Attempt"
+        # PFCP delete flood -> dedicated PFCP_DELETE로 select_policy가 pfcp_firewall로
+        # 라우팅. 다른 모든 트립된 metric (RTT/mongo/NAS/telemetry/command)은 generic
+        # single-signal 유지. 순전히 metric으로 식별; members가 metric을 실어
+        # 하류에서 귀속을 확인할 수 있게 함.
+        kind = ("PFCP_DELETE" if e.metric == "PFCP_Delete_Attempt"
                 else "single-signal")
-        # target = 귀속 셀렉터 (drop 가능 endpoint). 오직 5762 backdoor만
-        # 공격자-귀속 가능 peer를 실음 (step-4 WebProbe peer). PFCP delete는 귀속 가능
+        # target = 귀속 셀렉터 (drop 가능 endpoint). PFCP delete는 귀속 가능
         # 공격자가 없음: Prometheus 집계는 source IP가 없고 SMF 로그는
-        # VICTIM UAV tun-IP를 실음 — 그래서 PFCP target ""를 fail-closed로 둠, 아니면 pfcp_firewall이
+        # VICTIM UAV tun-IP를 실음 — 그래서 target ""를 fail-closed로 둠, 아니면 pfcp_firewall이
         # 피해자를 -s DROP 할 수 있음 (self-DoS, harmlessness/leak-0 위반). source 없음 -> "" (DRY).
-        target = e.source if e.metric == "Port_5762_State" else ""
+        target = ""
         incidents.append(Incident(
             id=f"sig-{state.get('tick_i',0)}-{e.metric}", kind=kind,
             score=severity_factor(e.band), members=[e.metric], ts=e.ts or ts,

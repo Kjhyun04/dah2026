@@ -278,7 +278,6 @@ ToolId = Literal[
     "capture_downlink",
     "observe_mode",
     # 계층 A — 무선·단말
-    "serial5762",
     "s1u_capture",
     # 계층 B — 코어망
     "subdb_dump",

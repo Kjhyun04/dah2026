@@ -1,5 +1,11 @@
 ﻿# CHANGELOG — attack_agent
 
+## 2026-07-10 · 5762 직결 주입 벡터 제거
+
+- **제거:** `serial5762` 주입 tool · `./dah.sh land` 서브커맨드 · `land_demo.py` · `goals/goal.land.yaml`. (5762 관측/정찰 벡터와 `forceland` 강제착륙 tool 은 유지.)
+- **enabler 레지스트리 6 → 5**(`naive`·`oracle`·`webcmd`·`forge`·`forceland`), **ToolSpec 총수 23 → 22**(tool 3자 정합).
+- **campaign 기본 goal `goal.land` → `goals/goal.example.yaml`**(mode_set mode=4 GUIDED — 방어가 탐지 가능한 능동주입).
+
 ## 2026-07-08 · 재구성 · 보안 · 검증 강화
 
 ### 구조 정리 (GitHub 배포 대응)

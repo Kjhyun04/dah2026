@@ -168,7 +168,7 @@ check("재구성 프레임 t 정렬 단조",
 _inj = ingest.inject_rows_from_action(_act["steps"])
 check("inject_rows: INJECT tool 만 (source=attacker-inject)",
       all(r["tool_id"] in ingest.INJECT_TOOL_IDS and r["source"] == "attacker-inject" for r in _inj))
-check("inject_rows: forge_sign/serial5762/naive 포함(3 주입)", len(_inj) == 3)
+check("inject_rows: forge_sign/naive 포함(2 주입)", len(_inj) == 2)
 
 _snap = ingest.build_snapshot(_sample / "action.jsonl", _sample / "evaluation.json",
                               _sample / "supervisor.jsonl")

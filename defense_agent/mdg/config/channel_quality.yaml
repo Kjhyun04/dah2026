@@ -2,7 +2,6 @@
 # per-Evidence 기본신뢰 소스 없음 → 채널별 상수. compute_confidence의 avg_quality 입력.
 channel_quality:
   plaintext_mavlink_tap: 0.95     # 14560/14556 평문 MAVLink 탭 (tap_mavlink_cmd, tap_telemetry_14560)
-  port_5762_read: 0.90            # read_port_state (ss, connect 금지)
   prometheus_9090: 0.90           # scrape_pfcp_metrics
   nas_log: 0.85                   # read_nas_cipher / EPC 로그
   mongo_conn_log: 0.60            # tail_mongo_conn (연결 단위, per-query 불가)
@@ -13,7 +12,6 @@ tool_channel:
   tap_mavlink_cmd: plaintext_mavlink_tap
   tap_telemetry_14560: plaintext_mavlink_tap
   tail_signing_drops: nas_log
-  read_port_state: port_5762_read
   scrape_pfcp_metrics: prometheus_9090
   tail_pfcp_smflog: nas_log
   tail_mme_log: nas_log

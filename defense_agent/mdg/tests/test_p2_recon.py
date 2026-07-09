@@ -195,7 +195,6 @@ def test_behavioral_anchor_consumes_verify_anchor():
     # 선언된 각 anchor 는 매칭되는 live evidence 로만 충족됨
     assert confirm_behavioral_anchor("lo_14550_heartbeat_sys1", AnchorEvidence(heartbeat_sys=1))
     assert not confirm_behavioral_anchor("lo_14550_heartbeat_sys1", AnchorEvidence(heartbeat_sys=2))
-    assert confirm_behavioral_anchor("port_5762_backdoor_attempt", AnchorEvidence(port_5762_estab=True))
     assert confirm_behavioral_anchor("signing_drop_log_uav_proxy", AnchorEvidence(signing_drop_seen=True))
     # fail-closed: 미지의 anchor / evidence 없음 -> False (절대 크래시 안 함)
     assert not confirm_behavioral_anchor("nonexistent_anchor", AnchorEvidence(heartbeat_sys=1))

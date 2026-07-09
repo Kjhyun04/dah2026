@@ -37,8 +37,7 @@ class _FakeDocker:
 class _ScriptedBackend:
     """Fake safe-exec Backend: 모든 ExecRequest 를 기록하고 프로브별 스크립트 결과를 반환한다.
 
-    관측자의 backdoor_drop 경로는 최대 두(TWO) 프로브를 발행한다 — PRIMARY ``iptables -S INPUT``
-    (규칙 존재) 다음 SECONDARY ``ss``(ESTAB 부재) — 그래서 fake 는 argv 로 디스패치한다.
+    관측자의 nsenter_input_drop 경로는 ``iptables -S INPUT``(규칙 존재) 프로브 하나를 발행한다.
     불변식2. 검증 — 관측자가 사용하는 유일한(ONLY) exec 경로는 Backend.run."""
     def __init__(self, *, ipt: ExecResult = None, ss: ExecResult = None):
         self._ipt = ipt if ipt is not None else ExecResult(ok=True, code=0, stdout="")
@@ -50,19 +49,9 @@ class _ScriptedBackend:
         return self._ipt if "iptables" in " ".join(req.argv) else self._ss
 
 
-_SS_WITH_5762 = (
-    "State  Recv-Q Send-Q Local Address:Port  Peer Address:Port\n"
-    "ESTAB  0      0      10.45.0.9:5762       10.45.0.5:44321\n"
-    "LISTEN 0      128    0.0.0.0:22           0.0.0.0:*\n"
-)
-_SS_NO_5762 = (
-    "State  Recv-Q Send-Q Local Address:Port  Peer Address:Port\n"
-    "LISTEN 0      128    0.0.0.0:5762         0.0.0.0:*\n"      # LISTEN 은 살아남음; ESTAB 만 카운트
-    "ESTAB  0      0      10.45.0.9:22         10.45.0.5:5001\n"
-)
 _NETNS = {"web_backend": ["nsenter", "--target", "111", "--net", "--"],
-          "uav_ue": ["nsenter", "--target", "222", "--net", "--"]}
-# 우리 봉쇄 DROP 이 설치된 iptables -S INPUT(PRIMARY 확인 신호) vs. 미설치.
+          "gcs_proxy": ["nsenter", "--target", "222", "--net", "--"]}
+# 우리 봉쇄 DROP 이 설치된 iptables -S INPUT(확인 신호) vs. 미설치.
 _IPT_WITH_DROP = "-P INPUT ACCEPT\n-A INPUT -s 10.45.0.5/32 -j DROP\n"
 _IPT_NO_DROP = "-P INPUT ACCEPT\n"
 
@@ -84,46 +73,32 @@ def test_pause_unconfirmed_when_not_paused_or_inconclusive():
 
 
 # --------------------------------------------------------------------------- #
-# nsenter_input_drop (backdoor_drop) — ss 가 대상 netns 에서 5762 ESTAB 없음을 보임
+# nsenter_input_drop (pfcp_firewall / mongo_acl) — iptables -S INPUT DROP 규칙 존재
 # --------------------------------------------------------------------------- #
-def test_drop_confirmed_via_rule_installed_primary():
-    # PRIMARY: INPUT DROP 규칙이 설치됨 -> ESTAB 대기 없이 즉시 confirmed.
-    be = _ScriptedBackend(ipt=ExecResult(ok=True, code=0, stdout=_IPT_WITH_DROP),
-                          ss=ExecResult(ok=True, code=0, stdout=_SS_WITH_5762))  # ESTAB 여전히 존재
+def test_drop_confirmed_via_rule_installed():
+    # INPUT DROP 규칙이 설치됨 -> 즉시 confirmed.
+    be = _ScriptedBackend(ipt=ExecResult(ok=True, code=0, stdout=_IPT_WITH_DROP))
     obs = make_effect_observer(netns_prefix_map=_NETNS, backend=be)
-    assert obs("backdoor_drop") is True                       # 규칙 존재만으로 confirm
-    # primary 프로브에서 단락됨: 정확히 exec 한 번(iptables -S), uav_ue netns 내부
+    assert obs("mongo_acl") is True                           # 규칙 존재만으로 confirm
+    # 정확히 exec 한 번(iptables -S), enforce_at=web_backend netns 내부
     assert len(be.calls) == 1
     req = be.calls[0]
-    assert req.argv[:5] == _NETNS["uav_ue"] and "iptables" in req.argv and "-S" in req.argv
+    assert req.argv[:5] == _NETNS["web_backend"] and "iptables" in req.argv and "-S" in req.argv
 
 
-def test_drop_confirmed_via_estab_gone_secondary():
-    # SECONDARY: 규칙은 관측 불가하나, 5762 의 공격자 ESTAB 가 사라짐 -> confirmed.
-    be = _ScriptedBackend(ipt=ExecResult(ok=True, code=0, stdout=_IPT_NO_DROP),
-                          ss=ExecResult(ok=True, code=0, stdout=_SS_NO_5762))
-    obs = make_effect_observer(netns_prefix_map=_NETNS, backend=be)
-    assert obs("backdoor_drop") is True
-    # 두 프로브 모두 실행됨; ss 폴백은 read_only + uav_ue netns 내부(불변식2.)
-    assert len(be.calls) == 2
-    ss_req = be.calls[1]
-    assert ss_req.read_only is True and ss_req.argv[:5] == _NETNS["uav_ue"] and "ss" in ss_req.argv
-
-
-def test_drop_unconfirmed_when_rule_absent_and_5762_estab_present():
-    be = _ScriptedBackend(ipt=ExecResult(ok=True, code=0, stdout=_IPT_NO_DROP),
-                          ss=ExecResult(ok=True, code=0, stdout=_SS_WITH_5762))
-    assert make_effect_observer(netns_prefix_map=_NETNS, backend=be)("backdoor_drop") is False
+def test_drop_unconfirmed_when_rule_absent():
+    # 규칙 미설치 -> 미확인 (부재-기반 신호는 신뢰하지 않음).
+    be = _ScriptedBackend(ipt=ExecResult(ok=True, code=0, stdout=_IPT_NO_DROP))
+    assert make_effect_observer(netns_prefix_map=_NETNS, backend=be)("mongo_acl") is False
 
 
 def test_drop_unconfirmed_on_dry_run_or_unresolved_netns():
-    # 두 프로브 모두 DRY-RUN 결과(operator-go 유보)면 confirm 안 함
-    be_dry = _ScriptedBackend(ipt=ExecResult(ok=True, code=0, dry_run=True),
-                              ss=ExecResult(ok=True, code=0, dry_run=True))
-    assert make_effect_observer(netns_prefix_map=_NETNS, backend=be_dry)("backdoor_drop") is False
+    # DRY-RUN 결과(operator-go 유보)면 confirm 안 함
+    be_dry = _ScriptedBackend(ipt=ExecResult(ok=True, code=0, dry_run=True))
+    assert make_effect_observer(netns_prefix_map=_NETNS, backend=be_dry)("mongo_acl") is False
     # 미해석 netns(맵에 컨테이너 없음) -> inert, exec 시도 안 함
     be = _ScriptedBackend(ipt=ExecResult(ok=True, code=0, stdout=_IPT_WITH_DROP))
-    assert make_effect_observer(netns_prefix_map={}, backend=be)("backdoor_drop") is False
+    assert make_effect_observer(netns_prefix_map={}, backend=be)("mongo_acl") is False
     assert be.calls == []
 
 

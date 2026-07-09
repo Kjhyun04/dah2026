@@ -74,7 +74,7 @@ class ResponseController:
         해석 없음 — 적대적 조언은 도구 집합도 컨테이너 집합도 넓힐 수 없다.
         수술적/keyed 대응 (nsenter_input_drop '-s <attacker>' DROP, gcs_proxy 를 통한
         send_signed_mode emit)은 파괴형 도구 집합에 없으므로, 실제 위협 회복은
-        보존된다 (backdoor_drop @ uav_ue 영향 없음)."""
+        보존된다 (pfcp_firewall/mongo_acl nsenter DROP 영향 없음)."""
         from ..config import defaults as _D
         if tool_id not in _D.INFRA_DESTRUCTIVE_TOOLS:
             return False
@@ -161,7 +161,7 @@ class ResponseController:
         두 endpoint 를 해석한다:
           - ENFORCEMENT: ``enforce_at`` CONTAINER KEY -> netns pid (INPUT 이 필터링하는
             chokepoint). keyspace 는 CONTAINER 이름 (pid/role_verified 는 container-keyed,
-            예: "uav_ue" 가 5762 LISTEN netns 소유) — role alias 가 아니다. ``rb.role`` 을 통해
+            예: "gcs_proxy" 가 command-plane netns 소유) — role alias 가 아니다. ``rb.role`` 을 통해
             ``_binding_verified`` 를 통과하는 role-alias 키는 아래 container-keyed pid 맵을
             놓치고 (``pid_map.get`` -> None) inert DRY 로 유지된다 (fail-closed).
           - SOURCE:      ``target``/``target_kind`` (drop_src) -> ``-s`` 용 공격자 UE-pool ip.
@@ -265,7 +265,7 @@ class ResponseController:
         # 여기서 INERT 된다 — 탐지 신호 (오탐 포함)나 operator_auto 와 무관하게. 대시보드
         # (web_backend/:8080)와 C2 chokepoint (gcs_proxy/:14556)는
         # 결코 자율적으로 동결/차단되지 않는다. 수술적 봉쇄는 영향받지 않는다:
-        # backdoor_drop @ uav_ue (nsenter DROP)와 send_signed_mode emit 은 파괴형 도구가 아니다.
+        # pfcp_firewall/mongo_acl (nsenter DROP)와 send_signed_mode emit 은 파괴형 도구가 아니다.
         enforce_at = (getattr(intent, "enforce_at", "") or "").strip()
         if self._infra_shielded(tool_id, enforce_at):
             return ResponsePlan(rule, tool_id, gd.tier2, exec_request=None,

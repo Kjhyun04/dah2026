@@ -13,13 +13,13 @@ state에서 READ (상류에서 now 대비 계산됨); 이 노드는 순수하고
 
 Distrust-input contract (P3-Q4 lock — crit_floor의 실제 정확도 앵커, 71/45
 크기가 아님): command 도메인 distrust는 실제 미인증-작동 관측에서만
-Red-floor 트리거(>=71)로 매핑된다 (5762-bypass command / SITL에 도달하는 CONFIRMED_OFF
+Red-floor 트리거(>=71)로 매핑된다 (SITL에 도달하는 CONFIRMED_OFF
 미서명 command; 동일 P3-Q3 latch 앵커). 단순 의심 / signing=UNKNOWN은 40-70
 band(mid-Yellow floor 45)에 머물러, 주입된 의심이 Red를 자동확정해 self-DoS 할 수 없다 (PS-7).
 서명검증 실패 DROP (uav_proxy '서명검증 실패 -> SITL 차단 (누적 N)')은 방어
 SUCCESS이지 침해가 아님 -> distrust를 ZERO 추가 (drop 카운터는 P3-Q2 활동 메트릭이지
 posture 신호가 아님; 단독으로 floor를 발화해서는 안 됨). 작동-관측 SOURCE
-(uav_signing collector / 5762 vantage)는 D-2 미배선 -> operator-go 유예; 배선되기
+(uav_signing collector)는 D-2 미배선 -> operator-go 유예; 배선되기
 전까지 command distrust는 evidence-derived로 유지 (fail-safe: floor가 그냥 발화 안 함).
 """
 from __future__ import annotations

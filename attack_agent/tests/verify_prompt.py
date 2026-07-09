@@ -3,7 +3,7 @@
 무해·오프라인(테스트베드/도커/네트워크/litellm 불필요). 구조 검사는 파일·AST·jinja 렌더 위주.
 
 P1(레시피 금지, V2-D5): prompts/default.yaml 에 '특정 tool id 2개 이상을 순서(sequencing)로
-  엮은 처방'(예: "serial5762 다음 oracle 를 써라", "A -> B -> C" 체인)이 없는지 검사.
+  엮은 처방'(예: "webcmd 다음 oracle 를 써라", "A -> B -> C" 체인)이 없는지 검사.
  휴리스틱(명시): 한 스팬(라인/3라인 창) 안에서 (a) REGISTRY 의 서로 다른 tool id 가 2개 이상
     등장하고 (b) 그 두 id **사이**에 순서 접속어(다음/이후/->/then/순서/뒤에/후에/연쇄)가 놓일 때만
     '레시피'로 flag. 단순 나열(·, 쉼표)·용어정의 번호목록·일반 의사결정 원칙("불확실->먼저 정찰",
@@ -17,7 +17,7 @@ P2(StrictUndefined 렌더): core.common.prompt_context 로더로 default.yaml �
   + 정적 보강: 템플릿의 모든 agent.*/t.* 토큰을 추출해 빌드된 뷰 컨텍스트에서 해석(대조).
   (jinja2 import 실패 시 렌더는 건너뛰고 정적 대조만 수행 — 한계를 finding 으로 보고.)
 
-P4(tool 3자 정합): REGISTRY 길이==23, ToolId(Literal)==REGISTRY keys,
+P4(tool 3자 정합): REGISTRY 길이==22, ToolId(Literal)==REGISTRY keys,
   default.yaml agents.*.tools keys==REGISTRY keys(3자), 각 tool 의 summary 필드 비어있지 않음.
   주의: ToolSpec(pydantic) 자체엔 description/summary 필드가 없음 -> 사람이 읽는 요약은
     prompts/default.yaml 의 tools[<id>].summary 에 존재. 여기선 그 요약의 비어있지 않음을 검사.
@@ -265,15 +265,15 @@ except ImportError as e:
 # ═══════════════════════════════════════════════════════════════════════════
 print()
 print("=" * 70)
-print("P4 · tool 3자 정합 — REGISTRY(23)==ToolId==yaml.tools · summary 비어있지 않음")
+print("P4 · tool 3자 정합 — REGISTRY(22)==ToolId==yaml.tools · summary 비어있지 않음")
 print("=" * 70)
 
 _reg_keys = set(REGISTRY.keys())
-check("REGISTRY 길이 == 23", len(REGISTRY) == 23)
+check("REGISTRY 길이 == 22", len(REGISTRY) == 22)
 
 _id_literal = set(_get_args(ToolId))
-check("ToolId(Literal) == REGISTRY keys (23)",
-      _id_literal == _reg_keys and len(_id_literal) == 23)
+check("ToolId(Literal) == REGISTRY keys (22)",
+      _id_literal == _reg_keys and len(_id_literal) == 22)
 
 # yaml tools 파싱(정적 — litellm/렌더 불필요)
 import yaml as _yaml_p4  # noqa: E402

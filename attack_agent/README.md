@@ -17,7 +17,7 @@
 - Part 3 · 요구사항 · 배포 (로컬 → 서버)
 - Part 4 · 실행 — 런처 하나로 (`./dah.sh`)
 - Part 5 · 검증 게이트 (11개 · 게이트→증명 매핑)
-- Part 6 · 공격 카탈로그 (enabler 6 · ADAPT · win_cause)
+- Part 6 · 공격 카탈로그 (enabler 5 · ADAPT · win_cause)
 - Part 7 · 서브시스템 (사이드카 이미지 · 뷰어)
 - Part 8 · 파라미터 파일 · 산출물
 - Part 9 · 운영 런북 · 트러블슈팅
@@ -36,7 +36,7 @@ pip install -e .                                     # pyproject.toml 의존성
 ./dah.sh verify        # 11개 무결성 게이트 (오프라인·무해, 테스트베드 불필요)
 ./dah.sh recon         # 정찰 폐루프 (오프라인 mock)
 ```
-라이브 캠페인(`./dah.sh campaign`)·착륙 데모(`./dah.sh land`)는 테스트베드 서버(온-호스트)에서 실행하며 Part 3·Part 4 참조.
+라이브 캠페인(`./dah.sh campaign`)은 테스트베드 서버(온-호스트)에서 실행하며 Part 3·Part 4 참조.
 
 ### 저장소 구조 · 정신모델
 
@@ -44,12 +44,11 @@ pip install -e .                                     # pyproject.toml 의존성
 run.py                         에이전트 본체 (플래그로 offline/live 전환)
   ├ run_live_gate5.py          캠페인 실행기 (감독은 --skip-supervisor 로 분리)
   └ run_supervisor_standalone.py  독립 감독 (gcs_proxy netns 14555 ARIA 복호)
-dah.sh                         단일 런처 (verify|recon|campaign|land|viewer|status) ← 평소엔 이것만
+dah.sh                         단일 런처 (verify|recon|campaign|viewer|status) ← 평소엔 이것만
 verify.py                      11개 게이트 단일 러너 (= ./dah.sh verify)
-land_demo.py                   착륙 데모 주입기(사이드카로 파이프)
 
 configs/   config.{testbed,live,example}.yaml · models.yaml   (환경·타깃·모델)
-goals/     goal.{testbed,p4,land,example}.yaml                (공격 목표·scope)
+goals/     goal.{testbed,p4,example}.yaml                     (공격 목표·scope)
 tests/     verify_{p0,p2,parsers,bindings,models,hygiene,structure,prompt,quality}.py (게이트 9)
 core/      오케스트레이터·실행엔진·KB      supervisor/ 독립 감독(+verify_grep0)
   ├ common/   types(Channel/Action)·config·llm·prompts·workdb
@@ -94,8 +93,8 @@ prompts/   default.yaml                   docs/ 설계·런북 원문
 ### 1.4 간판 혁신 — Differential BlockProof (DESIGN §10)
 naive(무키·차단 baseline) ↔ enabler(성립) 를 **연속 실행하여 차분**함으로써 "알고리즘은 막고 설계 결함만 뚫림"을
 **심판 없이 공격 측 단독으로** 증명한다. 각 공격에는 verdict(성립/조건부/방어) + `blocked_by` +
-`defense_snapshot`(signing ON/OFF 등)이 바인딩된다. 셀룰러 C2 서명은 강제되지만 직결 5762 경로로 우회되는 식의
-대비가 곧 증명이 된다.
+`defense_snapshot`(signing ON/OFF 등)이 바인딩된다. 셀룰러 C2 서명은 강제되지만 무인증 웹서명(`webcmd`)·평문
+오라클(`oracle`) 경로로 우회되는 식의 대비가 곧 증명이 된다.
 
 ---
 
@@ -186,7 +185,7 @@ reward 는 배포 환경서도 계산 가능한 공격자 신호만 사용한다
 ### 2.6 제어평면 = 결정론 FSM + LLM 2곳 (DESIGN §7)
 - **FSM:** `RECON → SELECT → EXECUTE → INFER → (goal? END : PIVOT) → SELECT …`(max_pivots 하드캡).
 - **LLM ① Planner:** `select`(target_node+방어상태+goal(expect_mode·mavcmd) 주입) / `pivot`(blocked_by→enabler ADAPT).
-  출력 = `Channel`(전송) + `Action`(intent) 분리 + enabler 레지스트리(6) pydantic 검증(무효값 폴백).
+  출력 = `Channel`(전송) + `Action`(intent) 분리 + enabler 레지스트리(5) pydantic 검증(무효값 폴백).
 - **LLM ② Evidence:** correlate(신호 종합) / narrate(BlockProof 서술).
 - **LLM 은 증강이지 load-bearing 아님** — 렌더 실패/장애 = 결정표 폴백 직행(빈 프롬프트 호출 금지).
 - **Recon 은 1급 단계** — 캠페인 전에 signing 등 방어상태를 선제 확보(discover 도구는 파서/결과모델/node_cmd 완전 등록).
@@ -262,10 +261,9 @@ cd ~/attack_agent
 ./dah.sh verify      # ① 11개 무결성 게이트 (ALL PASS 확인)
 ./dah.sh build-tools # ★ 캠페인 전 1회: 툴링 사이드카 이미지 dahv2/air-tools 빌드(recon/주입 baked 스크립트)
 ./dah.sh recon       # ② 정찰 (오프라인 mock 기본; 테스트베드 실측은 --backend local)
-./dah.sh campaign    # ③ 라이브 캠페인 + 감독 (기본 goal.land)  [LLM_MODEL + LLM_API_KEY 필요]
-./dah.sh land        # ④ 착륙 시각화 데모 (대시보드 고도↓)  [명시 승인 하]
-./dah.sh viewer      # ⑤ 뷰어 3패널 (127.0.0.1:8090)
-./dah.sh status      # ⑥ 컨테이너 + 드론 상태
+./dah.sh campaign    # ③ 라이브 캠페인 + 감독 (기본 goal.example)  [LLM_MODEL + LLM_API_KEY 필요]
+./dah.sh viewer      # ④ 뷰어 3패널 (127.0.0.1:8090)
+./dah.sh status      # ⑤ 컨테이너 + 드론 상태
 ```
 
 | 명령 | 하는 일 | 내부적으로 |
@@ -273,7 +271,6 @@ cd ~/attack_agent
 | `./dah.sh verify` | 11개 게이트 전부 PASS/FAIL | `verify.py`(11게이트) |
 | `./dah.sh recon` | 정찰만(오프라인·무해) | `run.py --config configs/config.testbed.yaml --goal goals/goal.testbed.yaml` |
 | `./dah.sh campaign` | **라이브 캠페인 + 감독**(헤드라인) | 내장 2-프로세스 오케스트레이션(nsenter 감독 + 캠페인) |
-| `./dah.sh land` | 착륙 시각화 데모(대시보드 고도↓) | 내장(5762 직결 LAND + `land_demo.py`) |
 | `./dah.sh viewer` | 뷰어 3패널(8090) | `viewer.server` |
 | `./dah.sh status` | 컨테이너 + 드론 상태 | `docker ps` + 5762 readback |
 
@@ -286,11 +283,8 @@ cd ~/attack_agent
   - 캠페인 = `run_live_gate5.py --skip-supervisor`(호스트 netns, live LLM ReAct).
   - ⚠️ `run_live_gate5` 의 **in-process 감독은 호스트 netns 라 14555 를 못 잡는다** → 반드시 분리 실행(dah.sh campaign 이 내장 처리).
   - 조정: `CONFIG=… GOAL=… SUP_WINDOW=… ./dah.sh campaign`. 산출: `run_live.jsonl`·`evaluation_live.json`·`supervisor_live.jsonl`.
-- **④ land (착륙 시각화)** — 공격자(attacker_ue)→UE격리부재→노출 5762 직결로 `DO_SET_MODE 9(LAND)`, **복원 없음**.
-  3중 증거(감독 mode 타임라인 · 대시보드 `/stats` Altitude · 5762 readback)를 `runs/land_*.log` 에 남긴다.
-  UAV IP 는 런타임 해석(하드코딩 0). **지속 착륙이라 명시 승인 하에서만.**
-- **⑤ viewer** — action/comms/evaluation 3패널을 `127.0.0.1:8090` 에 서빙(터널 `-L 8090:127.0.0.1:8090`).
-- **⑥ status** — `docker ps` + 5762 HEARTBEAT readback(mode·armed·rel_alt).
+- **④ viewer** — action/comms/evaluation 3패널을 `127.0.0.1:8090` 에 서빙(터널 `-L 8090:127.0.0.1:8090`).
+- **⑤ status** — `docker ps` + 5762 HEARTBEAT readback(mode·armed·rel_alt).
 
 ---
 
@@ -312,7 +306,7 @@ CI 게이트**이며, 보고서의 "검증 PASS" 증거로 쓰인다.
 | `verify_bindings` | registry exec 바인딩 |
 | `verify_parsers` | raw→모델 파서 |
 | `verify_structure` | 데드코드 0 · 모듈 docstring · 하드코딩 리터럴 0 |
-| `verify_prompt` | 레시피 금지 · Jinja StrictUndefined 실렌더 · tool 3자 정합(23개) |
+| `verify_prompt` | 레시피 금지 · Jinja StrictUndefined 실렌더 · tool 3자 정합(22개) |
 | `verify_quality` | 타입힌트 완전 · CLI 스키마 · 구조↔문서 · 비밀 리터럴 0 · **언어정책** · 스텁↔문서(은폐금지) |
 | `verify_hygiene` | UTF-8 · BOM/LF · 비밀 미노출 · 필수문서 |
 
@@ -328,14 +322,13 @@ CI 게이트**이며, 보고서의 "검증 PASS" 증거로 쓰인다.
 
 ## Part 6 · 공격 카탈로그 (DESIGN §9)
 
-**enabler 레지스트리(코드강제 6, pydantic validator 로 무효값 reject):**
+**enabler 레지스트리(코드강제 5, pydantic validator 로 무효값 reject):**
 | enabler | 의미 |
 |---|---|
 | `naive` | 무키·차단 baseline(Differential 의 대조군) |
 | `oracle` | 14556 평문 오라클 경로 |
 | `webcmd` | 무인증 웹 서명 우회(NF-4) |
 | `forge` | 위조 봉투(NF-6) |
-| `serial5762` | SITL 5762 직결 |
 | `forceland` | 강제 착륙 · HITL |
 
 **노드(실측 판정, 요약):** naive(차단 baseline) · TM1/V2 oracle(성립) · forceland(HITL) · V1 리플레이(성립) ·
@@ -414,7 +407,7 @@ python -m viewer.server \
 | 종류 | 실제 사용 | 변형(참고) |
 |---|---|---|
 | config | **`configs/config.live.yaml`**(라이브) | `configs/config.testbed.yaml`(오프라인 베이스), `configs/config.example.yaml`(템플릿) |
-| goal | **`goals/goal.land.yaml`**(캠페인 기본 · 5762 백도어 LAND — 방어 탐지 성립) | `goals/goal.p4.yaml`(서명우회 mode=5), `goals/goal.testbed.yaml`(정찰), `goals/goal.example.yaml`(템플릿). `GOAL=` 로 오버라이드 |
+| goal | **`goals/goal.example.yaml`**(캠페인 기본 · mode_set mode=4 GUIDED — 능동주입, 방어 탐지 성립) | `goals/goal.p4.yaml`(서명우회 mode=5), `goals/goal.testbed.yaml`(정찰). `GOAL=` 로 오버라이드 |
 | models | **`configs/models.yaml`**(역할→모델 라우팅) | — |
 
 config = 접속·vantage·타깃 이름, goal = 공격 목표·방어 시드·계층 scope. **하드코딩 0** — 값은 전부 파일로 주입.
@@ -426,7 +419,7 @@ CLI 즉석 목표: `run.py --goal-expr "mode_set mode=4 defense=on success=ack s
 | `run_live.jsonl` | 에이전트 액션 로그(체인·goal_reached·defenses_bypassed) |
 | `evaluation_live.json` | 감독 ground-truth 판정(mode 타임라인·autonomy_accuracy) |
 | `supervisor_live.jsonl` | 뷰어 통신 프레임 |
-| `runs/archive_*` · `runs/GATE5_*` · `runs/LAND_DEMO_*` | 타임스탬프 백업/스냅샷 |
+| `runs/archive_*` · `runs/GATE5_*` | 타임스탬프 백업/스냅샷 |
 
 ---
 
@@ -466,10 +459,7 @@ cp -a run*.jsonl evaluation*.json supervisor*.jsonl runs/archive_$(date +%Y%m%d_
 | campaign evaluation 0프레임 | in-process 감독이 호스트 netns | `dah.sh campaign` 사용 — nsenter 로 gcs_proxy netns 진입 |
 | `verify_hygiene FAIL: .cache_verify` | p2/parsers 스크래치 잔여 | `dah.sh verify` 가 전후 자동정리(수동 시 `rm -rf .cache_verify`) |
 | campaign LLM 전 호출 실패(402) | OpenRouter 크레딧 0 | 크레딧 충전(`.env.openrouter` 키 유효 확인) |
-| land TARGET unreachable | UE풀 IP 변동/미도달 | dah.sh land 가 `docker exec` 로 IP 재해석 + 주입기 discover 폴백 |
 | `status` 드론 읽기 실패 | `dahv2/air` 이미지 부재 | 이미지 빌드/확인 |
-
-> **드론 상태 주의:** 착륙 데모 후 `mode9/disarmed/landed`(복구 안 함). 재이륙하려면 GUIDED→arm→takeoff.
 
 ---
 
@@ -477,8 +467,8 @@ cp -a run*.jsonl evaluation*.json supervisor*.jsonl runs/archive_$(date +%Y%m%d_
 
 > (Part 10) 아래 한계는 은폐하지 않고 명시한다. 게이트 `verify_quality`(P7)의 스텁↔문서 은폐금지 앵커이기도 하다.
 
-- `forge_aria`/`forge_sign`(ARIA/서명 위조 tool)은 **스텁(stub)** — 실제 암호연산 미구현. 헤드라인 관통은 노출면
-  `serial5762`(tcp/5762) 경로로 실증하며, forge 경로는 "가정·미구현"으로 정직 표기한다.
+- `forge_aria`/`forge_sign`(ARIA/서명 위조 tool)은 **스텁(stub)** — 실제 암호연산 미구현. 헤드라인 관통은 유지 주입
+  tool(`webcmd` 무인증 웹서명 우회 · `oracle` 14556 평문) 경로로 실증하며, forge 경로는 "가정·미구현"으로 정직 표기한다.
 - `orchestrator.py` 의 결정론 폴백 등 일부 경로에 미완 표식이 남아 있으며, 본 한계는 은폐하지 않고 여기 명시한다.
 - PFCP 코어 세션 파괴(`pfcp_delete`)는 공유 코어 영향·복구 불확실로 실측 캠페인에서 기본 제외.
 
@@ -500,7 +490,7 @@ cp -a run*.jsonl evaluation*.json supervisor*.jsonl runs/archive_$(date +%Y%m%d_
 - **구조 정리:** 루트 파일 → 디렉터리화(`configs/`·`goals/`·`tests/`), **단일 셸 진입점 `dah.sh`**,
   **단일 게이트 러너 `verify.py`**, 개발·세션 문서는 저장소 밖 분리(git 엔 운영문서만).
   `.gitignore`(.venv·캐시·runs·`.env*`·`*.pem`) + `.gitattributes`(LF) + `pyproject.toml`.
-- **검증 게이트 8 → 11:** `verify_structure`(데드코드 0·docstring·하드코딩 0) · `verify_prompt`(레시피 금지·StrictUndefined·tool 3자 정합 23개) ·
+- **검증 게이트 8 → 11:** `verify_structure`(데드코드 0·docstring·하드코딩 0) · `verify_prompt`(레시피 금지·StrictUndefined·tool 3자 정합 22개) ·
   `verify_quality`(타입힌트 완전·CLI 스키마·구조↔문서·비밀 리터럴 0·언어정책·스텁↔문서) 신규.
 - **보안(비밀·서버정보 외부화):** 배포 의존값·비밀 → `.env`. `core/common/config.py` 의 `_load_yaml` 에 `${VAR:-default}` env 치환 추가.
   `configs/*.yaml` 의 host/user/ssh_key → `${TESTBED_HOST/USER/SSH_KEY}`, 실 IP·키파일명 전수 genericize. **git 추적 파일에 실제 키값·서버 IP 0.**

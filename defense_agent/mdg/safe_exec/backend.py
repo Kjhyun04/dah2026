@@ -4,7 +4,7 @@ Graph node와 collector는 절대 프로세스를 spawn하지 않는다; ExecReq
 ``subprocess``의 유일한 소유자인 Backend.run에 넘긴다. Backend가 spawn을 수행하고
 (비밀은 stdin으로, R5) R1/R2/R3/R4/R6 teardown 규율을 ``safeexec``에 위임한다
 (setsid 프로세스 그룹, 라벨된 container-scope reap).
-PrioritySemaphore(1)이 5762/nsenter 자원 단일화를 제공한다.
+PrioritySemaphore(1)이 nsenter 자원 단일화를 제공한다.
 
 모드:
   - ``mock``  : 절대 spawn하지 않음; 합성 출력을 반환(단위 테스트 / 오프라인).
@@ -77,7 +77,7 @@ def is_read_only_argv(argv: list[str]) -> bool:
         if not rest or rest[0] not in ("logs", "inspect"):
             return False
     if binary == "iptables":                  # read-only 나열만(-L/-S/-C); 변경 없음
-        # DAH5762 backdoor SYN-counter 읽기(`iptables -n -v -x -L DAH5762`). 모든
+        # effect-confirm 의 INPUT DROP 규칙 존재 읽기(`iptables -w -S INPUT`). 모든
         # 변경성 동사를 거부한다 — long form 또는 command 문자를 포함한 short cluster
         # (A/I/D/R/F/X/N/P/Z/E, -Z counter-zero 포함) — 그래서 이 read-only fast-path는 결코
         # 규칙을 설치/flush/zero할 수 없다; 그리고 최소 하나의 나열 동사(-L/-S/-C)를 요구한다.
@@ -124,7 +124,7 @@ class ExecResult:
 
 
 class PrioritySemaphore:
-    """5762 ss / nsenter 대상 자원 단일화를 위한 pool=1 (G4)."""
+    """nsenter 대상 자원 단일화를 위한 pool=1 (G4)."""
     def __init__(self, permits: int = 1):
         self._sem = threading.BoundedSemaphore(permits)
 
@@ -214,13 +214,13 @@ class Backend:
         #   점유하지 않으므로 그래프 act 노드/타 collector의 집행이 직렬 대기하지 않는다
         #   (성능 경합 버그 수정). teardown/reap(R1·R6)은 _spawn 내부에서 그대로 수행되므로
         # 불변식2.(누수-0)는 세마포어와 무관하게 유지된다.
-        #   5762 pool=1 의도 무손상: WebProbe의 ss는 read-only 관측이라 5762 소켓 슬롯을
-        #   실제로 점유(연결/집행)하지 않는다 — 세마포어 없이도 자원 단일화 대상이 아님.
+        #   read-only 관측은 소켓 슬롯을 실제로 점유(연결/집행)하지 않으므로,
+        #   세마포어 없이도 자원 단일화 대상이 아니다.
         if read_only:
             return self._spawn(req)
 
         # 집행(read_only=False, 또는 read_only 주장이 argv 검증 실패로 강등됨):
-        #   nsenter/5762 대상 자원 단일화를 위해 pool=1 세마포어 획득.
+        #   nsenter 대상 자원 단일화를 위해 pool=1 세마포어 획득.
         with self._sem:                                     # pool=1
             return self._spawn(req)
 

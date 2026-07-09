@@ -25,7 +25,7 @@ from typing import Any, Optional
 
 # 13 INJECT (kind==INJECT). 통신-주입로그 레인 필터용 표시 분류.
 INJECT_TOOL_IDS: frozenset[str] = frozenset({
-    "serial5762", "subdb_canary", "pfcp_delete", "pfcp_flood", "pivot_exploit",
+    "subdb_canary", "pfcp_delete", "pfcp_flood", "pivot_exploit",
     "oracle", "webcmd", "forge_sign", "forge_aria", "replay", "peer_flood",
     "forceland", "naive",
 })
@@ -46,7 +46,7 @@ _PROBE_TOOL_IDS: frozenset[str] = frozenset({
 _LAYER: dict[str, str] = {
     "recon_reach": "RECON", "recon_defense": "RECON", "recon_session": "RECON",
     "capture_downlink": "RECON", "observe_mode": "RECON",
-    "serial5762": "A", "s1u_capture": "A",
+    "s1u_capture": "A",
     "subdb_dump": "B", "subdb_canary": "B", "pfcp_delete": "B",
     "pfcp_flood": "B", "pivot_exploit": "B",
     "key_extract": "C", "signkey_leak": "C", "nonce_scan": "C",

@@ -316,7 +316,6 @@ def test_classify_view_standing_vs_attack():
     비-상시 공격 시그니처만 위험/주의를 유발한다. (탐지 엔진 출력은 불변; 순수 표현계층)"""
     # 상시조건만 있으면 평시(Green), attack_signals 비어있음
     assert viewer._classify_view(["Unauthorized_Command"]) == ([], "Green")
-    assert viewer._classify_view(["Port_5762_State", "BACKDOOR_5762"]) == ([], "Green")
     assert viewer._classify_view([]) == ([], "Green")
     # 상시 + 실제 공격이면 위험(Red), attack_signals 는 공격만 남김
     atk, band = viewer._classify_view(["Unauthorized_Command", "PFCP_Delete_Attempt"])
@@ -324,7 +323,7 @@ def test_classify_view_standing_vs_attack():
     # 저심각(정찰) 단독이면 주의(Yellow)
     assert viewer._classify_view(["Recon"]) == (["Recon"], "Yellow")
     # 저심각 + 상시면 주의 (상시 제거 후 저심각만 남으므로)
-    assert viewer._classify_view(["Recon", "Port_5762_State"]) == (["Recon"], "Yellow")
+    assert viewer._classify_view(["Recon", "Unauthorized_Command"]) == (["Recon"], "Yellow")
 
 
 def test_viewer_standing_panel_and_view_band():
@@ -445,7 +444,7 @@ def test_recovery_panel_signed_mechanism_annotations():
         # 탐지/회복 step 은 메커니즘 노트 없음 (respond/enforce/confirm 만 주석)
         assert note["탐지"] is None and note["회복"] is None
         # containment 복구는 주석 없음 / signed=False 유지
-        assert viewer._is_signed_recovery("nsenter_input_drop", "backdoor_drop") is False
+        assert viewer._is_signed_recovery("nsenter_input_drop", "pfcp_firewall") is False
         assert viewer._is_signed_recovery("send_signed_mode", "signed_guided") is True
 
 
@@ -458,7 +457,6 @@ def test_recovery_band_prefers_engine_impact_over_view_band():
     assert viewer._recovery_band({"impact_band": "Green", "signals": ["Unauthorized_Command"]}) == "Green"
     # impact_band 부재/무효 -> standing 시그널을 포함하는 detection 밴드로 폴백
     assert viewer._recovery_band({"impact_band": None, "signals": ["Unauthorized_Command"]}) == "Red"
-    assert viewer._recovery_band({"signals": ["Port_5762_State"]}) == "Red"
     assert viewer._recovery_band({"signals": ["Recon"]}) == "Yellow"
     assert viewer._recovery_band({"signals": []}) == "Green"
     # _detect_band (recovery)는 _classify_view (log)처럼 standing 시그널을 벗기지 않음

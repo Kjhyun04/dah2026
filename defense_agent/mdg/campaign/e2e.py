@@ -364,12 +364,6 @@ def _unauth_cmd(band="danger", value=2):
             "confidence": 0.95, "source_id": "air_command_tap"}
 
 
-def _port5762(band="danger"):
-    return {"metric": "Port_5762_State", "value": "ESTAB_PRESENT", "band": band,
-            "domain": "command", "channel": "port_5762_read",
-            "confidence": 0.90, "source_id": "col_web"}
-
-
 def _db_access(band="danger", value=3):
     return {"metric": "DB_Access", "value": value, "band": band,
             "domain": "identity_access", "channel": "mongo_conn_log",
@@ -391,16 +385,15 @@ def _packet_loss(band="danger", value=100, confidence=0.95):
 ATTACKS: list[AttackScenario] = [
     AttackScenario(
         id="A1_command_hijack_cr01",
-        title="명령채널 하이재킹 (CR01: PFCP 세션삭제 + 무인증 명령 + 5762 ESTAB)",
+        title="명령채널 하이재킹 (CR01: PFCP 세션삭제 + 무인증 명령)",
         description=(
-            "공격자가 PFCP 세션을 강제해제하며 동시에 무인증 MAVLink 명령을 주입하고 5762 "
-            "백도어 소켓이 ESTAB 된다. PFCP+Unauthorized_Command 시간창 상관 -> CR01 incident. "
-            "command distrust≥71 -> criticality_floor 71 -> Red. 대응 pfcp_firewall/command_override "
-            "선택(가역 AUTO는 DRY, 미검증 셀렉터는 inert-DRY)."
+            "공격자가 PFCP 세션을 강제해제하며 동시에 무인증 MAVLink 명령을 주입한다. "
+            "PFCP+Unauthorized_Command 시간창 상관 -> CR01 incident. 대응 pfcp_firewall/"
+            "command_override 선택(가역 AUTO는 DRY, 미검증 셀렉터는 inert-DRY)."
         ),
-        ticks=[[_pfcp(), _unauth_cmd(), _port5762()],
-               [_pfcp(), _unauth_cmd(), _port5762()]],
-        verified_detection=False,               # command-plane(14556/5762) 탐지는 미검증
+        ticks=[[_pfcp(), _unauth_cmd()],
+               [_pfcp(), _unauth_cmd()]],
+        verified_detection=False,               # command-plane(14556) 탐지는 미검증
         seed_target_verified=True,
     ),
     AttackScenario(
@@ -428,18 +421,6 @@ ATTACKS: list[AttackScenario] = [
         ),
         ticks=[[_unauth_cmd(), _unauth_cmd(value=3)],
                [_unauth_cmd(value=4), _unauth_cmd(value=5)]],
-        verified_detection=False,
-        seed_target_verified=True,
-    ),
-    AttackScenario(
-        id="A4_5762_backdoor",
-        title="5762 백도어 명령경로 (ESTAB 관측·actuation blind)",
-        description=(
-            "web_backend 5762 LISTEN 소켓에 세션이 ESTAB 된다(Port_5762_State). WebProbe는 ss-only·"
-            "pool=1이라 소켓 상태만 관측하고 그 위로 흐르는 무인증 명령은 blind(D-2 미배선). "
-            "command Yellow -> backdoor_pause(web_backend) 후보. 실 actuation·차단 효력 미검증."
-        ),
-        ticks=[[_port5762()], [_port5762()]],
         verified_detection=False,
         seed_target_verified=True,
     ),

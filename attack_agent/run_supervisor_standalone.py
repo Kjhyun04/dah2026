@@ -16,7 +16,7 @@ from supervisor.aria import load_key  # noqa: E402
 from supervisor.supervisor import run as srun  # noqa: E402
 from run_live_gate5 import _goal_payload  # noqa: E402
 
-goal_path = sys.argv[1] if len(sys.argv) > 1 else "goals/goal.land.yaml"
+goal_path = sys.argv[1] if len(sys.argv) > 1 else "goals/goal.example.yaml"
 duration = float(sys.argv[2]) if len(sys.argv) > 2 else 120.0
 
 ev = srun(

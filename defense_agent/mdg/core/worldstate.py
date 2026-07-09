@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 # Closed reach 집합 (V3 §3): 누가/무엇이 어느 plane 에서 reachable 한지.
 ReachTarget = Literal[
-    "gcs14556", "web8080", "uav5762", "mongo27017", "pfcp8805", "net_core", "net_sgi"
+    "gcs14556", "web8080", "mongo27017", "pfcp8805", "net_core", "net_sgi"
 ]
 Domain = Literal["communication", "identity_access", "session_network", "command", "mission"]
 ThreatLevel = Literal["none", "low", "medium", "high", "critical"]
@@ -71,7 +71,7 @@ class RoleBinding(BaseModel):
         UE-pool role 의 경우 live tun IP 가 ``ue_pool_cidr`` 안에 있음. 이는 토폴로지
         체크 — role 이 정상 동작함을 증명하지 않음. 적법성 (role_verified) 이 이를 읽음.
       - ``behaviorally_verified`` = live behavioural anchor (``RoleSpec.verify_anchor``) 가
-        관측됨 (예: uav_ue lo:14550 의 HEARTBEAT sysid=1; 5762 ESTAB/LISTEN; signing
+        관측됨 (예: uav_ue lo:14550 의 HEARTBEAT sysid=1; signing
         drop-log). live collector 증거로부터 ``targets/behavioral.apply_behavioral_verification`` 가
         설정. 존재하지만 anchor 를 방출하지 않거나 불리한 컨테이너는
         ``verified=True, behaviorally_verified=False`` — presence 를 behavioural

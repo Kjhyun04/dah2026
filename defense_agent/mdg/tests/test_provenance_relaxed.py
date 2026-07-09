@@ -89,7 +89,7 @@ def test_demo_operator_auto_relaxes_and_records():
 # END-TO-END(ish) — INJECTED 단일 시그널 attack 이 demo 하에서 chosen_action 에 bind
 # --------------------------------------------------------------------------- #
 def test_injected_attack_binds_to_chosen_action_under_demo():
-    # BACKDOOR_5762 injected incident -> select_policy 후보 -> rank_recovery 가 bind
+    # injected single-signal incident -> select_policy 후보 -> rank_recovery 가 bind
     cfg = loader.config_version()
     rv = {}
     for spec in loader.recovery_priors().get("recovery_priors", {}).values():
@@ -97,11 +97,11 @@ def test_injected_attack_binds_to_chosen_action_under_demo():
         if ea:
             rv[ea] = True
     world = WorldState(config_version=cfg, role_verified=rv)
-    inc = Incident(id="sig-0-Port_5762_State", kind="BACKDOOR_5762", target="10.45.0.9")
+    inc = Incident(id="sig-0-injected", kind="single-signal", target="10.45.0.9")
     st = {"incidents": [inc], "worldstate": world, "config_version": cfg,
           "operator_auto": True}
     st.update(select_policy(st))
-    assert st["legal_actions"], "injected 5762 incident must yield a legal recovery candidate"
+    assert st["legal_actions"], "injected incident must yield a legal recovery candidate"
     out = rank_recovery({**st, **{"legal_actions": st["legal_actions"]}})
     assert out["chosen_action"] is not None, "injected attack must bind to chosen_action"
     assert out["chosen_action"].provenance_relaxed is True
@@ -125,7 +125,7 @@ def test_demo_debounce_shrink_holds_live_insertion_frees_inert_path():
     # -I 를 사용하고, observe=None 이면 already_applied 가 절대 발동 안 함 -> debounce 가 유일한
     # 재작동 throttle. demo shrink 은 여기 적용되어선 안 됨 (아니면 단일 -D revert 로 되돌릴 수 없는
     # 중복 DROP 규칙이 누적). strict 3-tick hold 는 prod 와 operator_auto 양쪽에서 유지.
-    live_rule = "backdoor_drop"
+    live_rule = "pfcp_firewall"
     world_live = WorldState().with_applied(
         AppliedRule(rule=live_rule, applied_tick=0, confirmed=False))
     intent_live = Intent(rule=live_rule, tool_id="nsenter_input_drop")

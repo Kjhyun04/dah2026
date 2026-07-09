@@ -28,12 +28,12 @@ def _run(out_dir: str):
     return e2e.run_campaign(out_dir)
 
 
-def test_campaign_six_attacks_detected_and_zero_live():
-    """6개 공격 전부 replay + detect; live 상태 변경 없음 (불변식2./operator-go)."""
+def test_campaign_five_attacks_detected_and_zero_live():
+    """5개 공격 전부 replay + detect; live 상태 변경 없음 (불변식2./operator-go)."""
     with tempfile.TemporaryDirectory() as d:
         c = _run(d)
-        assert c.total == 6, c.total
-        assert c.detected_count == 6, "every attack must be detected"
+        assert c.total == 5, c.total
+        assert c.detected_count == 5, "every attack must be detected"
         assert c.live_execution_count == 0, "operator-go: ZERO live executions allowed"
         for o in c.outcomes:
             assert o.live_execution is False
@@ -47,12 +47,12 @@ def test_detection_response_verification_spread():
     with tempfile.TemporaryDirectory() as d:
         c = _run(d)
         by = {o.attack_id: o for o in c.outcomes}
-        # A1 명령 탈취 (5762 ESTAB + unauth) -> command floor 71 -> Red
+        # A1 명령 탈취 (CR01: PFCP 삭제 + 무인증 명령 시간창 상관) -> Red
         assert by["A1_command_hijack_cr01"].top_impact_band == "Red"
         # A2 PFCP delete storm -> session floor -> Red, 그리고 VERIFIED detection (B-1)
         assert by["A2_pfcp_teardown"].top_impact_band == "Red"
         assert by["A2_pfcp_teardown"].verified_detection is True
-        # 정확히 2개 verified detection (telemetry D-1 + PFCP B-1), 4개 unverified
+        # 정확히 2개 verified detection (telemetry D-1 + PFCP B-1), 3개 unverified
         assert c.verified_count == 2, c.verified_count
         # 발동하는 대응은 OPER operator-gate (부수효과 0, operator-go): docker_pause
         responders = [o for o in c.outcomes if o.responded]
@@ -136,7 +136,7 @@ def test_report_six_chapters_and_honesty():
         assert len(ch1["invariants"]) == 2 and ch1["operating_constraints"]
         ch6 = rep["chapters"]["6"]
         keys = {l["key"] for l in ch6["limitations"]}
-        assert {"V4_KEY_FORGERY_UNDETECTABLE", "PORT_5762_BLIND", "MISSION_WEIGHTED_DILUTION",
+        assert {"V4_KEY_FORGERY_UNDETECTABLE", "MISSION_WEIGHTED_DILUTION",
                 "UNVERIFIED_RESPONSE_EFFICACY", "BLAST_RADIUS_SELF_DOS"} <= keys
         # chapter 4 는 blast-radius 공개를 표출; chapter 5 는 agent≠truth 총계
         assert rep["chapters"]["4"]["blast_radius"]
@@ -152,13 +152,13 @@ def test_honest_banner_and_chapter_mapping():
     """honest.py: banner + chapter 별 매핑이 일관적이고 자기 기술적."""
     b = honest.banner()
     assert b["live_state_changes"] == 0 and b["execution_mode"].startswith("DRY")
-    assert b["verified_detections"] == 2 and b["total_attacks"] == 6
+    assert b["verified_detections"] == 2 and b["total_attacks"] == 5
     # 모든 한계는 {4,5,6} 의 report chapter 에 매핑
     for lim in honest.HONEST_LIMITATIONS:
         assert lim.report_chapter in (4, 5, 6)
     # honest_note 는 KeyError-safe
     assert honest.honest_note("nope")["title"] == "(unknown limitation)"
-    assert honest.attack_honest_keys("A4_5762_backdoor")
+    assert honest.attack_honest_keys("A1_command_hijack_cr01")
 
 
 def _run_all() -> int:

@@ -90,7 +90,6 @@ OFFLINE_FIXTURES: dict[str, dict[str, Any]] = {
     },
     "observe_mode": {"observed_mode": 4},
     # A
-    "serial5762": {"accepted": True, "signed": False, "effect": {"mode": "5"}},
     "s1u_capture": {"artifacts": ["ciphertext", "pcap"], "values": {"pcap": "long-blob"}},
     # B
     "subdb_dump": {
@@ -173,7 +172,7 @@ def run_offline() -> None:
     print("B. parser edge behavior")
     print("=" * 70)
     # killed/timed_out should force accepted=False on INJECT.
-    inj = get_spec("serial5762")
+    inj = get_spec("webcmd")
     out_killed = ExecOutput(
         returncode=124,
         stdout=json.dumps({"accepted": True, "effect": {"mode": "5"}}),

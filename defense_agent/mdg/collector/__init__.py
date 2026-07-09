@@ -1,10 +1,9 @@
 """Collector — 그래프 밖 장수 데몬; keyring 소유자 (PS-2/PS-5).
 
-수집기 7종 (P1 관측 엔진):
+수집기 6종 (P1 관측 엔진):
   AirCommandTap          air 측 netns 사이드카 — gcs_proxy eth0 UDP:14556 (command)
   AirTelemetryTap        air 측 netns 사이드카 — 14560 + uav_ue lo:14550 cross-tap
   NetworkMetricCollector network — NF :9090 Prometheus 폴링 (httpx)
-  WebProbeCollector      web — 5762 ss-only, pool=1
   MongoLogCollector      mongo — docker logs stdout JSON
   MissionConfigCollector mission — config 파생 컨텍스트
   SignLogCollector       command — uav_proxy docker logs §9-B signing drop-line (P3-Q2)
@@ -26,11 +25,10 @@ from .mongo import MongoLogCollector
 from .network import NetworkMetricCollector
 from .sign_log import SignLogCollector
 from .smf_session import SmfSessionCollector, SmfSessionTable
-from .web import WebProbeCollector
 
 __all__ = [
     "BaseCollector", "AirCommandTap", "AirTelemetryTap", "NetworkMetricCollector",
-    "WebProbeCollector", "MongoLogCollector", "MissionConfigCollector",
+    "MongoLogCollector", "MissionConfigCollector",
     "SignLogCollector", "SmfSessionCollector", "SmfSessionTable", "MmeLogTail", "ansi_strip",
     "Keyring", "SensorEnvelope", "compute_hmac", "verify_envelope",
     "build_collectors", "build_epc_collectors", "build_source_domains",
@@ -55,7 +53,7 @@ def build_collectors(out_queue: "_queue.Queue", keyring: Keyring, kid: str, *,
                      backend=None, clock=None,
                      netns_prefix_map: Optional[dict[str, list[str]]] = None,
                      ) -> list[BaseCollector]:
-    """하나의 queue + keyring/kid를 공유하는 표준 7-collector 세트를 인스턴스화한다.
+    """하나의 queue + keyring/kid를 공유하는 표준 collector 세트를 인스턴스화한다.
     각 collector는 봉투를 ``kid``로 서명한다; ``sense``가 drain에서 검증한다.
 
     ``netns_prefix_map``(container -> nsenter prefix)는 recon->collector 브리지다
@@ -77,13 +75,12 @@ def build_collectors(out_queue: "_queue.Queue", keyring: Keyring, kid: str, *,
     return [
         # AirCommandTap DISABLED (라이브 수집기 제외) — 14556 업링크 명령-탭이 정상 업링크(드론
         #   GUIDED@30m 유지용 GCS setpoint 등)를 Unauthorized_Command 로 오탐 → single-signal →
-        #   backdoor_pause(web_backend docker_pause) → 8080 대시보드 중단을 유발. 5762 공방전과
-        #   무관한 오탐 경로라 라이브에서 제거. 클래스/테스트/verifier 는 유지(부재=idle-baseline=
+        #   backdoor_pause(web_backend docker_pause) → 8080 대시보드 중단을 유발하는 오탐 경로라
+        #   라이브에서 제거. 클래스/테스트/verifier 는 유지(부재=idle-baseline=
         #   healthy 로 안전 처리, verifier.py:185). 재활성 원하면 아래 라인 주석 해제 + 오탐 baseline 필요.
         # AirCommandTap(out_queue, keyring, kid, netns_prefix=m.get("gcs_proxy"), **air_common),
         AirTelemetryTap(out_queue, keyring, kid, netns_prefix=m.get("uav_ue"), **air_common),
         NetworkMetricCollector(out_queue, keyring, kid, **common),
-        WebProbeCollector(out_queue, keyring, kid, netns_prefix=m.get("uav_ue"), **common),
         MongoLogCollector(out_queue, keyring, kid, **common),
         MissionConfigCollector(out_queue, keyring, kid, **common),
         # §9-B uplink-signing posture: uav_proxy drop-line tail (P3-Q2). netns-무관

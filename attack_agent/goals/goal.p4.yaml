@@ -1,5 +1,5 @@
 # goal.p4.yaml — P4 헤드라인: 서명 강제 하에서 mode 우회(signing_bypass).
-# serial5762(직결)가 ARIA+서명을 관통해 mode:=5 달성 → signing_bypass 성립.
+# forge_sign(누출 서명키 소비) 등이 서명검증을 관통해 mode:=5 달성 → signing_bypass 성립.
 goal:
   type: signing_bypass
   target: mode=5           # GUIDED(4) → LOITER(5), 둘 다 비행안전 자율모드

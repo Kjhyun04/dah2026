@@ -22,7 +22,6 @@ from mdg.collector.ingest import Keyring, verify_envelope  # noqa: E402
 from mdg.collector.mongo import MongoLogCollector, parse_mongo_line  # noqa: E402
 from mdg.collector.network import (NetworkMetricCollector, counter_diff,  # noqa: E402
                                    parse_prometheus)
-from mdg.collector.web import WebProbeCollector, parse_ss_established  # noqa: E402
 from mdg.collector.mission import MissionConfigCollector  # noqa: E402
 from mdg.core.clock import VirtualClock  # noqa: E402
 from mdg.ingest.server import EnqueueServicer, decode_envelope, encode_envelope  # noqa: E402
@@ -110,12 +109,6 @@ def test_counter_diff_semantics():
     assert counter_diff(None, 5) is None          # 베이스라인
     assert counter_diff(5, 8) == 3                 # 양의 신호
     assert counter_diff(8, 2) is None              # reset -> reseed, 신호 아님
-
-
-def test_parse_ss_established():
-    out = "ESTAB 0 0 172.30.0.10:5762 10.45.0.10:44012\n"
-    assert parse_ss_established(out, 5762) == 1
-    assert parse_ss_established("", 5762) == 0
 
 
 def test_parse_mongo_line_ran_only():
@@ -297,16 +290,6 @@ def test_network_collector_first_poll_baseline_then_signal():
     assert t2 and t2[0]["value"] == 4 and t2[0]["band"] == "danger"
 
 
-def test_web_probe_pool1_and_estab_signal():
-    q = queue.Queue()
-    be = Backend(mode="mock", mock_table={"ss": "ESTAB 0 0 172.30.0.10:5762 10.45.0.10:5000\n"})
-    c = WebProbeCollector(q, _kr(), _KID, backend=be, clock=_clock([5.0] * 3),
-                          netns_prefix=_NSPREFIX)
-    c.tick_once()
-    envs = _drain(q)
-    assert len(envs) == 1 and envs[0].payload["value"] == "ESTAB_PRESENT"
-
-
 class _CountingBackend:
     """run() 이 호출된 적 있는지 기록 (collector inert = exec 없음 을 단언하기 위함)."""
     def __init__(self):
@@ -335,7 +318,7 @@ def test_netns_prefix_builder_and_inert_collectors():
     assert prefmap == {"gcs_proxy": ["nsenter", "--target", "111", "--net", "--"]}
 
     # inert 가드: netns_prefix None => collect() 는 [] 반환하고 backend 를 절대 건드리지 않음
-    for Coll, kwextra in ((AirCommandTap, {}), (AirTelemetryTap, {}), (WebProbeCollector, {})):
+    for Coll, kwextra in ((AirCommandTap, {}), (AirTelemetryTap, {})):
         be = _CountingBackend()
         c = Coll(queue.Queue(), _kr(), _KID, backend=be, clock=_clock([1.0] * 3),
                  netns_prefix=None, **kwextra)

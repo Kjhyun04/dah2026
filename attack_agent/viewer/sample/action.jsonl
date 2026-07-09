@@ -3,5 +3,4 @@
 {"type": "step", "step": 2, "tool_id": "naive", "params": {"mode": "4"}, "verdict": "BLOCKED", "blocked_by": "baseline"}
 {"type": "step", "step": 3, "tool_id": "signkey_leak", "params": {}, "verdict": "OK", "blocked_by": null}
 {"type": "step", "step": 4, "tool_id": "forge_sign", "params": {"mode": "4"}, "verdict": "OK", "blocked_by": null}
-{"type": "step", "step": 5, "tool_id": "serial5762", "params": {"mode": "4"}, "verdict": "OK", "blocked_by": null}
-{"type": "campaign_result", "goal_reached": true, "steps": 6, "defenses_bypassed": ["signing"], "win_causes": ["key-leak"], "kb_final": {"facts": ["attached", "reach(gcs14556)", "reach(uav5762)", "reach(sgi)"], "artifacts": ["sign_key"], "flags": [], "scalars": {"signing": "on", "mode": 4, "c2": "unknown"}, "prov": {"attached": "config", "sign_key": "signkey_leak", "mode": "forge_sign"}}}
+{"type": "campaign_result", "goal_reached": true, "steps": 5, "defenses_bypassed": ["signing"], "win_causes": ["key-leak"], "kb_final": {"facts": ["attached", "reach(gcs14556)", "reach(uav5762)", "reach(sgi)"], "artifacts": ["sign_key"], "flags": [], "scalars": {"signing": "on", "mode": 4, "c2": "unknown"}, "prov": {"attached": "config", "sign_key": "signkey_leak", "mode": "forge_sign"}}}

@@ -7,26 +7,25 @@
 
     python mdg/tests/verify_parsers.py      # -> 파서별 [PASS]/[FAIL], 실패 시 exit 1
 
-커버되는 파서 세트 — 12개의 순수(PURE, 픽스처 테스트 가능, 라이브 백엔드 불요) 디코드 함수
+커버되는 파서 세트 — 11개의 순수(PURE, 픽스처 테스트 가능, 라이브 백엔드 불요) 디코드 함수
 (finding P2-2 / P2-4):
   log_common.ansi_strip / parse_epc_ts        (공통 EPC strip + ts, null-safe)     [2]
   smf_session.parse_smf_line                  (P4-1 SMF create/remove, ANSI, CIDR 스코프, null-safe) [1]
   mme_log.parse_mme_line                      (P4-5 MME attach/IMSI, ANSI, null-safe) [1]
   mongo.parse_mongo_line                      (A-2 id==22943 JSON, RAN-CIDR 스코프, null-safe) [1]
   network.parse_prometheus / counter_diff     (P4-2/P4-3 exposition 합산, 양의 diff 만) [2]
-  web.parse_ss_established                     (5762 ESTAB 카운트)                     [1]
   air_side._count_packets                     (B-3/B-4 tcpdump HEARTBEAT/패킷 카운트 디코드, null-safe) [1]
   resolve.parse_ip_addr_show                  (2단계 tun IPv4)                      [1]
   ingest.encode_envelope / decode_envelope    (엔벨로프 코덱 왕복, 크기 가드) [2]
                                               -----------------------------------------
-                                              = 순수 디코드 함수 12개, 모두 여기서 행사.
+                                              = 순수 디코드 함수 11개, 모두 여기서 행사.
 
-'19 파서' 목표 조정(finding P2-4 — 미조정 상태였음): 설계의 19 는 이 12개 순수 디코드 함수에
-``*.collect()`` 메서드에 내장된 7개의 라이브 collector band 분류기(air_command / air_telemetry
-/ network / web / mongo / mme / smf collector) 를 더한 것 — 이들은 subprocess/backend 구동
-(nsenter+tcpdump / ss / docker-logs / :9090 scrape) 이며 통합 스위트(test_p4_*, verify_d11_*) 가
-커버하고 여기서는 커버하지 않는다. 라이브/mock Backend 없이 실행 불가하기 때문이다. 이 파일의
-계약은 12개 순수 함수; 12(순수, 여기) + 7(라이브, 통합) = 19. 파서가 추가/제거되면 이 분리를
+'파서' 목표 조정(finding P2-4): 위 11개 순수 디코드 함수에 ``*.collect()`` 메서드에 내장된
+6개의 라이브 collector band 분류기(air_command / air_telemetry / network / mongo / mme / smf
+collector) 를 더한다 — 이들은 subprocess/backend 구동(nsenter+tcpdump / docker-logs / :9090
+scrape) 이며 통합 스위트(test_p4_*, verify_d11_*) 가 커버하고 여기서는 커버하지 않는다.
+라이브/mock Backend 없이 실행 불가하기 때문이다. 이 파일의 계약은 11개 순수 함수;
+11(순수, 여기) + 6(라이브, 통합) = 17. 파서가 추가/제거되면 이 분리를
 DESIGN_DECISIONS appendix A 와 동기화하라.
 """
 from __future__ import annotations
@@ -43,7 +42,6 @@ from mdg.collector.mme_log import parse_mme_line  # noqa: E402
 from mdg.collector.mongo import parse_mongo_line  # noqa: E402
 from mdg.collector.network import counter_diff, parse_prometheus  # noqa: E402
 from mdg.collector.smf_session import parse_smf_line  # noqa: E402
-from mdg.collector.web import parse_ss_established  # noqa: E402
 from mdg.ingest.server import decode_envelope, encode_envelope  # noqa: E402
 from mdg.targets.resolve import parse_ip_addr_show  # noqa: E402
 
@@ -146,16 +144,6 @@ def test_counter_diff_positive_only():
     assert counter_diff(None, 5.0) is None          # 첫 관측 -> 기준선, 신호 없음
     assert counter_diff(5.0, 8.0) == 3.0            # 양의 diff -> 신호
     assert counter_diff(8.0, 5.0) is None           # 리셋/재시작 -> 재시드, 신호 아님
-
-
-# --------------------------------------------------------------------------- #
-# web.parse_ss_established (5762 backdoor 상태)
-# --------------------------------------------------------------------------- #
-def test_parse_ss_established():
-    estab = "0      0      10.44.0.31:44512      10.45.0.2:5762\n"
-    assert parse_ss_established(estab, 5762) == 1
-    assert parse_ss_established("", 5762) == 0                      # LISTEN_NO_ESTAB / 빈 입력
-    assert parse_ss_established("0 0 1.2.3.4:80 5.6.7.8:80\n", 5762) == 0
 
 
 # --------------------------------------------------------------------------- #

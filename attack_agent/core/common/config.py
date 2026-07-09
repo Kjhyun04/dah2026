@@ -137,7 +137,7 @@ class TgtSpec(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    uav5762: Optional[str] = None   # A: SITL 시리얼 직결
+    uav5762: Optional[str] = None   # A: SITL 상태(5762) 정찰·관측 대상
     s1u: Optional[str] = None       # A: SGW-U(S1-U 캡처)
     mongo: Optional[str] = None     # B: 가입자DB
     pfcp_upf: Optional[str] = None  # B: PFCP

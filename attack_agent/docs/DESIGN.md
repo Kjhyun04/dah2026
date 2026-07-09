@@ -161,7 +161,7 @@ evaluation = { "autonomy_accuracy":…, "truth_success":…, "agent_vs_truth":[�
 ## 7. 제어평면 = 결정론 FSM + LLM 2곳
 
 - **FSM 상태:** `RECON → SELECT → EXECUTE → INFER → (goal? END : PIVOT) → SELECT …` (max_pivots 하드캡, 고위험 안전목표는 전 예산사유 면제 = M6).
-- **LLM ① Planner:** `select`(target_node+방어상태+**goal(expect_mode·mavcmd) 주입**) / `pivot`(blocked_by→enabler ADAPT). 출력 = `Channel`(전송) + `Action`(intent) 분리 + **enabler 레지스트리(6) pydantic 검증**(무효값 폴백). 캐시키 = precond+goal.
+- **LLM ① Planner:** `select`(target_node+방어상태+**goal(expect_mode·mavcmd) 주입**) / `pivot`(blocked_by→enabler ADAPT). 출력 = `Channel`(전송) + `Action`(intent) 분리 + **enabler 레지스트리(5) pydantic 검증**(무효값 폴백). 캐시키 = precond+goal.
 - **LLM ② Evidence:** correlate(신호 종합) / narrate(BlockProof 서술).
 - **LLM은 증강이지 load-bearing 아님** — 렌더 실패/장애 = 결정표 폴백 직행(빈 프롬프트 호출 금지). self.name 뮤테이션 금지.
 - **Recon 1급 단계:** 캠페인 전에 signing 등 방어상태 선제 확보(discover 도구 = 파서/결과모델/node_cmd **완전 등록**, 유령 금지 = B6 해소).
@@ -177,11 +177,11 @@ evaluation = { "autonomy_accuracy":…, "truth_success":…, "agent_vs_truth":[�
 
 ---
 
-## 9. 공격 노드 카탈로그 · enabler(6) · ADAPT
+## 9. 공격 노드 카탈로그 · enabler(5) · ADAPT
 
 **노드(실측 판정, MASTER_SUMMARY):** naive(차단 baseline) · TM1/V2 oracle(성립) · forceland(HITL) · V1 리플레이(성립) · V3 peer(조건부) · V4 키노출(성립) · V5 nonce(잠재) · TM2(완화) · TM3(ARIA무력) · **NF-3 가입자DB·NF-4 웹서명우회·NF-6 서명키**(실측).
 
-**enabler 레지스트리(코드강제 6):** `naive`(차단) · `oracle`(14556 평문) · `webcmd`(NF-4 서명우회) · `forge`(NF-6 위조봉투) · `serial5762`(직결) · `forceland`(강제착륙·HITL). — pydantic validator로 무효값 reject.
+**enabler 레지스트리(코드강제 5):** `naive`(차단) · `oracle`(14556 평문) · `webcmd`(NF-4 서명우회) · `forge`(NF-6 위조봉투) · `forceland`(강제착륙·HITL). — pydantic validator로 무효값 reject.
 
 **ADAPT:** 방어가 벡터 차단(3실패/페로몬 or blocked_by=signing) → 사전 미정의 대체 벡터 자율 전환(oracle→webcmd→forge). `blocked_by`(signing/auth/no_effect)는 **파싱응답에서 도출**(이름 하드코딩 금지 = F5). ADAPT가 LLM 값어치의 핵심.
 

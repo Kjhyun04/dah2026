@@ -7,7 +7,7 @@
   PROBE  -> ReconResult   : recon_reach(reach) · recon_defense(signing) · recon_session(seid,sessions)
   COLLECT-> CollectResult : capture_downlink · s1u_capture(ciphertext,pcap) · subdb_dump(k_opc,imsi)
                            key_extract(aria_key) · signkey_leak(sign_key) · nonce_scan(nonce_collision)
-  INJECT -> InjectResult  : serial5762 · oracle · webcmd · forge_sign · forge_aria · replay · naive
+  INJECT -> InjectResult  : oracle · webcmd · forge_sign · forge_aria · replay · naive
                            (mode via effect) · pfcp_delete/pfcp_flood/peer_flood(c2) ·
                            subdb_canary(subscriber_written flag) · forceland(mode=9) · pivot_exploit(reach)
 

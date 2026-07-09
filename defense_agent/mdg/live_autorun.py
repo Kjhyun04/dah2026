@@ -3,7 +3,7 @@
 scratchpad 임시 스크립트를 관측자 lifecycle 을 소유하는 실제 모듈로 대체한다. 순서는 정확히:
 
     recon_boot  (그래프 밖: read-only 역할/IP 해석 + seq/ledger boot 복구)
-      -> build_collectors(start)  (표준 6-set, recon PID 로부터 netns 브리지)
+      -> build_collectors(start)  (표준 collector set, recon PID 로부터 netns 브리지)
       -> build_graph              (결정론 StateGraph; LLM advisory, checkpointer)
       -> run_driver               (그래프 밖 tick 루프; tick 별 run.jsonl)
 
@@ -267,7 +267,7 @@ def run(out_dir: str, run_id: str, *, allow_live: bool = False, operator_auto: b
             smf_table = None
     # Phase 4: effect-confirm observer(read-only 회복 관측) -> effect_confirm(observe=...).
     # 적용된 각 rule 을 그 response_tool 로 해석하고 READ-ONLY probe 로 확인한다:
-    # docker_pause->inspect .State.Paused / nsenter_input_drop->ss (대상 netns 에 5762 ESTAB 없음) /
+    # docker_pause->inspect .State.Paused / nsenter_input_drop->iptables -S INPUT DROP 규칙 존재 /
     # send_signed_mode->telemetry rel_alt 30m 회복. 모든 probe 는 단일 Backend 를 경유한다
     # (불변식2.). 이전엔 None 이었음(effect_confirm 이 항상 confirmed=False -> 회복 신호 없음).
     # Phase 5: AirTelemetryTap(14560/14550 디코드)의 live 비행상태 snapshot 을 observer 에 배선하여

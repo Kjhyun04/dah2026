@@ -1,7 +1,7 @@
-"""verify_tools — 27 tool 계약 완전·유령0·Literal 화이트리스트 (H-A/G · DESIGN §2).
+"""verify_tools — 26 tool 계약 완전·유령0·Literal 화이트리스트 (H-A/G · DESIGN §2).
 
 강제:
-  - DefToolId Literal 집합 == REGISTRY keys, 정확히 27 (유령 없음, 누락 없음)
+  - DefToolId Literal 집합 == REGISTRY keys, 정확히 26 (유령 없음, 누락 없음)
   - 모든 spec 완전 등록 (owner/category/backend/consumes/produces/T)
   - response 도구는 exec(safe-exec)를 바인딩 AND effect 를 선언
   - send_signed_mode (flight) risk == HIGH (operator)
@@ -24,7 +24,7 @@ def _check() -> Report:
     literal_ids = set(get_args(DefToolId))
     reg_ids = set(REGISTRY.keys())
 
-    rep.check(len(reg_ids) == TOOL_COUNT == 27, f"registry has {len(reg_ids)} tools, expect 27")
+    rep.check(len(reg_ids) == TOOL_COUNT == 26, f"registry has {len(reg_ids)} tools, expect 26")
     rep.check(literal_ids == reg_ids,
               f"DefToolId Literal != REGISTRY keys (ghost/missing): "
               f"only-literal={literal_ids - reg_ids} only-reg={reg_ids - literal_ids}")

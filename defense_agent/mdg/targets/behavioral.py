@@ -4,7 +4,7 @@
 이 모듈이 존재하는 이유: ``resolve.py`` 는 ``RoleBinding.verified`` 를 PRESENCE(존재)로만
 설정한다(inspect .State.Pid 로 컨테이너 존재; UE-pool 역할은 추가로 라이브 tun IP 가
 ``ue_pool_cidr`` 안에 있어야 함). 존재는 TOPOLOGY(위상) 검사다 — 컨테이너는 존재하나
-HEARTBEAT 미방출 / 잘못된 sysid / backdoor-port 상태 없음이어도 여전히
+HEARTBEAT 미방출 / 잘못된 sysid 여도 여전히
 ``verified=True`` 가 되어 GATE2 확신을 과대 표현한다. 선언된 ``RoleSpec.verify_anchor``
 (``lo_14550_heartbeat_sys1`` 등)는 어떤 코드도 읽지 않는 DEAD 필드였다.
 
@@ -12,7 +12,7 @@ HEARTBEAT 미방출 / 잘못된 sysid / backdoor-port 상태 없음이어도 여
 술어로 매핑하고, GATE2 행위 프로브가 읽는 별개의(DISTINCT) ``behaviorally_verified`` 비트를
 생성한다 — ``verified``(따라서 적법성의 ``role_verified``)는 순수 존재/해석 술어로 남긴다.
 
-operator-go 주의: 기저 라이브 관측(air 측 tcpdump HEARTBEAT 디코드, ss 5762 상태,
+operator-go 주의: 기저 라이브 관측(air 측 tcpdump HEARTBEAT 디코드,
 uav_proxy signing drop-log)은 그래프 밖에서 수집되며 상태변경-0 read-only 이나,
 샌드박스 테스트베드에서 라이브 탭은 operator-go 유보다. 증거 부재 => 모든 anchor 는
 미확인(False) — 정직한 boot 자세. ``recon_boot`` 은 ``behaviorally_verified`` 를 전부
@@ -36,13 +36,11 @@ class AnchorEvidence:
 
     모든 필드는 '관측 안 됨' 값으로 기본 설정되어 빈 AnchorEvidence(boot /
     operator-go 자세)는 아무것도 확인하지 않는다. 런타임은 ``sense`` 를 공급하는 동일한
-    collector 페이로드(air 측 HEARTBEAT 디코드, ss 5762 상태,
+    collector 페이로드(air 측 HEARTBEAT 디코드,
     uav_proxy signing drop-log)로부터 이를 채운다 — 이 모듈은 스스로 아무것도 관측하지 않는다.
     """
     heartbeat_sys: Optional[int] = None   # uav_ue lo:14550 에서 디코드된 MAVLink system id (None = 미관측)
     command_entry_seen: bool = False      # gcs_proxy command-entry UDP:14556 탭에서 패킷 관측됨
-    port_5762_listen: bool = False        # 5762 가 LISTEN 상태(web_backend backdoor 포트 존재)
-    port_5762_estab: bool = False         # 5762 에 ESTABLISHED 연결 존재(공격자 backdoor 시도)
     signing_drop_seen: bool = False       # uav_proxy signing-verify-fail drop 라인 관측됨(§9-B ON)
 
 
@@ -53,10 +51,6 @@ _ANCHOR_CHECKS: dict[str, Callable[[AnchorEvidence], bool]] = {
     "lo_14550_heartbeat_sys1": lambda e: e.heartbeat_sys == 1,
     # gcs_proxy: command-entry 평면이 UDP:14556 에서 라이브(업링크 command entry, §P).
     "command_entry_udp_14556": lambda e: e.command_entry_seen,
-    # attacker: 5762 backdoor 의 ESTABLISHED 연결 = backdoor 시도.
-    "port_5762_backdoor_attempt": lambda e: e.port_5762_estab,
-    # web_backend: 5762 존재/LISTEN(backdoor 포트 바인딩됨; ESTAB 도 존재를 만족).
-    "port_5762_listen": lambda e: e.port_5762_listen or e.port_5762_estab,
     # uav_proxy: §9-B signing-verify-fail drop 라인(권위 있는 강제 신호).
     "signing_drop_log_uav_proxy": lambda e: e.signing_drop_seen,
 }

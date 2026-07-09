@@ -1,8 +1,0 @@
-# goal.land.yaml — 착륙(LAND, mode 9) 강제 목표. A(감독 분리)로 ground-truth 검증용.
-# type/target/forceland·serial5762(mode9)·goal_reached 모두 기존 코드 — 이 파일은 순수 파라미터(데이터).
-goal:
-  type: mode_set          # mode==target 도달 판정 (kb.goal_reached)
-  target: mode=9          # LAND (0=STAB 4=GUIDED 5=LOITER 9=LAND)
-  defense: "on"           # 서명 강제 ON (테스트베드 실측) → signing 시드
-  success: ack            # 에이전트 자율판정 — 실제 착륙은 감독(ground-truth)이 독립 확인
-  scope: [A, B, C, D]     # 전 계층 주입 tool 노출 (forceland 포함)

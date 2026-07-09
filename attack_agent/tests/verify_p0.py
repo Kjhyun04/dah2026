@@ -242,21 +242,21 @@ check("pre_hook 차단 → ToolError (하드게이트)", isinstance(r_pre, ToolE
 
 print()
 print("=" * 70)
-print("EXTRA · 닫힘 강제 (registry 화이트리스트 23 전량)")
+print("EXTRA · 닫힘 강제 (registry 화이트리스트 22 전량)")
 print("=" * 70)
-check("REGISTRY has 23 tools (원시 전량)", len(REGISTRY) == 23)
+check("REGISTRY has 22 tools (원시 전량)", len(REGISTRY) == 22)
 # ToolId Literal 과 REGISTRY 키 일치(누락/유령 없음)
 _ids = set(_get_args(ToolId))
-check("ToolId Literal == REGISTRY keys (23)", _ids == set(REGISTRY.keys()) and len(_ids) == 23)
+check("ToolId Literal == REGISTRY keys (22)", _ids == set(REGISTRY.keys()) and len(_ids) == 22)
 # 04 §5 명시 22 원시 전량 등록 확인
 _expected = {
     "recon_reach", "recon_defense", "recon_session", "capture_downlink", "observe_mode",
-    "serial5762", "s1u_capture",
+    "s1u_capture",
     "subdb_dump", "subdb_canary", "pfcp_delete", "pfcp_flood", "pivot_exploit",
     "key_extract", "signkey_leak", "nonce_scan",
     "oracle", "webcmd", "forge_sign", "forge_aria", "replay", "peer_flood", "forceland", "naive",
 }
-check("23 원시 id 전량 일치 (04 §5)", set(REGISTRY.keys()) == _expected)
+check("22 원시 id 전량 일치 (04 §5)", set(REGISTRY.keys()) == _expected)
 # (a) 미등록 id -> KeyError
 try:
     get_spec("nonexistent_tool")
@@ -298,10 +298,6 @@ kb_update(kb_c, ReconResult(reach=[f"{t}@10.50.0.1:0" for t in
           ("net_core", "mongo", "sgi", "uav5762", "s1u", "pivot",
            "gcs14555", "gcs14556", "web8080")]))
 kb_update(kb_c, ReconResult(signing="on"))
-# serial5762: reach(uav5762) 충족 -> runnable, effect SET_MODE (서명 관통)
-st = status_of("serial5762", kb_c)
-check("serial5762 runnable + effect_eval SET_MODE (서명 관통)",
-      st.runnable and st.effect_eval.kind == EffectEvalKind.SET_MODE)
 # webcmd: reach(web8080) 있으나 unauth(web) 없음 -> NOT runnable
 st = status_of("webcmd", kb_c)
 check("webcmd NOT runnable (missing unauth(web))",

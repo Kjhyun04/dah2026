@@ -15,7 +15,7 @@
   3. 탐지           incidents / 근거 타임라인 (탐지 관측)
   4. 대응           decisions / tier / inert-DRY dispatch + blast-radius 공개
   5. 독립 검증      Verifier 진실 + agent≠truth 발산 (H-K)
-  6. 정직성·한계    정직한 한계 (V4/5762/mission-weight/unverified/blast-radius)
+  6. 정직성·한계    정직한 한계 (V4/mission-weight/unverified/blast-radius)
 
 의존 방향: e2e.py -> artifacts.py -> {honest, verifier, replay.play}. 이 모듈은 mdg.core를
 전혀 import하지 않고(보고서 측, JSONL 소비) langgraph도 import하지 않는다. 결과 dataclass가

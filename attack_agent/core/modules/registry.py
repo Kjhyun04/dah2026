@@ -4,9 +4,9 @@
 조합은 오케스트레이터가 precond/require_any/consumes/produces/produces_facts/effect 로
 런타임 도출(레시피 없음, 03). goal.scope 로 옵션 필터(19 PART1-4).
 
-22 = RECON(4) + A(2) + B(5) + C(3) + D(8).
-  RECON: recon_reach · recon_defense · recon_session · capture_downlink
-  A: serial5762 · s1u_capture
+22 = RECON(5) + A(1) + B(5) + C(3) + D(8).
+  RECON: recon_reach · recon_defense · recon_session · capture_downlink · observe_mode
+  A: s1u_capture
   B: subdb_dump · subdb_canary · pfcp_delete · pfcp_flood · pivot_exploit
   C: key_extract · signkey_leak · nonce_scan
   D: oracle · webcmd · forge_sign · forge_aria · replay · peer_flood · forceland · naive
@@ -150,22 +150,6 @@ _SPECS: list[ToolSpec] = [
     # ═══════════════════════════════════════════════════════════════════════
     # 계층 A — 무선·단말 (04 §3 A)
     # ═══════════════════════════════════════════════════════════════════════
-    ToolSpec(
-        id="serial5762",
-        layer=Layer.A,
-        kind=ToolKind.INJECT,
-        precond=(reach(RT.UAV5762),),
-        effect=SetMode(),  # 서명·ARIA 관통(직접 시리얼) — signing 무관 성립
-        params=dict(_MODE_PARAM),
-        risk=Risk.LOW,
-        reversible=True,
-        win_cause="config-flaw",
-        exec_binding=ExecBinding(
-            sidecar="ue",
-            script="dah_exec/R5_ROGUE_ATTACK/atk_direct5762.py",
-            args_template="mode {mode}",
-        ),
-    ),
     ToolSpec(
         id="s1u_capture",
         layer=Layer.A,
@@ -469,8 +453,8 @@ _REGISTRY: dict[ToolId, ToolSpec] = {s.id: s for s in _SPECS}
 # 무결성 불변식 (04 §6-1): 중복/누락 없음 확인
 if len(_REGISTRY) != len(_SPECS):
     raise RuntimeError("duplicate tool id in registry")
-if len(_REGISTRY) != 23:
-    raise RuntimeError(f"expect 23 원시 전량, got {len(_REGISTRY)}")
+if len(_REGISTRY) != 22:
+    raise RuntimeError(f"expect 22 원시 전량, got {len(_REGISTRY)}")
 
 # 외부 노출은 read-only mapping으로 고정(런타임 변조 방지).
 REGISTRY: Mapping[ToolId, ToolSpec] = MappingProxyType(_REGISTRY)

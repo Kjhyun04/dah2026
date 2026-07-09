@@ -48,7 +48,6 @@ METRICS: dict[str, dict[str, object]] = {
     "PFCP_Delete_Attempt": {"domain": "session_network", "normal": [0, 0], "warning": [1, 1], "critical": [2, 3], "danger": [4, "inf"], "weight": 0.55},  # 0.40->0.55: danger distrust 49.5 >= session_network floor 40 -> Yellow -> orient (PFCP 단독 탐지). warning/critical 은 여전히 Green(오탐 방지).
     "Unauthorized_Command": {"domain": "command", "normal": [0, 0], "warning": [1, 1], "critical": [2, "inf"], "weight": 0.35},
     "Signature_Verify_Fail": {"domain": "command", "warning": [1, 3], "critical": [4, "inf"], "weight": 0.20},
-    "Port_5762_State": {"domain": "command", "normal": "LISTEN_NO_ESTAB", "danger": "ESTAB_PRESENT", "weight": 0.45},
     "DB_Access": {"domain": "identity_access", "normal": [0, 0], "warning": [1, 2], "critical": [3, "inf"], "weight": 0.35},
     "Packet_Loss": {"domain": "communication", "normal": [0, 1], "warning": [2, 5], "critical": [6, 20], "danger": [21, 100], "weight": 0.30},
     "RTT": {"domain": "communication", "normal": [0, 40], "warning": [41, 80], "critical": [81, 150], "weight": 0.20},
@@ -88,7 +87,6 @@ MISSION_PROFILE: dict[str, object] = {
 # --- Confidence channel-quality priors (FEASIBILITY §3) 신뢰 채널품질 prior ---
 CHANNEL_QUALITY: dict[str, float] = {
     "plaintext_mavlink_tap": 0.95,   # 14560/14556 평문 탭
-    "port_5762_read": 0.90,
     "prometheus_9090": 0.90,
     "nas_log": 0.85,
     "mongo_conn_log": 0.60,
@@ -116,15 +114,14 @@ RECOVERY_DEFAULT_ENFORCE_AT: str = "gcs_proxy"  # command plane 진입점 (폴�
 # response_tool/flight은 recovery_priors.yaml에서 MIRROR되어 pyyaml-부재 폴백이 type별
 # response-tool TIER를 보존하게 한다(audit defaults.py:116 tier-inversion):
 # 여기 response_tool이 없으면 _candidates(select_policy)가 모든 type에 대해 AUTO 도구
-# nsenter_input_drop으로 폴백하여, backdoor_pause(docker_pause/OPER)와 send_signed_mode
-# flight type들을 조용히 AUTO DROP 레인으로 강등시킨다. flight도 마찬가지로 HIGH/operator
+# nsenter_input_drop(pfcp_firewall/mongo_acl AUTO 티어)으로 폴백하여, backdoor_pause(docker_pause/OPER)와
+# send_signed_mode flight type들을 조용히 AUTO DROP 레인으로 강등시킨다. flight도 마찬가지로 HIGH/operator
 # 에스컬레이션을 게이트한다. 이 두 key는 yaml 행 값과 byte 단위로 동일하게 유지하라.
 RECOVERY_PRIORS: dict[str, dict[str, object]] = {
     "signed_land": {"success_probability": 0.90, "expected_trust_recovery": {"command": 40}, "risk": "HIGH", "reversible": False, "response_tool": "send_signed_mode", "flight": True, "enforce_at": "gcs_proxy"},
     "signed_rtl": {"success_probability": 0.90, "expected_trust_recovery": {"command": 40}, "risk": "HIGH", "reversible": False, "response_tool": "send_signed_mode", "flight": True, "enforce_at": "gcs_proxy"},
     "signed_guided": {"success_probability": 0.90, "expected_trust_recovery": {"command": 40}, "risk": "HIGH", "reversible": False, "response_tool": "send_signed_mode", "flight": True, "enforce_at": "gcs_proxy"},
     "backdoor_pause": {"success_probability": 0.95, "expected_trust_recovery": {"command": 30}, "risk": "MED", "reversible": True, "response_tool": "docker_pause", "flight": False, "enforce_at": "web_backend"},
-    "backdoor_drop": {"success_probability": 0.85, "expected_trust_recovery": {"command": 30}, "risk": "MED", "reversible": True, "response_tool": "nsenter_input_drop", "flight": False, "enforce_at": "uav_ue"},
     "pfcp_firewall": {"success_probability": 0.80, "expected_trust_recovery": {"session_network": 20}, "risk": "MED", "reversible": True, "response_tool": "nsenter_input_drop", "flight": False, "enforce_at": "gcs_proxy"},
     "mongo_acl": {"success_probability": 0.85, "expected_trust_recovery": {"identity_access": 20}, "risk": "MED", "reversible": True, "response_tool": "nsenter_input_drop", "flight": False, "enforce_at": "web_backend"},
     "command_override": {"success_probability": 0.90, "expected_trust_recovery": {"command": 30}, "risk": "HIGH", "reversible": False, "response_tool": "send_signed_mode", "flight": True, "enforce_at": "gcs_proxy"},
@@ -146,8 +143,8 @@ RECOVERY_FEASIBLE_MIN: float = 0.70  # 최소 success_probability; prior는 0.80
 #
 # PRESERVATION(실제 위협 복구는 손대지 않음): SURGICAL / keyed 응답은 INFRA_DESTRUCTIVE_TOOLS
 # 에 없으므로, 이 가드에 절대 걸리지 않는다 —
-#   • backdoor_drop @ uav_ue : nsenter_input_drop '-s <verified attacker> -j DROP' (5762 차단),
-#     이미 two-endpoint verified/DISTINCT/self-DoS resolver로 이중 게이트됨.
+#   • pfcp_firewall @ gcs_proxy / mongo_acl @ web_backend : nsenter_input_drop
+#     '-s <verified attacker> -j DROP', 이미 two-endpoint verified/DISTINCT/self-DoS resolver로 이중 게이트됨.
 #   • send_signed_mode @ gcs_proxy : gcs_proxy를 THROUGH하여 서명 명령을 EMIT함(gcs_c2에
 #     위임); chokepoint를 freeze/disconnect하지 않는다.
 PROTECTED_INFRA_CONTAINERS: frozenset[str] = frozenset({"web_backend", "gcs_proxy"})
@@ -238,15 +235,12 @@ INPUT_SPEC: dict[str, object] = {
         {"role": "attacker", "container": "attacker_ue", "netns": False,
          "cellular_network": "net_cellular", "tun_iface": "tun_srsue",
          "imsi": "001010000000002",                       # ue2.conf (attacker_ue)
-         "verify_anchor": "port_5762_backdoor_attempt", "reach": []},
+         "verify_anchor": "", "reach": []},
         {"role": "web_backend", "container": "web_backend", "netns": True,
          "cellular_network": None, "tun_iface": None,
-         # 5762 LISTEN/ESTAB는 web_backend netns가 아니라 uav_ue netns에 존재(WebProbe도
-         # uav_ue netns로 이전 관측). 따라서 이 role은 더 이상 5762 앵커를 소유하지 않는다. uav_ue의
-         # behavioral bit는 design-lock된 lo_14550_heartbeat_sys1(anti-spoof)로 확정되므로 5762
-         # LISTEN을 uav_ue anchor로 합류시키지 않는다(heartbeat 없이 flip 방지). web8080-native
-         # 앵커가 없으면 fail-closed "" (behaviorally_verified positive-only, False는 무해).
-         "verify_anchor": "", "reach": ["uav5762", "web8080"]},
+         # web8080-native 앵커가 없으면 fail-closed "" (behaviorally_verified positive-only,
+         # False는 무해).
+         "verify_anchor": "", "reach": ["web8080"]},
         {"role": "uav_proxy", "container": "uav_proxy", "netns": False,
          "cellular_network": None, "tun_iface": None,
          "verify_anchor": "signing_drop_log_uav_proxy", "reach": []},
@@ -258,10 +252,10 @@ INPUT_SPEC: dict[str, object] = {
     # uav_proxy 서명 drop-log (§9-B 강제 확인 소스; P3+ operator-go).
     "log_containers": {"smf": "epc_smf", "mme": "epc_mme", "mongo": "epc_mongo",
                        "uav_proxy": "uav_proxy"},
-    # 관심 포트 (command 진입 / telemetry / uav lo cross-tap / backdoor / db / pfcp / web)
+    # 관심 포트 (command 진입 / telemetry / uav lo cross-tap / db / pfcp / web)
     "ports": {"command": 14556, "telemetry": 14560, "uav_lo_telemetry": 14550,
-              "backdoor": 5762, "mongo": 27017, "pfcp": 8805, "web": 8080},
+              "mongo": 27017, "pfcp": 8805, "web": 8080},
     # boot 시 WorldState.reach에 seed되는 닫힌 reach 어휘 (관측 전까지 전부 False)
-    "reach_targets": ["gcs14556", "web8080", "uav5762", "mongo27017", "pfcp8805",
+    "reach_targets": ["gcs14556", "web8080", "mongo27017", "pfcp8805",
                       "net_core", "net_sgi"],
 }
