@@ -1,6 +1,6 @@
-"""Clock protocol (PA-7) — injected. Nodes call clock.now()/clock.sleep() only;
-direct time.* calls in nodes are AST-forbidden (verify_routing). VirtualClock reads
-JSONL ts for deterministic replay.
+"""Clock 프로토콜 (PA-7) — 주입식. 노드는 clock.now()/clock.sleep() 만 호출한다;
+노드 내 직접 time.* 호출은 AST 로 금지된다(verify_routing). VirtualClock 은
+결정론 replay 를 위해 JSONL ts 를 읽는다.
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ class Clock(Protocol):
 
 
 class RealClock:
-    """Production clock. The ONLY place time.* is called for the core."""
+    """Production clock. 코어에서 time.* 가 호출되는 유일한 곳."""
     def now(self) -> float:
         return time.time()
 
@@ -24,7 +24,7 @@ class RealClock:
 
 
 class VirtualClock:
-    """Replay clock: advances from a JSONL ts stream (deterministic)."""
+    """Replay clock: JSONL ts 스트림에서 전진한다(결정론)."""
     def __init__(self, ts_stream: list[float] | None = None, start: float = 0.0):
         self._stream = list(ts_stream or [])
         self._i = 0

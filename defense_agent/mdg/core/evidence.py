@@ -1,20 +1,20 @@
-"""evidence analysis primitives (E7 band->sev/dev + TTL freshness).
+"""증거 분석 프리미티브 (E7 band->sev/dev + TTL freshness).
 
-Two concerns, both pure/deterministic (no I/O, no LLM, no subprocess):
+두 관심사, 모두 순수/결정론적 (no I/O, no LLM, no subprocess):
 
-1. band -> (severity, deviation)  — the E7 mapping. Delegates to ``scoring`` so there is
-   a SINGLE source for the numbers; this is the named accessor the analysis layer uses.
+1. band -> (severity, deviation)  — E7 매핑. 숫자의 단일 소스가 되도록 ``scoring`` 에
+   위임한다; 분석 계층이 사용하는 명명된 접근자다.
 
-2. TTL freshness — classify a SensorEv (or a domain's latest evidence) as fresh vs stale
-   relative to ``evidence_ttl_s`` (config). This is the classifier the present-set
-   exclusion in compute_impact (PP-3) consumes: a domain whose latest evidence is STALE
-   is a dead-collector candidate for exclusion, distinct from an IDLE domain (no evidence
-   -> trust 100, still present). Injecting a stale/dead domain as trust=100 would fail-open
-   and mask impact (PP-3 contract #1); excluding it is the conservative move.
+2. TTL freshness — SensorEv(또는 도메인의 최신 증거)를 ``evidence_ttl_s``(config) 기준으로
+   fresh vs stale 로 분류한다. compute_impact (PP-3) 의 present-set
+   제외가 소비하는 분류기다: 최신 증거가 STALE 인 도메인은
+   제외 대상 dead-collector 후보이며, IDLE 도메인(증거 없음
+   -> trust 100, 여전히 present)과 구분된다. stale/dead 도메인을 trust=100 으로 주입하면
+   fail-open 되어 impact 를 가린다 (PP-3 contract #1); 제외하는 것이 보수적 선택이다.
 
-Live liveness wiring of ``fresh_domains`` into compute_trust/compute_impact is deferred
-(PP-3 잔여: "present-set 제외 구조만 배선, 감지신호 배선은 후속"). This module supplies
-the deterministic classifier that wiring will call.
+``fresh_domains`` 를 compute_trust/compute_impact 로 실 liveness 배선하는 것은 유보 상태다
+(PP-3 잔여: "present-set 제외 구조만 배선, 감지신호 배선은 후속"). 이 모듈은
+그 배선이 호출할 결정론적 분류기를 제공한다.
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ from . import scoring
 # E7 — band -> (severity, deviation)
 # --------------------------------------------------------------------------- #
 def sev_dev(band: str) -> tuple[float, float]:
-    """(severity_factor, deviation) for a band name (E7). Single source = scoring."""
+    """band 이름에 대한 (severity_factor, deviation) (E7). 단일 소스 = scoring."""
     return scoring.severity_factor(band), scoring.deviation(band)
 
 
@@ -37,7 +37,7 @@ def sev_dev(band: str) -> tuple[float, float]:
 # TTL freshness
 # --------------------------------------------------------------------------- #
 def evidence_ttl_s(cfg: dict | None = None) -> float:
-    """Config TTL for evidence freshness. thresholds.yaml override -> defaults fallback."""
+    """증거 신선도용 Config TTL. thresholds.yaml 오버라이드 -> defaults 폴백."""
     if cfg is not None and "evidence_ttl_s" in cfg:
         return float(cfg["evidence_ttl_s"])
     thr = loader.thresholds()
@@ -50,12 +50,12 @@ def evidence_ttl_s(cfg: dict | None = None) -> float:
 
 
 def age(ev_ts: float, now: float) -> float:
-    """Non-negative age in seconds (clamped at 0 for clock skew / ts==0 scaffolding)."""
+    """초 단위 음수 아닌 age (clock skew / ts==0 스캐폴딩에 대해 0 으로 클램프)."""
     return max(0.0, float(now) - float(ev_ts))
 
 
 def is_fresh(ev_ts: float, now: float, ttl: float | None = None) -> bool:
-    """Fresh iff age <= ttl. ts==0 with now==0 (test/scaffold) reads age 0 -> fresh."""
+    """age <= ttl 인 경우에만 fresh. ts==0 이고 now==0 (test/scaffold)은 age 0 -> fresh."""
     ttl = evidence_ttl_s() if ttl is None else float(ttl)
     return age(ev_ts, now) <= ttl
 
@@ -65,7 +65,7 @@ def is_stale(ev_ts: float, now: float, ttl: float | None = None) -> bool:
 
 
 def fresh(evidence: Iterable, now: float, ttl: float | None = None) -> list:
-    """Non-tamper, within-TTL evidence only (provenance gate + freshness, PS-2/PP-3)."""
+    """tamper 아니고 TTL 이내인 증거만 (provenance gate + freshness, PS-2/PP-3)."""
     ttl = evidence_ttl_s() if ttl is None else float(ttl)
     return [e for e in evidence
             if not getattr(e, "tamper", False)
@@ -73,7 +73,7 @@ def fresh(evidence: Iterable, now: float, ttl: float | None = None) -> list:
 
 
 def latest_ts_by_domain(evidence: Iterable) -> dict[str, float]:
-    """Most-recent evidence ts per domain (non-tamper), for staleness classification."""
+    """도메인별 최신 증거 ts (non-tamper), staleness 분류용."""
     out: dict[str, float] = {}
     for e in evidence:
         if getattr(e, "tamper", False):
@@ -88,9 +88,9 @@ def latest_ts_by_domain(evidence: Iterable) -> dict[str, float]:
 
 
 def fresh_domains(evidence: Iterable, now: float, ttl: float | None = None) -> set[str]:
-    """Domains with at least one fresh, non-tamper evidence this window. The deferred
-    present-set liveness wiring (PP-3) intersects trust domains with this set so a
-    dead-collector domain is EXCLUDED rather than read as full marks."""
+    """이번 윈도우에 fresh, non-tamper 증거가 하나 이상 있는 도메인들. 유보된
+    present-set liveness 배선(PP-3)이 trust 도메인을 이 집합과 교집합하여
+    dead-collector 도메인이 만점으로 읽히지 않고 EXCLUDED 되게 한다."""
     ttl = evidence_ttl_s() if ttl is None else float(ttl)
     return {dom for dom, ts in latest_ts_by_domain(evidence).items()
             if is_fresh(ts, now, ttl)}

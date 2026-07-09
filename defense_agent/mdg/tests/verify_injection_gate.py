@@ -1,30 +1,29 @@
 """verify_injection_gate (PS-7 / PS-2, DESIGN_DECISIONS §PS-7 line 334 + 요건매트릭스
-line 477 '신뢰불가 고-severity가 act 미도달') — END-TO-END NEGATIVE TEST.
+line 477 '신뢰불가 고-severity가 act 미도달') — 종단간 NEGATIVE 테스트.
 
-This is the executable injection-gate verifier the locked design names but that was
-otherwise only asserted piecemeal. It threads a FORGED high-severity SensorEv (bad HMAC
--> verified=False / tamper) through the REAL node chain
+이는 잠금 설계가 명명하지만 그 외에는 단편적으로만 assert 되던 실행 가능한
+injection-gate 검증기다. 위조된(bad HMAC -> verified=False / tamper) 고-severity
+SensorEv 를 실제 노드 체인
     sense -> correlate -> compute_trust -> compute_impact -> orient
           -> select_policy -> rank_recovery -> decide -> route_after_decide
-and proves the chain invariant: ``chosen_action is None`` and the decide-edge routes to
-END, so ``act`` is never reached and produces ZERO side effects. It also proves a canary
-STATUSTEXT / injected free-text payload never leaks into ANY response channel.
+에 통과시켜 체인 불변식을 증명한다: ``chosen_action is None`` 이며 decide-edge 가
+END 로 라우팅되어 ``act`` 에 절대 도달하지 않고 부작용 0 을 낸다. 또한 카나리
+STATUSTEXT / 주입된 자유 텍스트 페이로드가 어떤 응답 채널로도 누출되지 않음을 증명한다.
 
-The chain is driven node-by-node (not via a compiled LangGraph) because langgraph is not
-installed in the local host (IMPLEMENTATION_GAPS D-1); the node functions are the same
-pure callables the compiled graph wraps, and edges.route_* are the exact branch functions
-add_conditional_edges binds — so this exercises the identical decision surface.
+체인은 (컴파일된 LangGraph 대신) 노드별로 구동되는데, 이는 로컬 호스트에 langgraph 가
+설치되지 않았기 때문이다(IMPLEMENTATION_GAPS D-1); 노드 함수들은 컴파일 그래프가 감싸는
+동일한 순수 callable 이고, edges.route_* 는 add_conditional_edges 가 바인딩하는 바로 그
+분기 함수다 — 따라서 이는 동일한 결정 표면을 행사한다.
 
-Non-vacuity is guarded three ways:
-  * a POSITIVE control feeds the SAME payload AUTHENTICATED (valid HMAC) and shows it DOES
-    become an actionable incident and routes all the way to ``act`` — so the negative
-    assertions are not trivially always-true;
-  * a value-carry check shows ``SensorEv.value`` IS a genuine leak path when authenticated,
-    so the canary-absence assertion is load-bearing (the forged canary is absent ONLY
-    because the provenance gate discarded the envelope);
-  * a hostile-LLM variant shows that even a maximally tightened orient note (severity_bump=1,
-    the only thing an injection could inflate) cannot manufacture an action without a
-    provenance-passed incident.
+비공허성(non-vacuity)은 세 가지로 보장:
+  * POSITIVE 대조군이 동일 페이로드를 인증된(valid HMAC) 상태로 공급해 실제로
+    조치 가능한 인시던트가 되어 ``act`` 까지 라우팅됨을 보인다 — 따라서 negative
+    assert 가 자명하게 항상-참이 아니다;
+  * value-carry 검사가 인증 시 ``SensorEv.value`` 가 진짜 누출 경로임을 보여,
+    카나리 부재 assert 가 하중을 담당한다(위조 카나리는 오직 provenance gate 가
+    엔벨로프를 폐기했기 때문에 부재);
+  * hostile-LLM 변형이, 최대로 강화된 orient note(severity_bump=1, 주입이 부풀릴 수
+    있는 유일한 것)조차 provenance 통과 인시던트 없이는 조치를 만들어낼 수 없음을 보인다.
 """
 from __future__ import annotations
 
@@ -33,8 +32,8 @@ import os
 import queue
 import sys
 
-# repo root on sys.path so ``python mdg/tests/verify_injection_gate.py`` works standalone
-# (pytest adds it via rootdir; this covers the direct-exec path too).
+# ``python mdg/tests/verify_injection_gate.py`` 가 단독 실행되도록 repo 루트를 sys.path 에
+# (pytest 는 rootdir 로 추가; 이는 직접 실행 경로도 커버).
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from mdg.collector.ingest import Keyring, SensorEnvelope, compute_hmac  # noqa: E402
@@ -54,18 +53,18 @@ from mdg.core.worldstate import WorldState
 from mdg.ingest.verify import IngestVerifier
 from mdg.ledger.intent_ledger import SeqWatermark
 
-# A MAVLink-STATUSTEXT-shaped injection canary the forged envelope smuggles. It is placed
-# in BOTH a free-text ``statustext`` key AND the derived ``value`` field, so that if the
-# provenance gate failed open it WOULD surface in evidence/response channels.
+# 위조 엔벨로프가 밀반입하는 MAVLink-STATUSTEXT 형태의 injection 카나리. 자유 텍스트
+# ``statustext`` 키와 파생 ``value`` 필드 양쪽에 배치하여, provenance gate 가 fail-open
+# 이면 evidence/response 채널에 노출되도록 한다.
 CANARY = "CANARY-STATUSTEXT::LAND_NOW::b7f3-injection"
 
 _KID = "k1"
 _KEY = b"unit-test-ingest-key-not-a-secret"
-ACC = ("ledger", "decisions", "incidents")   # operator.add channels (extend, not replace)
+ACC = ("ledger", "decisions", "incidents")   # operator.add 채널(대체 아닌 확장)
 
 
 # --------------------------------------------------------------------------- #
-# helpers — build authentic / forged envelopes and drive the deterministic chain
+# helpers — 진본/위조 엔벨로프 생성 및 결정론적 체인 구동
 # --------------------------------------------------------------------------- #
 def _keyring() -> Keyring:
     return Keyring(keys={_KID: _KEY})
@@ -79,23 +78,23 @@ def _env(metric: str, source_id: str, *, seq: int = 1, band: str = "danger",
     if value is not None:
         payload["value"] = value
     if statustext is not None:
-        payload["statustext"] = statustext          # free-text (never a SensorEv field)
+        payload["statustext"] = statustext          # 자유 텍스트(SensorEv 필드 절대 아님)
     return SensorEnvelope(payload=payload, source_id=source_id, kid=_KID,
                           seq=seq, ts=0.0, nonce=f"n-{source_id}-{seq}")
 
 
 def _sign(env: SensorEnvelope) -> SensorEnvelope:
-    env.hmac = compute_hmac(env, _KEY)               # authentic
+    env.hmac = compute_hmac(env, _KEY)               # 진본
     return env
 
 
 def _forge(env: SensorEnvelope) -> SensorEnvelope:
-    env.hmac = "0" * 64                              # wrong digest -> HMAC mismatch -> tamper
+    env.hmac = "0" * 64                              # 잘못된 다이제스트 -> HMAC 불일치 -> tamper
     return env
 
 
 def _merge(state: dict, update: dict) -> dict:
-    """Simulate LangGraph channel reducers: ACC channels extend, all else replace."""
+    """LangGraph 채널 리듀서 시뮬레이션: ACC 채널은 확장, 그 외는 대체."""
     for k, v in update.items():
         if k in ACC:
             state[k] = list(state.get(k, [])) + list(v)
@@ -109,9 +108,9 @@ def _base_state(*, role_verified_target: bool = False) -> dict:
     st = dict(initial_state(cfg))
     rv: dict[str, bool] = {}
     if role_verified_target:
-        # legality dynamically verifies role_verified[<action.enforce_at container>] (step 10),
-        # so seed the REAL enforcement-container keys the candidates resolve to (not a fictional
-        # "target" alias). Derived from config -> no pinned testbed literal.
+        # legality 는 role_verified[<action.enforce_at 컨테이너>] 를 동적으로 검증(step 10),
+        # 따라서 후보가 해석되는 실제 enforcement-container 키를 시드한다(가상의
+        # "target" 별칭 아님). config 에서 파생 -> 고정된 testbed 리터럴 없음.
         for _spec in loader.recovery_priors().get("recovery_priors", {}).values():
             _ea = str(_spec.get("enforce_at") or "")
             if _ea:
@@ -121,8 +120,8 @@ def _base_state(*, role_verified_target: bool = False) -> dict:
 
 
 def _drive(state: dict, envs, *, orient_llm=None):
-    """Run sense..decide over ``envs`` (already inbox-ordered) and return
-    (state, route_after_impact, route_after_decide)."""
+    """``envs``(이미 inbox 순서) 에 대해 sense..decide 를 실행하고
+    (state, route_after_impact, route_after_decide) 를 반환."""
     keyring, seqwm = _keyring(), SeqWatermark()
     verifier = IngestVerifier(keyring, seqwm)
     q: queue.Queue = queue.Queue()
@@ -135,9 +134,9 @@ def _drive(state: dict, envs, *, orient_llm=None):
     _merge(state, compute_impact(state))
     r_impact = edges.route_after_impact(state)
 
-    # thread the LLM half UNCONDITIONALLY (관통 검증): even if route_after_impact already
-    # said END (Green tick), force-run the decision half to prove the chain still cannot
-    # manufacture an action from provenance-failed input.
+    # LLM 절반을 무조건 통과시킨다(관통 검증): route_after_impact 가 이미 END(Green tick)
+    # 라 해도, 결정 절반을 강제 실행해 provenance 실패 입력으로부터 체인이 여전히 조치를
+    # 만들어낼 수 없음을 증명한다.
     _merge(state, orient(state, llm=orient_llm))
     _merge(state, select_policy(state))
     _merge(state, rank_recovery(state))
@@ -165,11 +164,11 @@ class _SpyBackend:
 
 
 # --------------------------------------------------------------------------- #
-# CORE NEGATIVE TEST — forged high-severity never reaches act (chain invariant)
+# CORE NEGATIVE TEST — 위조 고-severity 는 act 에 절대 도달하지 않음(체인 불변식)
 # --------------------------------------------------------------------------- #
 def test_forged_high_severity_signal_never_reaches_act():
-    # two forged command-domain DANGER signals (the exact bundle that, authenticated,
-    # drives command distrust>=71 -> criticality floor -> Red -> routes to orient/act)
+    # 두 개의 위조 command-domain DANGER 신호(인증되면 command distrust>=71 ->
+    # criticality 하한 -> Red -> orient/act 로 라우팅하는 바로 그 번들)
     forged = [
         _forge(_env("Unauthorized_Command", "col_gcs", domain="command",
                     value=CANARY, statustext=CANARY)),
@@ -178,24 +177,24 @@ def test_forged_high_severity_signal_never_reaches_act():
     ]
     state, r_impact, r_decide = _drive(_base_state(), forged)
 
-    # 1) provenance gate at sense: forged envelopes discarded, NOT merged as evidence
+    # 1) sense 의 provenance gate: 위조 엔벨로프 폐기, evidence 로 병합 안 됨
     assert state["evidence"] == [], "forged evidence must be fail-closed discarded (PS-2)"
     tamper = [i for i in state["incidents"] if i.kind == "tamper"]
     assert len(tamper) == 2, "each forged envelope must surface as a tamper Incident"
 
-    # 2) no provenance-passed evidence -> no correlate incident, all domains idle (trust 100)
+    # 2) provenance 통과 evidence 없음 -> correlate 인시던트 없음, 모든 도메인 유휴(trust 100)
     non_tamper = [i for i in state["incidents"] if i.kind != "tamper"]
     assert non_tamper == [], "no actionable incident may be derived from forged input"
     assert state["impact"].band == "Green", "forged danger must not raise impact"
     assert r_impact == edges.END, "Green tick ends before the LLM half (no orient in-graph)"
 
-    # 3) chain invariant: no legal candidate, no chosen action, decide-edge -> END
+    # 3) 체인 불변식: legal 후보 없음, 선택 조치 없음, decide-edge -> END
     assert state["legal_actions"] == [], "tamper/absent incidents yield no legal candidate"
     assert state["chosen_action"] is None, "no action may be selected from forged input"
     assert state["chosen_action_risk"] == "LOW"
     assert r_decide == edges.END, "decide-edge must route to END, NOT act/escalate"
 
-    # 4) act is side-effect-0 even if invoked directly with this state
+    # 4) 이 state 로 직접 호출해도 act 는 부작용 0
     spy_ledger, spy_backend = _SpyLedger(), _SpyBackend()
     out = act(state, backend=spy_backend, ledger=spy_ledger)
     assert out == {}, "act must early-return with zero side effects (chosen_action None)"
@@ -203,7 +202,7 @@ def test_forged_high_severity_signal_never_reaches_act():
 
 
 # --------------------------------------------------------------------------- #
-# CANARY — injected STATUSTEXT / free-text never enters any response channel
+# CANARY — 주입된 STATUSTEXT / 자유 텍스트는 어떤 응답 채널에도 진입하지 않음
 # --------------------------------------------------------------------------- #
 def test_canary_statustext_absent_from_every_response_channel():
     forged = [
@@ -236,14 +235,14 @@ def test_canary_statustext_absent_from_every_response_channel():
     }
     blob = json.dumps(_dump(channels), default=str, ensure_ascii=False)
     assert CANARY not in blob, "canary STATUSTEXT must not leak into any response channel"
-    # applied response rules on the world must be empty (no enforcement ever ran)
+    # 월드에 적용된 응답 규칙은 비어 있어야 함(집행이 한 번도 실행 안 됨)
     assert state["worldstate"].applied == {}
 
 
 def test_value_field_is_a_real_leak_path_so_canary_check_is_load_bearing():
-    """Proves the canary-absence assertion is NOT vacuous: an AUTHENTIC envelope's
-    ``value`` DOES carry into SensorEv (so a fail-open gate WOULD surface the canary),
-    while a free-text ``statustext`` key is dropped by envelope_to_ev (PS-7 layer 2)."""
+    """카나리 부재 assert 가 공허하지 않음을 증명: 진본 엔벨로프의 ``value`` 는
+    SensorEv 로 전달되며(따라서 fail-open gate 라면 카나리를 노출), 반면 자유 텍스트
+    ``statustext`` 키는 envelope_to_ev 가 폐기한다(PS-7 layer 2)."""
     probe = "CANARY-VALUE-CARRY::x9"
     env = _sign(_env("Unauthorized_Command", "col_gcs", domain="command",
                      value=probe, statustext=probe))
@@ -251,13 +250,13 @@ def test_value_field_is_a_real_leak_path_so_canary_check_is_load_bearing():
     ok, reason, ev = verifier(env)
     assert ok and ev.verified and not ev.tamper, f"authentic envelope must verify: {reason}"
     assert ev.value == probe, "value IS a carry path -> forged canary-absence is meaningful"
-    # the free-text statustext key never becomes a SensorEv field (no attribute for it)
+    # 자유 텍스트 statustext 키는 SensorEv 필드가 절대 되지 않음(해당 속성 없음)
     assert not hasattr(ev, "statustext")
     assert probe not in (ev.metric, ev.channel, str(ev.domain or ""))
 
 
 # --------------------------------------------------------------------------- #
-# POSITIVE CONTROL — the SAME signal, AUTHENTICATED, DOES route to act
+# POSITIVE CONTROL — 동일 신호가 인증되면 act 로 라우팅됨
 # --------------------------------------------------------------------------- #
 def test_authentic_same_signal_would_reach_act():
     authentic = [
@@ -267,16 +266,16 @@ def test_authentic_same_signal_would_reach_act():
     state, r_impact, r_decide = _drive(
         _base_state(role_verified_target=True), authentic)
 
-    # authenticated evidence IS merged and DOES produce actionable incidents
+    # 인증된 evidence 는 병합되고 조치 가능한 인시던트를 생성
     assert len(state["evidence"]) == 2 and all(e.verified for e in state["evidence"])
     assert not any(i.kind == "tamper" for i in state["incidents"])
     assert any(i.kind == "single-signal" for i in state["incidents"])
 
-    # localized command compromise -> criticality floor -> non-Green -> LLM half runs
+    # 국소 command 침해 -> criticality 하한 -> non-Green -> LLM 절반 실행
     assert state["impact"].band == "Red"
     assert r_impact == "orient"
 
-    # ... and the decide-edge routes to act (the exact path the forged input could NOT take)
+    # ... 그리고 decide-edge 는 act 로 라우팅(위조 입력이 취할 수 없던 바로 그 경로)
     assert state["chosen_action"] is not None, "authentic signal selects an action"
     assert state["chosen_action_risk"] == "MED"
     assert state["chosen_action_reversible"] is True
@@ -284,12 +283,12 @@ def test_authentic_same_signal_would_reach_act():
 
 
 # --------------------------------------------------------------------------- #
-# TAMPER-KIND incident is structurally non-actionable (select_policy has no mapping)
+# TAMPER-KIND 인시던트는 구조적으로 조치 불가(select_policy 에 매핑 없음)
 # --------------------------------------------------------------------------- #
 def test_tamper_incident_yields_no_legal_candidate():
     state = _base_state(role_verified_target=True)
-    # inject a tamper incident directly and run only the policy half
-    _merge(state, sense(state, inbox=queue.Queue(), verify=None))   # empty drain (fail-open)
+    # tamper 인시던트를 직접 주입하고 policy 절반만 실행
+    _merge(state, sense(state, inbox=queue.Queue(), verify=None))   # 빈 드레인(fail-open)
     from mdg.core.state import Incident
     _merge(state, {"incidents": [Incident(id="t0", kind="tamper", target="")]})
     _merge(state, select_policy(state))
@@ -297,8 +296,8 @@ def test_tamper_incident_yields_no_legal_candidate():
 
 
 # --------------------------------------------------------------------------- #
-# HOSTILE LLM — a maximally tightened orient note (all an injection could inflate)
-# still cannot manufacture an action without a provenance-passed incident (PS-7 #2)
+# HOSTILE LLM — 최대로 강화된 orient note(주입이 부풀릴 수 있는 전부)조차
+# provenance 통과 인시던트 없이는 조치를 만들어낼 수 없음(PS-7 #2)
 # --------------------------------------------------------------------------- #
 def test_hostile_orient_severity_bump_cannot_manufacture_action():
     hostile = lambda feats: OrientNote(rationale="inflate", severity_bump=1)
@@ -308,8 +307,8 @@ def test_hostile_orient_severity_bump_cannot_manufacture_action():
     ]
     state, _, r_decide = _drive(_base_state(role_verified_target=True), forged,
                                 orient_llm=hostile)
-    # the note tightened the band upward (raise-only), but with NO incident there is still
-    # no candidate, no chosen action, and the decide-edge routes to END.
+    # note 가 band 를 상향(상승 전용) 강화했으나, 인시던트가 없으므로 여전히
+    # 후보 없음, 선택 조치 없음, decide-edge 는 END 로 라우팅.
     assert state["orient_note"].severity_bump == 1
     assert state["legal_actions"] == []
     assert state["chosen_action"] is None
@@ -317,8 +316,8 @@ def test_hostile_orient_severity_bump_cannot_manufacture_action():
 
 
 if __name__ == "__main__":                                    # pragma: no cover
-    # run standalone WITHOUT pytest collection (avoids cwd-dependent rootdir scanning);
-    # every test here uses plain asserts, so direct invocation is faithful.
+    # pytest 수집 없이 단독 실행(cwd 의존적 rootdir 스캔 회피);
+    # 여기의 모든 테스트는 순수 assert 를 쓰므로 직접 호출이 충실하다.
     _fns = [v for k, v in sorted(globals().items())
             if k.startswith("test_") and callable(v)]
     for _fn in _fns:

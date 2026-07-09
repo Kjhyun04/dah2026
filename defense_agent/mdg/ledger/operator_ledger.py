@@ -1,17 +1,17 @@
-"""Operator approval ledger (PS-9 / P4-Q3) — durable, secret-free anti-replay.
+"""Operator 승인 ledger (PS-9 / P4-Q3) — durable, secret-free 재전송 방지.
 
-DECISION (P4-Q3, locked): the signed approval TOKEN (the HMAC output) is NEVER persisted
-(NOT-PERSIST). Persisting a bearer credential only widens the at-rest capture surface and buys
-zero replay defense (replay is stopped by the single-use nonce + short TTL, not by keeping the
-token). What DOES need to survive a crash is the CONSUMED-NONCE set: ``OperatorGate._seen_nonces``
-is an in-memory set, so without durability a reboot re-opens the replay window for a captured,
-still-unexpired token (the same defect PS-6 fixed for seq high-watermarks).
+결정(P4-Q3, 잠금): 서명된 승인 TOKEN(HMAC 출력)은 절대 영속화하지 않는다(NOT-PERSIST). bearer
+자격증명을 영속화하면 at-rest 캡처 표면만 넓히고 replay 방어는 전혀 얻지 못한다(replay 는 token 을
+보관해서가 아니라 single-use nonce + 짧은 TTL 로 차단된다). 크래시를 살아남아야 하는 것은
+CONSUMED-NONCE 집합이다: ``OperatorGate._seen_nonces`` 는 in-memory 집합이라, 영속성이 없으면 재부팅이
+캡처되었으나 아직 만료되지 않은 token 에 대해 replay window 를 재개방한다(PS-6 가 seq high-watermark
+에서 고친 것과 동일한 결함).
 
-So this ledger stores a secret-free ``OperatorApprovalReceipt`` (command-binding metadata +
-lifecycle verdict) and exposes the consumed-nonce set for boot recovery. It holds NO token / hmac
-/ key field — structurally secret-free (PS-3), so ``verify_replay_leak0`` passes by construction.
-It is a SEPARATE durable ledger from the intent ledger (actuation/G3); both are 0600, owner-only,
-non-shared volumes, distinct from the checkpointer (FRAMEWORK §2.2, PS-9 #3).
+그래서 이 ledger 는 secret-free ``OperatorApprovalReceipt``(명령 바인딩 메타데이터 + lifecycle
+verdict)를 저장하고 boot 복구를 위해 consumed-nonce 집합을 노출한다. token / hmac / key 필드를
+전혀 보유하지 않는다 — 구조적으로 secret-free(PS-3)이므로 ``verify_replay_leak0`` 이 구성상 통과한다.
+이는 intent ledger(집행/G3)와 별개의 durable ledger 다; 둘 다 0600, owner-only, 비공유 볼륨이며
+checkpointer 와 구별된다(FRAMEWORK §2.2, PS-9 #3).
 """
 from __future__ import annotations
 
@@ -23,30 +23,30 @@ from typing import Optional
 
 _LOCK = threading.Lock()
 
-# lifecycle verdicts (no token/secret anywhere in the receipt)
+# lifecycle verdict (receipt 어디에도 token/secret 없음)
 _VERDICTS = ("ISSUED", "GRANTED", "DENIED", "EXPIRED", "REPLAY_REJECTED")
 
 
 @dataclass
 class OperatorApprovalReceipt:
-    """Secret-free approval receipt — the command binding + lifecycle, NEVER the token/key."""
+    """secret-free 승인 receipt — 명령 바인딩 + lifecycle, 절대 token/key 아님."""
     decision_id: str
     command_digest: str
     nonce: str
     expiry: float
-    verdict: str = "ISSUED"          # one of _VERDICTS
+    verdict: str = "ISSUED"          # _VERDICTS 중 하나
     kid: str = ""
     issued_ts: float = 0.0
     consumed_ts: Optional[float] = None
-    # NOTE: no ``token`` / ``hmac`` / ``key`` field exists here by design (PS-3, structural).
+    # NOTE: 설계상 ``token`` / ``hmac`` / ``key`` 필드는 여기 존재하지 않는다(PS-3, 구조적).
 
 
 class OperatorLedger:
-    """Append-only JSONL of OperatorApprovalReceipts (0600, owner-only, non-shared volume).
+    """OperatorApprovalReceipt 의 Append-only JSONL (0600, owner-only, 비공유 볼륨).
 
-    Drives durable single-use anti-replay: ``consumed_nonces()`` returns every nonce that reached
-    a consuming verdict, and ``recover_on_boot()`` reloads that set so the gate re-seeds its
-    ``_seen_nonces`` BEFORE the first verify is accepted (order fence, like SeqWatermark).
+    durable single-use 재전송 방지를 구동한다: ``consumed_nonces()`` 는 소비 verdict 에 도달한 모든
+    nonce 를 반환하고, ``recover_on_boot()`` 는 그 집합을 재로드해 첫 verify 가 accept 되기 전에
+    게이트가 ``_seen_nonces`` 를 재시드하게 한다(SeqWatermark 처럼 순서 fence).
     """
 
     _CONSUMED = frozenset({"GRANTED", "EXPIRED", "REPLAY_REJECTED"})
@@ -58,7 +58,7 @@ class OperatorLedger:
     def record(self, *, decision_id: str, command_digest: str, nonce: str, expiry: float,
                verdict: str = "ISSUED", kid: str = "", issued_ts: float = 0.0,
                consumed_ts: Optional[float] = None) -> OperatorApprovalReceipt:
-        """Append a secret-free receipt (fsync). Rejects an unknown verdict (fail-closed)."""
+        """secret-free receipt 추가(fsync). 알 수 없는 verdict 는 거부(fail-closed)."""
         if verdict not in _VERDICTS:
             raise ValueError(f"unknown operator receipt verdict: {verdict!r}")
         rcpt = OperatorApprovalReceipt(
@@ -71,7 +71,7 @@ class OperatorLedger:
                 fh.write(line + "\n")
                 fh.flush()
                 os.fsync(fh.fileno())
-            # tighten perms owner-only (best-effort; no-op where unsupported, e.g. Windows).
+            # 권한을 owner-only 로 조임(best-effort; 미지원 환경, 예: Windows 에서는 no-op).
             try:
                 os.chmod(self.path, 0o600)
             except OSError:
@@ -90,10 +90,10 @@ class OperatorLedger:
         return out
 
     def consumed_nonces(self) -> set[str]:
-        """Every nonce that reached a consuming verdict (single-use is durable across reboot)."""
+        """소비 verdict 에 도달한 모든 nonce(single-use 는 재부팅을 가로질러 durable)."""
         return {r.nonce for r in self.scan() if r.verdict in self._CONSUMED and r.nonce}
 
     def recover_on_boot(self) -> set[str]:
-        """Reload the consumed-nonce set (call BEFORE the gate accepts any verify). Returns the
-        set so ``OperatorGate(ledger=...)`` can seed ``_seen_nonces`` at construction."""
+        """consumed-nonce 집합 재로드(게이트가 어떤 verify 든 accept 하기 전에 호출). ``OperatorGate
+        (ledger=...)`` 가 생성 시 ``_seen_nonces`` 를 시드할 수 있도록 그 집합을 반환한다."""
         return self.consumed_nonces()

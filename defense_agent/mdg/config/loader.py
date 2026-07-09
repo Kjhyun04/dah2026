@@ -1,26 +1,24 @@
-"""Config loader. Prefers the canonical *.yaml files (pyyaml). Falls back to the
-Python-native constants in ``defaults.py`` when pyyaml is unavailable so the
-deterministic pipeline and tests run with zero extra deps.
+"""Config 로더. 정규 *.yaml 파일(pyyaml)을 우선한다. pyyaml 이 없으면 ``defaults.py`` 의
+Python 네이티브 상수로 폴백하여 결정론 파이프라인과 테스트가 추가 의존성 없이 동작한다.
 
-Q-D-4 DOCUMENTATION-ONLY — which keys are ACTUALLY live-read via this loader:
-The deterministic SCORING pipeline does NOT read scoring calibration back through
-``thresholds()``. It imports the ``defaults.py`` constants DIRECTLY (by design, to
-keep the determinism path off the YAML surface): scoring.py reads
-D.SEVERITY_FACTOR/BAND_MAP/TRUST_BANDS/IMPACT_BANDS/LOW_CONFIDENCE_THRESHOLD/
-IMPACT_BAND_ORDER; compute_trust.py D.METRICS/D.DOMAINS; correlate.py
-D.CORRELATION_RULES; intent_ledger.py D.SEQ_WINDOW; ingest/verify.py D.TS_SKEW_S;
-driver.py D.DRIVER_BUDGETS; bundle.py D.DEBOUNCE_*/DEESCALATION_*. Therefore the
+Q-D-4 문서 전용 — 이 로더를 통해 실제로 live-read 되는 키는 무엇인가:
+결정론 SCORING 파이프라인은 ``thresholds()`` 를 거쳐 스코어링 보정값을 다시 읽지 않는다.
+``defaults.py`` 상수를 직접 import 한다(설계상, 결정론 경로를 YAML 표면에서 떼어놓기 위함):
+scoring.py 는 D.SEVERITY_FACTOR/BAND_MAP/TRUST_BANDS/IMPACT_BANDS/LOW_CONFIDENCE_THRESHOLD/
+IMPACT_BAND_ORDER 를, compute_trust.py 는 D.METRICS/D.DOMAINS 를, correlate.py 는
+D.CORRELATION_RULES 를, intent_ledger.py 는 D.SEQ_WINDOW 를, ingest/verify.py 는 D.TS_SKEW_S 를,
+driver.py 는 D.DRIVER_BUDGETS 를, bundle.py 는 D.DEBOUNCE_*/DEESCALATION_* 를 읽는다. 따라서
+``thresholds()`` 페이로드 안의
 ``severity_factor/band_map/metrics/trust_bands/impact_bands/low_confidence_threshold/
-seq_window/ts_skew_s/correlation_rules/driver`` keys in the ``thresholds()`` payload
-(and the matching scoring section of thresholds.yaml) are DEAD for scoring — editing
-them does NOT recalibrate scoring.
-The keys that ARE live-consumed via this loader:
+seq_window/ts_skew_s/correlation_rules/driver`` 키(및 thresholds.yaml 의 대응 scoring 섹션)는
+스코어링 관점에서 DEAD 이다 — 이들을 편집해도 스코어링이 재보정되지 않는다.
+이 로더를 통해 실제로 live-consume 되는 키:
   - thresholds(): rtt_baseline_ms/rtt_mdev_ms (recon.py), evidence_ttl_s (evidence.py),
     llm_response_max_bytes (llm/client.py)
-  - mission_profile(): config_version and mission scalars (below)
-  - recovery_priors(), models(), input_spec(): consumed by recovery/llm/recon
-Do NOT wire the loader into the scoring path to "fix" this — that would move calibration
-onto the YAML surface and change the determinism path (불변식1.).
+  - mission_profile(): config_version 및 mission 스칼라(아래)
+  - recovery_priors(), models(), input_spec(): recovery/llm/recon 에서 소비
+이를 "고치려고" 로더를 스코어링 경로에 배선하지 마라 — 그러면 보정값이 YAML 표면으로 옮겨가
+결정론 경로가 바뀐다(불변식1.).
 """
 from __future__ import annotations
 
@@ -49,14 +47,13 @@ def thresholds() -> dict:
     y = _try_yaml("thresholds.yaml")
     if y:
         return y
-    # Q-D-4 NOTE: this pyyaml-absent fallback is INTENTIONALLY a SUBSET (non-mirrored) of
-    # thresholds.yaml — it omits keys such as ``evidence_ttl_s``, ``llm_response_max_bytes``,
-    # ``debounce`` and ``deescalation``. That omission is HARMLESS by construction: every
-    # consumer reads via ``.get(key, <default>)`` or falls back to a ``defaults.py`` constant
-    # when the key is absent (evidence.evidence_ttl_s -> D.TIME_WINDOWS; llm.client
-    # llm_response_max_bytes -> _DEFAULT_MAX_BYTES; recon rtt_* -> literal defaults). So the
-    # non-mirror changes no scoring/routing scalar. Do NOT add numeric keys here to "fix" the
-    # mirror — that would introduce a value on the fallback path and is a calibration change.
+    # Q-D-4 주의: 이 pyyaml-부재 폴백은 의도적으로 thresholds.yaml 의 SUBSET(비-미러)이다 —
+    # ``evidence_ttl_s``, ``llm_response_max_bytes``, ``debounce``, ``deescalation`` 같은 키를 생략한다.
+    # 이 생략은 구조적으로 HARMLESS 하다: 모든 소비자는 ``.get(key, <default>)`` 로 읽거나
+    # 키가 없으면 ``defaults.py`` 상수로 폴백한다(evidence.evidence_ttl_s -> D.TIME_WINDOWS; llm.client
+    # llm_response_max_bytes -> _DEFAULT_MAX_BYTES; recon rtt_* -> 리터럴 기본값). 따라서
+    # 비-미러는 어떤 scoring/routing 스칼라도 바꾸지 않는다. "미러를 고치려고" 여기에 숫자 키를
+    # 추가하지 마라 — 그러면 폴백 경로에 값이 도입되어 보정 변경이 된다.
     return {
         "severity_factor": D.SEVERITY_FACTOR,
         "band_map": D.BAND_MAP,
@@ -76,9 +73,9 @@ def thresholds() -> dict:
 
 @lru_cache(maxsize=1)
 def demo_mode() -> dict:
-    """Phase 2 (PS-7/B3) demo-mode relaxation knobs. thresholds.yaml ``demo_mode`` block ->
-    defaults fallback. The returned values apply ONLY under operator_auto (sandbox demo);
-    production (operator_auto off) NEVER consults them, so the strict posture is unaffected."""
+    """Phase 2 (PS-7/B3) demo-mode 완화 노브. thresholds.yaml ``demo_mode`` 블록 ->
+    defaults 폴백. 반환값은 operator_auto(sandbox demo) 에서만 적용된다;
+    production(operator_auto off)은 절대 참조하지 않으므로 엄격 태세는 영향받지 않는다."""
     thr = thresholds()
     dm = thr.get("demo_mode") if isinstance(thr, dict) else None
     if isinstance(dm, dict):
@@ -95,14 +92,14 @@ def mission_profile() -> dict:
     return _try_yaml("mission_profile.yaml") or D.MISSION_PROFILE
 
 
-# Q-D-4 DOCUMENTATION-ONLY: this accessor + defaults.CHANNEL_QUALITY + channel_quality.yaml
-# (channel_quality/tool_channel/decay) have NO live consumer within mdg (grep-confirmed:
-# channel_quality() is never called, CHANNEL_QUALITY is never read). Per-evidence confidence
-# comes from the ingest payload — collector/ingest.py sets SensorEv.confidence from
-# p.get('confidence', 0.9), and compute_trust.py derives avg_q from those per-evidence values,
-# NEVER from these channel priors. The YAML header claiming it feeds "compute_confidence의
-# avg_quality" is inaccurate. Kept as a harmless orphan (repo convention: SEQ_SKEW_S,
-# score_weights); do NOT delete or retune these priors expecting a scoring effect.
+# Q-D-4 문서 전용: 이 accessor + defaults.CHANNEL_QUALITY + channel_quality.yaml
+# (channel_quality/tool_channel/decay)은 mdg 내부에 live 소비자가 없다(grep 확인:
+# channel_quality() 는 호출되지 않고 CHANNEL_QUALITY 는 읽히지 않는다). 증거별 confidence 는
+# ingest 페이로드에서 온다 — collector/ingest.py 가 SensorEv.confidence 를
+# p.get('confidence', 0.9) 로 설정하고, compute_trust.py 는 그 증거별 값에서 avg_q 를 유도한다,
+# 절대 이 채널 prior 로부터가 아니다. 그것이 "compute_confidence의
+# avg_quality" 를 공급한다는 YAML 헤더 주장은 부정확하다. 무해한 orphan 으로 보존(repo 관례: SEQ_SKEW_S,
+# score_weights); 스코어링 효과를 기대하고 이 prior 를 삭제하거나 재조정하지 마라.
 @lru_cache(maxsize=1)
 def channel_quality() -> dict:
     y = _try_yaml("channel_quality.yaml")
@@ -122,14 +119,14 @@ def recovery_priors() -> dict:
 
 
 def _apply_model_env(cfg: dict) -> dict:
-    """.env overlay so supervisors set model slug + key-env without editing models.yaml.
-    All optional; unset => yaml unchanged. Only the env NAME lands in the dict — never the
-    key VALUE (PS-3: the value is resolved later in client.resolve_api_key from os.environ).
-      MDG_LLM_API_KEY     — key VALUE (provider-agnostic). Its presence self-points
-                            api_key_env at itself so has_api_key()/client find it.
-      MDG_LLM_API_KEY_ENV — override the api_key_env NAME (provider-conventional keys); wins.
-      MDG_ORIENT_MODEL / MDG_DECIDE_MODEL       — primary slug per role (openrouter/…, anthropic/…, openai/…, gemini/…).
-      MDG_ORIENT_FALLBACK / MDG_DECIDE_FALLBACK — comma list; '' clears (same-provider slug when switching provider).
+    """.env 오버레이로 supervisor 가 models.yaml 을 편집하지 않고 model slug + key-env 를 설정한다.
+    전부 선택적; 미설정 => yaml 불변. dict 에는 env NAME 만 들어간다 — key VALUE 는 절대 아니다
+    (PS-3: 값은 나중에 client.resolve_api_key 가 os.environ 에서 해석한다).
+      MDG_LLM_API_KEY     — key VALUE(provider 무관). 존재하면 api_key_env 를
+                            자기 자신으로 가리켜 has_api_key()/client 가 찾는다.
+      MDG_LLM_API_KEY_ENV — api_key_env NAME 오버라이드(provider 관례 키); 우선한다.
+      MDG_ORIENT_MODEL / MDG_DECIDE_MODEL       — 역할별 primary slug (openrouter/…, anthropic/…, openai/…, gemini/…).
+      MDG_ORIENT_FALLBACK / MDG_DECIDE_FALLBACK — 콤마 리스트; '' 는 비운다(provider 전환 시 동일 provider slug).
     """
     if not isinstance(cfg, dict):
         return cfg
@@ -161,7 +158,7 @@ def models() -> dict:
 
 @lru_cache(maxsize=1)
 def input_spec() -> dict:
-    """DefInputSpec source (P2). YAML override -> defaults.INPUT_SPEC fallback."""
+    """DefInputSpec 소스 (P2). YAML 오버라이드 -> defaults.INPUT_SPEC 폴백."""
     return _try_yaml("input_spec.yaml") or D.INPUT_SPEC
 
 

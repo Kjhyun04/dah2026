@@ -1,29 +1,28 @@
-"""honest.py (P6 · H-K honesty · V3 §8) — the campaign's honesty layer.
+"""honest.py (P6 · H-K 정직성 · V3 §8) — 캠페인의 정직성 레이어.
 
-The defense agent must NEVER present its posture as ground truth. This module is the
-single source of the honest disclosures the E2E campaign and the report surface:
+방어 에이전트는 자신의 posture를 지상진실로 결코 제시해선 안 된다. 이 모듈은 E2E 캠페인과
+보고서가 드러내는 정직한 공개의 단일 원천이다:
 
-  * V4 (ARIA key-forgery) is UNDETECTABLE — a valid-signature forged command has no
-    per-packet success log (A-2), so it can only be CONTAINED, never detected.
-  * The 5762 backdoor command ACTUATION is BLIND — WebProbe is ss-only/pool=1 and the
-    5762 vantage is D-2 un-wired, so only the ESTAB socket state is observed, never the
-    unauthenticated command that rides it.
-  * Impact is MISSION-WEIGHTED — a compensatory weighted mean can dilute a single
-    safety-critical domain; the criticality floor (71/45, band-cut-derived, P3-Q4)
-    corrects that, but the weights are config and are operator-tunable.
-  * RESPONSE EFFICACY is UNVERIFIED for 4 of the 6 attacks — only the telemetry
-    cross-tap (D-1) and the PFCP counter diff (B-1) are live-grounded observations; the
-    inter-container nsenter DROP / docker pause efficacy is unmeasured (C-1) and stays
-    GATE2 / operator-go. Detection observation != response efficacy.
-  * Every response carries a BLAST RADIUS — a mis-targeted DROP would self-DoS an ally
-    (PS-7). The dispatch is fail-closed inert-DRY when the target is not a VERIFIED
-    binding, so live actuation never fires from an unverified selector.
+  * V4 (ARIA 키위조)는 탐지 불가 — 유효 서명 위조 명령은 per-packet 성공 로그가 없으므로
+    (A-2) 봉쇄(CONTAIN)만 가능하고 탐지는 결코 불가하다.
+  * 5762 백도어 명령 ACTUATION은 blind — WebProbe는 ss-only/pool=1이고 5762 vantage는
+    D-2 미배선이라, ESTAB 소켓 상태만 관측되고 그 위로 흐르는 무인증 명령은 결코 관측되지
+    않는다.
+  * Impact는 MISSION-WEIGHTED — 보상적 가중평균은 단일 안전-핵심 도메인을 희석할 수 있다;
+    criticality floor(71/45, 밴드컷 파생, P3-Q4)가 이를 교정하나, weight는 config이며
+    operator가 튜닝 가능하다.
+  * 대응 효력은 6공격 중 4공격에서 미검증 — telemetry cross-tap(D-1)과 PFCP counter
+    diff(B-1)만 라이브 지상근거 관측이다; 컨테이너 간 nsenter DROP / docker pause 효력은
+    미측정(C-1)이며 GATE2 / operator-go로 유지된다. 탐지 관측 != 대응 효력.
+  * 모든 대응은 BLAST RADIUS를 수반한다 — 오조준 DROP은 아군을 self-DoS시킨다
+    (PS-7). 타깃이 VERIFIED 바인딩이 아니면 dispatch는 fail-closed inert-DRY이므로, 라이브
+    actuation은 미검증 셀렉터에서 결코 발화하지 않는다.
 
-These are DISCLOSURES, not bugs: the architecture is deliberately conservative
+이들은 버그가 아니라 공개다: 아키텍처는 의도적으로 보수적이다
 (inert-DRY, tri-state signing, agent≠truth Verifier). ``banner`` / ``honest_note`` /
-``for_chapter`` feed them into the campaign result and the 6-chapter report (artifacts.py).
+``for_chapter``가 이를 캠페인 결과와 6장 보고서(artifacts.py)에 공급한다.
 
-Pure module: no I/O, no testbed, no core import — safe to import anywhere.
+순수 모듈: I/O 없음, testbed 없음, core import 없음 — 어디서든 안전하게 import 가능.
 """
 from __future__ import annotations
 
@@ -39,21 +38,21 @@ __all__ = [
 
 @dataclass(frozen=True)
 class HonestLimitation:
-    """One disclosed limitation of the defense agent (evidence-cited, chapter-mapped)."""
+    """방어 에이전트의 공개된 한계 하나 (근거 인용·章 매핑)."""
     key: str
     title: str
     severity: str                       # "blind" | "unverified" | "structural" | "advisory"
     summary: str
-    evidence: list[str] = field(default_factory=list)   # doc/live refs (A-2 / B-1 / C-1 / D-1 …)
-    report_chapter: int = 6             # which of the 6 report chapters surfaces it
-    blast_radius: str = ""              # who/what a mis-fire would affect (self-DoS scope)
+    evidence: list[str] = field(default_factory=list)   # doc/live 참조 (A-2 / B-1 / C-1 / D-1 …)
+    report_chapter: int = 6             # 6개 보고서 章 중 어디에 드러나는지
+    blast_radius: str = ""              # 오발화가 영향을 미칠 대상 (self-DoS 범위)
 
     def to_dict(self) -> dict:
         return asdict(self)
 
 
 # --------------------------------------------------------------------------- #
-# The disclosed-limitations registry (single source of truth for the report).
+# 공개 한계 레지스트리 (보고서의 단일 진실원).
 # --------------------------------------------------------------------------- #
 HONEST_LIMITATIONS: list[HonestLimitation] = [
     HonestLimitation(
@@ -134,12 +133,12 @@ HONEST_LIMITATIONS: list[HonestLimitation] = [
 LIMITATION_INDEX: dict[str, HonestLimitation] = {h.key: h for h in HONEST_LIMITATIONS}
 
 
-# per-attack honest-key hints: which disclosures a given attack surfaces. The
-# campaign runner attaches these to each AttackOutcome so the report cross-links.
+# 공격별 honest-key 힌트: 주어진 공격이 어떤 공개를 드러내는지. 캠페인 러너가 이를 각
+# AttackOutcome에 붙여 보고서가 상호 링크하게 한다.
 _ATTACK_HONEST: dict[str, list[str]] = {
     "A1_command_hijack_cr01": ["UNVERIFIED_RESPONSE_EFFICACY", "PORT_5762_BLIND",
                                "BLAST_RADIUS_SELF_DOS", "MISSION_WEIGHTED_DILUTION"],
-    "A2_pfcp_teardown": ["BLAST_RADIUS_SELF_DOS"],           # PFCP diff is verified detection
+    "A2_pfcp_teardown": ["BLAST_RADIUS_SELF_DOS"],           # PFCP diff는 검증된 탐지
     "A3_unauth_command": ["UNVERIFIED_RESPONSE_EFFICACY", "V4_KEY_FORGERY_UNDETECTABLE",
                           "BLAST_RADIUS_SELF_DOS"],
     "A4_5762_backdoor": ["PORT_5762_BLIND", "UNVERIFIED_RESPONSE_EFFICACY",
@@ -150,15 +149,15 @@ _ATTACK_HONEST: dict[str, list[str]] = {
 
 
 def attack_honest_keys(attack_id: str) -> list[str]:
-    """Honest-limitation keys an attack surfaces (empty if none registered)."""
+    """공격이 드러내는 정직-한계 키 (등록된 게 없으면 빈 리스트)."""
     return list(_ATTACK_HONEST.get(attack_id, []))
 
 
 # --------------------------------------------------------------------------- #
-# Banners / notes
+# 배너 / 노트
 # --------------------------------------------------------------------------- #
 def campaign_disclaimer() -> str:
-    """The single-line campaign honesty banner pinned at the top of the report."""
+    """보고서 최상단에 고정되는 한 줄 캠페인 정직성 배너."""
     return (
         "이 캠페인은 DRY(operator-go 유보) — 라이브 상태변경 0. 탐지는 관측근거 위에서, "
         "대응은 fail-closed inert-DRY로 계획까지만 실행된다. 독립 Verifier(별 프로세스, "
@@ -168,7 +167,7 @@ def campaign_disclaimer() -> str:
 
 
 def banner() -> dict:
-    """Structured honesty banner for the campaign result / report header (H-K)."""
+    """캠페인 결과 / 보고서 헤더용 구조화된 정직성 배너 (H-K)."""
     return {
         "text": campaign_disclaimer(),
         "trust_root": "mdg.verifier (out-of-graph, replay-only, deterministic)",
@@ -181,7 +180,7 @@ def banner() -> dict:
 
 
 def honest_note(key: str) -> dict:
-    """One disclosed limitation as a dict (for embedding in a result/note). KeyError-safe."""
+    """공개된 한계 하나를 dict로 (결과/노트 임베딩용). KeyError-safe."""
     lim = LIMITATION_INDEX.get(key)
     if lim is None:
         return {"key": key, "title": "(unknown limitation)", "severity": "unknown",
@@ -190,5 +189,5 @@ def honest_note(key: str) -> dict:
 
 
 def for_chapter(chapter: int) -> list[dict]:
-    """All disclosed limitations whose report_chapter == ``chapter`` (report mapping)."""
+    """report_chapter == ``chapter``인 모든 공개 한계 (보고서 매핑)."""
     return [h.to_dict() for h in HONEST_LIMITATIONS if h.report_chapter == chapter]

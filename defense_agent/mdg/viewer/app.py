@@ -1,33 +1,32 @@
-"""app.py (V3 §8 · PS-8 · H-K) — FastAPI 3-panel replay Viewer.
+"""app.py (V3 §8 · PS-8 · H-K) — FastAPI 3패널 replay Viewer.
 
-Three panels (V3 §8):
-  - 동작 (action)       : the agent's decision timeline, from run.jsonl (decisions channel)
-  - 통신 (communication): 14560 downlink telemetry + uav_ue lo:14550 cross-tap heartbeats
-  - 검증 (verification) : the INDEPENDENT Verifier's per-tick truth, side-by-side with the
-                          agent's decision — the *agent ≠ truth* comparison (H-K)
+3개 패널 (V3 §8):
+  - 동작 (action)       : 에이전트의 결정 타임라인, run.jsonl 에서(decisions 채널)
+  - 통신 (communication): 14560 downlink 텔레메트리 + uav_ue lo:14550 크로스탭 하트비트
+  - 검증 (verification) : 독립(INDEPENDENT) Verifier 의 per-tick 진실을, 에이전트의 결정과
+                          나란히 배치 — *에이전트 ≠ 진실* 비교 (H-K)
 
-UI (2026-07): the alarming top banner is removed. The agent≠truth semantics survive as
-compact header stat chips (신뢰근원 trust_root + 불일치 count) — the Verifier (a separate
-trust root) stays authoritative for link health without a red warning bar. The per-tick
-timeline is grouped into collapsible batches of 10 ticks (newest auto-expanded, expand-state
-preserved across the 3s refresh) and risk-colored (Red=위험 / Yellow=주의 / Green=평시;
-agent≠truth divergence flagged red) for at-a-glance triage.
+UI (2026-07): 경보성 상단 배너는 제거됨. 에이전트≠진실 의미는 콤팩트한 헤더 stat 칩으로 존치
+(신뢰근원 trust_root + 불일치 count) — Verifier(별도 신뢰근원)가 붉은 경고 바 없이도 링크 헬스의
+권위로 남는다. per-tick 타임라인은 10틱 단위 접기 가능한 묶음으로 그룹핑되고(최신 자동펼침, 펼침 상태는
+3초 갱신을 넘어 유지) risk 색상 부여(Red=위험 / Yellow=주의 / Green=평시;
+에이전트≠진실 불일치는 붉게 표시)되어 한눈에 트리아지 가능.
 
-Security posture (locked):
-  * the Verifier (a separate trust root) is authoritative for link health; the header shows
-    its trust_root and the agent≠truth divergence count as stat chips (no alarm banner).
-  * record-time redact ONLY (PS-3): the Viewer performs NO display-time redaction. Instead
-    it runs a load-time secret scan and FAILS CLOSED (refuses to serve a tainted file) —
-    honoring "record-time redact, viewer display-time redact 폐기" while staying safe.
-  * read-only: every route is GET; there is no endpoint that mutates state or the testbed.
-  * bearer-token auth (PS-8): constant-time compare; no token => every data route 401s.
-  * loopback / management bind (PS-8): ``serve()`` refuses 0.0.0.0 (attacker UE 10.45.x
-    must never reach the management plane).
+보안 태세 (고정):
+  * Verifier(별도 신뢰근원)가 링크 헬스의 권위이다; 헤더는 그 trust_root 와 에이전트≠진실 불일치 수를
+    stat 칩으로 표시한다(경보 배너 없음).
+  * record-time redact 전용(PS-3): Viewer 는 display-time redaction 을 전혀 하지 않는다. 대신
+    load-time 시크릿 스캔을 돌려 fail-closed 한다(오염된 파일 서빙 거부) —
+    "record-time redact, viewer display-time redact 폐기" 를 지키면서 안전 유지.
+  * read-only: 모든 route 는 GET; 상태나 테스트베드를 변경하는 endpoint 는 없다.
+  * bearer-token 인증(PS-8): constant-time 비교; 토큰 없으면 모든 data route 가 401.
+  * loopback / management bind(PS-8): ``serve()`` 는 0.0.0.0 을 거부(공격자 UE 10.45.x
+    가 관리 평면에 절대 도달하지 못하도록).
 
-FastAPI/uvicorn are imported lazily (like core.graph imports langgraph) so this module —
-and its pure builders (load_panels / scan_secrets) — import and test with zero web deps.
-This module does NOT import mdg.core (it consumes JSONL via replay.play + the standalone
-Verifier), keeping the management plane off the decision path.
+FastAPI/uvicorn 은 lazy import(core.graph 가 langgraph 를 import 하듯) — 그래서 이 모듈과
+그 순수 빌더(load_panels / scan_secrets)는 web 의존성 없이 import·테스트된다.
+이 모듈은 mdg.core 를 import 하지 **않는다**(replay.play + 독립 Verifier 로 JSONL 소비),
+관리 평면을 결정 경로 밖에 유지한다.
 """
 from __future__ import annotations
 
@@ -41,23 +40,23 @@ from mdg.verifier import verifier as V
 
 __all__ = ["load_panels", "scan_secrets", "SecretLeakError", "create_app", "serve"]
 
-# Load-time secret scan (defense-in-depth over record-time redact). If any pattern matches,
-# the file is tainted and the Viewer refuses to serve it (fail-closed) rather than redacting.
-# The pattern list is the shared single source (mdg.redact_patterns) — the same list the
-# record-time scrub uses — so the two boundaries cannot drift. mdg.redact_patterns is a pure,
-# dependency-free module (NOT under mdg.core), so importing it keeps the decision path off
-# the management plane (this module still imports no mdg.core.*).
+# Load-time 시크릿 스캔(record-time redact 위에 얹은 심층방어). 어떤 패턴이라도 매치되면
+# 파일은 오염된 것이고 Viewer 는 redaction 대신 서빙을 거부한다(fail-closed).
+# 패턴 목록은 공유 단일 소스(mdg.redact_patterns) — record-time scrub 이 쓰는 것과 동일한 목록 —
+# 이라 두 경계가 어긋날 수 없다. mdg.redact_patterns 는 순수·의존성 없는 모듈(mdg.core 하위 아님)
+# 이므로, 이를 import 해도 결정 경로를 관리 평면 밖에 유지한다(이 모듈은 여전히 mdg.core.* 를 전혀
+# import 하지 않음).
 
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
 
 class SecretLeakError(RuntimeError):
-    """Raised when a run.jsonl still contains secret material (record-time redact failed)."""
+    """run.jsonl 이 여전히 시크릿 자료를 담고 있을 때 발생(record-time redact 실패)."""
 
 
 def scan_secrets(text: str) -> list[str]:
-    """Return the secret patterns found in ``text`` (empty => clean). Used at load time to
-    fail-closed; the Viewer never redacts at display time (PS-3 contract)."""
+    """``text`` 에서 발견된 시크릿 패턴을 반환(빈 값 => 깨끗함). load time 에 fail-closed
+    하려고 사용; Viewer 는 display time 에 절대 redact 하지 않는다(PS-3 계약)."""
     hits: list[str] = []
     for pat in _SECRET_PATTERNS:
         if pat.search(text):
@@ -135,10 +134,10 @@ def _recovery_band(row: dict) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# Pure panel builders (no web deps) — testable directly
+# 순수 패널 빌더(web 의존성 없음) — 직접 테스트 가능
 # --------------------------------------------------------------------------- #
 def _telemetry_rows(tick: play.TickView) -> list[dict]:
-    """14560/14550 telemetry evidence rows for the communication panel."""
+    """통신 패널용 14560/14550 텔레메트리 증거 행."""
     rows = []
     for ev in tick.evidence or []:
         if not isinstance(ev, dict):
@@ -155,9 +154,9 @@ def _telemetry_rows(tick: play.TickView) -> list[dict]:
 # --------------------------------------------------------------------------- #
 # Phase 7 — 복구 타임라인 + 비행상태 (recovery lifecycle / flight state) builders
 # --------------------------------------------------------------------------- #
-# PRESENTATION ONLY: derived purely from the already-recorded ledger(Intent)/worldstate.applied/
-# view_band transitions + 14560 rel_alt/flight_mode telemetry rows. No re-execution, no testbed,
-# deterministic — reuses the same run.jsonl the 3-panel view consumes (H-J portability pillar).
+# PRESENTATION ONLY: 이미 기록된 ledger(Intent)/worldstate.applied/view_band 전이 + 14560
+# rel_alt/flight_mode 텔레메트리 행에서 순수 파생. 재실행 없음, 테스트베드 없음,
+# 결정론적 — 3패널 뷰가 소비하는 동일 run.jsonl 재사용(H-J 이식성 기둥).
 _FLIGHT_TARGET_ALT = 30.0                       # S2 복귀 목표 고도(m) — 스파크라인 기준선
 _RECOVERY_STEPS = (("detect", "탐지"), ("respond", "대응"),
                    ("enforce", "집행"), ("confirm", "확인"), ("recover", "회복"))
@@ -169,13 +168,13 @@ _SIGNED_STEP_NOTES = {"respond": "operator-select", "enforce": "gcs_c2 위임", 
 
 
 def _is_signed_recovery(tool: str, rule: str) -> bool:
-    """True for the S2 signed-mode physical-return recovery (send_signed_mode / signed_* rule)."""
+    """S2 signed-mode 물리 복귀 복구(send_signed_mode / signed_* rule)이면 True."""
     return tool in _SIGNED_TOOLS or str(rule or "").startswith("signed")
 
 
 def _flight_series(comm_panel: list[dict]) -> list[dict]:
-    """Per-tick flight state (rel_alt/flight_mode) from the 14560 telemetry rows already
-    folded into the communication panel. Ticks with neither metric are omitted."""
+    """이미 통신 패널에 접힌 14560 텔레메트리 행에서 얻은 per-tick 비행 상태
+    (rel_alt/flight_mode). 두 metric 모두 없는 틱은 생략된다."""
     series: list[dict] = []
     for c in comm_panel:
         alt = None
@@ -196,17 +195,17 @@ def _flight_series(comm_panel: list[dict]) -> list[dict]:
 
 
 def _recovery_events(ticks: list, band_by_tick: dict, flight: list[dict]) -> list[dict]:
-    """Group ledger(Intent) + worldstate.applied[rule].confirmed + detection-band transitions into
-    per-incident recovery lifecycles: 탐지 -> 대응 -> 집행 -> 확인 -> 회복. One event per recovery ``rule``.
+    """ledger(Intent) + worldstate.applied[rule].confirmed + 탐지밴드 전이를 사건별 복구
+    lifecycle 로 묶는다: 탐지 -> 대응 -> 집행 -> 확인 -> 회복. 복구 ``rule`` 당 이벤트 1개.
 
-    ``band_by_tick`` here is the recovery detection band (engine impact_band / incident presence,
-    built by ``_recovery_band``), NOT the standing-filtered view_band — so a command-hijack /
-    5762-LAND whose incident members are STANDING config metrics still shows an attack band.
+    여기서 ``band_by_tick`` 은 복구 탐지밴드(엔진 impact_band / 사건 존재, ``_recovery_band`` 가
+    구성)이며, 상시조건을 걷어낸 view_band 가 **아니다** — 그래서 사건 멤버가 상시(STANDING) config
+    지표인 command-hijack / 5762-LAND 도 여전히 공격밴드를 보인다.
 
-    detect = first non-Green tick (attack visible); respond = first ledger Intent for the rule;
-    enforce = first EXECUTED Intent (operator_gate falsy — an operator_auto-widened OPER tool
-    executes here); confirm = first tick worldstate.applied[rule].confirmed; recover = first Green
-    tick after enforcement (band returned to 평시). Pure/deterministic."""
+    detect = 첫 non-Green 틱(공격 가시화); respond = 해당 rule 의 첫 ledger Intent;
+    enforce = 첫 실행된(EXECUTED) Intent(operator_gate falsy — operator_auto 로 넓혀진 OPER 도구가
+    여기서 실행됨); confirm = 첫 worldstate.applied[rule].confirmed 틱; recover = 집행 이후 첫 Green
+    틱(밴드가 평시로 복귀). 순수/결정론적."""
     alt_by_tick = {f["tick"]: f["rel_alt"] for f in flight if f.get("rel_alt") is not None}
     detect_global = None
     for t in ticks:
@@ -270,11 +269,11 @@ def _recovery_events(ticks: list, band_by_tick: dict, flight: list[dict]) -> lis
         confirm_tick = ev["confirm_tick"]
         enforced = enforce_tick is not None
         confirmed = confirm_tick is not None
-        # detection = earliest visible attack tick, but never after this event first appeared
+        # detection = 가장 이른 가시 공격 틱, 단 이 이벤트가 처음 등장한 이후로는 절대 늦어지지 않음
         detect_tick = detect_global
         if detect_tick is None or (first_tick is not None and detect_tick > first_tick):
             detect_tick = first_tick
-        # recovery = first Green tick after enforcement (band returned to 평시)
+        # recovery = 집행 이후 첫 Green 틱(밴드가 평시로 복귀)
         recover_tick = None
         base = enforce_tick if enforce_tick is not None else first_tick
         if base is not None:
@@ -326,10 +325,10 @@ def _recovery_events(ticks: list, band_by_tick: dict, flight: list[dict]) -> lis
 
 
 def load_panels(run_path: str) -> dict:
-    """Build the full 3-panel view model from ``run.jsonl`` (+ independent Verifier truth).
+    """``run.jsonl`` (+ 독립 Verifier 진실)에서 전체 3패널 뷰 모델을 구성한다.
 
-    Fail-closed on any residual secret (record-time redact contract). Pure: no web deps,
-    no testbed, deterministic — the portability pillar (H-J)."""
+    잔여 시크릿이 있으면 fail-closed(record-time redact 계약). 순수: web 의존성 없음,
+    테스트베드 없음, 결정론적 — 이식성 기둥(H-J)."""
     with open(run_path, "r", encoding="utf-8") as fh:
         raw = fh.read()
     hits = scan_secrets(raw)
@@ -340,7 +339,7 @@ def load_panels(run_path: str) -> dict:
         )
 
     ticks = play.load_timeline(run_path)
-    verdicts = V.verify_run(run_path)               # independent trust root
+    verdicts = V.verify_run(run_path)               # 독립 신뢰근원
     vmap = {v.tick: v for v in verdicts}
 
     action_panel, comm_panel, verify_panel = [], [], []
@@ -377,6 +376,29 @@ def load_panels(run_path: str) -> dict:
         })
 
     summary = V.summarize(verdicts)
+
+    # 링크 헬스(우측 상태 박스) — air_telemetry_tap 은 incident 파이프라인에서 분리(status-only)되어
+    # 로그 위험/주의/평시 밴드에 관여하지 않는다(transient 공백→자율복구 유발 금지, P2). 링크 상태는
+    # 독립 Verifier(링크 헬스 권위 신뢰근원)의 per-tick 판정으로만 우측 상태 박스에 '정상/저하'로 표시.
+    # 공격/손실 없으면 정상, 지속 telemetry-silence 는 저하로 보이되 자율 파괴복구는 트리거하지 않는다.
+    silent_ticks = sum(1 for v in verify_panel if v["telemetry_alive"] is False)
+    silence_verdicts = sum(1 for v in verify_panel if v["truth_verdict"] == V.TELEMETRY_SILENCE)
+    last_v = verify_panel[-1] if verify_panel else None
+    if last_v is None or last_v["telemetry_alive"] is None:
+        lh_state, lh_level = "관측 없음(탭 미가동)", "unknown"
+    elif last_v["truth_verdict"] == V.TELEMETRY_SILENCE:
+        lh_state, lh_level = "저하 — 지속 telemetry-silence", "degraded"
+    elif last_v["telemetry_alive"] is True:
+        lh_state, lh_level = "정상", "normal"
+    else:
+        lh_state, lh_level = "정상 — 순간 지터/샘플링 공백(비지속)", "normal"
+    link_health = {
+        "state": lh_state, "level": lh_level,
+        "silent_ticks": silent_ticks, "silence_verdicts": silence_verdicts,
+        "silence_streak": last_v["silence_streak"] if last_v else 0,
+        "detail": "14560 downlink + uav_ue lo:14550 HEARTBEAT 크로스탭(status-only). 공격/손실 없으면 "
+                  "정상. 지속 침묵은 저하로 표시되나 자율 파괴복구는 트리거하지 않음(독립 Verifier 판정).",
+    }
 
     # 상시(구조적) 취약 노드 상태 — 우측 패널용. run 전체에서 관측된 상시 시그니처를 노드로 묶어
     # 활성/틱수/최근틱을 집계(로그가 아닌 '상태'). recent = 마지막 tick 에 존재하면 현재 활성.
@@ -425,15 +447,16 @@ def load_panels(run_path: str) -> dict:
         },
         "summary": summary,
         "standing": standing,              # 우측 취약 노드 상태(상시조건 — 로그 아님)
+        "link_health": link_health,        # 우측 상태 박스: 링크 헬스(status-only, incident 미유발)
         "recovery": recovery,              # 좌측 복구 진행 카드 + 고도 스파크라인(Phase 7)
         "panels": {"action": action_panel, "communication": comm_panel, "verification": verify_panel},
-        "record_time_redact": True,        # display-time redaction is intentionally OFF (PS-3)
+        "record_time_redact": True,        # display-time redaction 은 의도적으로 OFF (PS-3)
         "read_only": True,
     }
 
 
 # --------------------------------------------------------------------------- #
-# HTML shell (inline; no external assets)
+# HTML 셸(인라인; 외부 에셋 없음)
 # --------------------------------------------------------------------------- #
 _HTML = """<!doctype html><html><head><meta charset="utf-8"><title>MDG 방어 로그 뷰어</title>
 <style>
@@ -508,10 +531,13 @@ _HTML = """<!doctype html><html><head><meta charset="utf-8"><title>MDG 방어 �
  .aside h3{font-size:12px;color:#9fd7e6;margin:0 0 8px;border-bottom:1px solid #1f2c3e;padding-bottom:6px}
  .vnode{border:1px solid #7a2b3e;border-left:4px solid #ff5470;background:#1b1013;border-radius:9px;padding:10px 12px;margin-bottom:9px}
  .vnode.calm{border-color:#2e7d5b;border-left-color:#3ecf8e;background:#0f1a17}
+ .vnode.warn{border-color:#7a5a2b;border-left-color:#ffb454;background:#1c1710}
  .vnode .vt{font-size:13px;color:#ffd0d8;font-weight:bold;display:flex;justify-content:space-between;gap:8px}
  .vnode.calm .vt{color:#bfe9d4}
+ .vnode.warn .vt{color:#ffd79a}
  .vnode .vstate{font-size:11px;color:#ff9fb0;margin-top:3px}
  .vnode.calm .vstate{color:#8fe6bf}
+ .vnode.warn .vstate{color:#ffd79a}
  .vnode .vdetail{font-size:11px;color:#9fb0c4;margin-top:6px;line-height:1.6}
  .vnode .vsig{font-size:10px;color:#c98fa0;margin-top:5px}
  @media(max-width:820px){.wrap{flex-direction:column}.aside{width:auto;position:static}}
@@ -575,9 +601,20 @@ function batchBlock(id,list){
   +'<span class="muted">('+list.length+'개)</span>'+ind+'</summary>'
   +'<div class="brows">'+list.map(tickRow).join('')+'</div></details>';
 }
-function renderStanding(standing){
+function linkHealthCard(lh){
+ if(!lh)return '';
+ // 링크 헬스 = status-only(로그 밴드/자율복구 미관여). 정상=녹색 · 저하=주의(황) · 미가동=회색.
+ const lv=lh.level||'unknown';
+ const cls=(lv==='degraded')?'vnode warn':'vnode calm';
+ const icon=(lv==='degraded')?'🟡':(lv==='normal')?'🟢':'⚪';
+ return '<div class="'+cls+'"><div class="vt"><span>'+icon+' 링크 헬스 (14560/14550 텔레메트리)</span>'
+   +'<span class="muted">침묵 '+esc(lh.silent_ticks)+'틱</span></div>'
+   +'<div class="vstate">상태: '+esc(lh.state)+'</div>'
+   +'<div class="vdetail">'+esc(lh.detail)+'</div></div>';
+}
+function renderStanding(standing,lh){
  const el=document.getElementById('aside');
- let h='<h3>상시 취약 노드 상태</h3>';
+ let h='<h3>상시 취약 노드 상태</h3>'+linkHealthCard(lh);
  if(!standing||!standing.length){
   el.innerHTML=h+'<div class="vnode calm"><div class="vt"><span>🟢 취약 노드 없음</span></div><div class="vstate">관측된 상시 취약점 없음</div></div>';
   return;
@@ -676,7 +713,7 @@ function render(d){
   +(causes.length?('<div class="causes"><span class="lbl">공격 원인</span>'+causes.map(c=>'<span class="sig">'+esc(c[0])+' <b>'+c[1]+'틱</b></span>').join('')+'</div>'):'<div class="causes"><span class="sig calm">공격 시그니처 없음 · 상시조건만(우측 상태 참조)</span></div>');
  document.getElementById('body').innerHTML= ids.length? ids.map(id=>batchBlock(id,byBatch.get(id))).join('') : '<div class="muted">로그 없음 — 감시(monitor) 실행을 확인하세요.</div>';
  renderRecovery(d.recovery);
- renderStanding(d.standing);
+ renderStanding(d.standing,d.link_health);
  document.querySelectorAll('details.batch').forEach(el=>el.addEventListener('toggle',()=>{const id=+el.dataset.batch; el.open?openBatches.add(id):openBatches.delete(id);}));
  document.querySelectorAll('details.trow').forEach(el=>el.addEventListener('toggle',()=>{const tk=+el.dataset.tick; el.open?openTicks.add(tk):openTicks.delete(tk);}));
 }
@@ -691,15 +728,15 @@ load(); setInterval(load, 3000);   // ★ 3초마다 실시간 자동 갱신 (ru
 
 
 # --------------------------------------------------------------------------- #
-# FastAPI app (lazy import) — read-only, bearer-auth, loopback bind
+# FastAPI 앱(lazy import) — read-only, bearer-auth, loopback bind
 # --------------------------------------------------------------------------- #
 def create_app(run_path: str, *, token: Optional[str] = None):
-    """Build the read-only FastAPI app. ``token`` (bearer) is required for data routes;
-    if None, a token is read from env ``MDG_VIEWER_TOKEN`` (no token => all data routes 401).
+    """read-only FastAPI 앱을 구성한다. data route 에는 ``token``(bearer)이 필요하다;
+    None 이면 env ``MDG_VIEWER_TOKEN`` 에서 토큰을 읽는다(토큰 없으면 모든 data route 401).
 
-    Panels are recomputed per request from ``run_path`` (offline, deterministic). Requires
-    fastapi (python:3.12-slim image). Raises ImportError otherwise; the pure builders
-    (load_panels / scan_secrets) work without it."""
+    패널은 요청마다 ``run_path`` 에서 재계산된다(오프라인, 결정론적). fastapi 가 필요하다
+    (python:3.12-slim 이미지). 없으면 ImportError; 순수 빌더
+    (load_panels / scan_secrets)는 그것 없이도 동작한다."""
     try:
         import os
         from fastapi import FastAPI, Header, HTTPException
@@ -713,7 +750,7 @@ def create_app(run_path: str, *, token: Optional[str] = None):
     tok = token if token is not None else os.environ.get("MDG_VIEWER_TOKEN", "")
 
     def _auth(authorization: Optional[str]) -> None:
-        # constant-time bearer compare (PS-8). Empty configured token => deny all (no anon).
+        # constant-time bearer 비교(PS-8). 설정 토큰이 비어 있으면 => 전부 거부(익명 없음).
         presented = ""
         if authorization and authorization.lower().startswith("bearer "):
             presented = authorization[7:].strip()
@@ -723,7 +760,7 @@ def create_app(run_path: str, *, token: Optional[str] = None):
     app = FastAPI(title="MDG Replay Viewer", docs_url=None, redoc_url=None)
 
     @app.get("/", response_class=HTMLResponse)
-    def index() -> Any:  # the shell itself carries no data (data routes are authed)
+    def index() -> Any:  # 셸 자체는 데이터를 담지 않음(data route 는 인증됨)
         return HTMLResponse(_HTML)
 
     @app.get("/api/panels")
@@ -732,7 +769,7 @@ def create_app(run_path: str, *, token: Optional[str] = None):
         try:
             return JSONResponse(load_panels(run_path))
         except SecretLeakError as exc:
-            # fail-closed: never serve a tainted file, never silently redact at display time
+            # fail-closed: 오염된 파일을 절대 서빙 안 함, display time 에 조용히 redact 도 안 함
             raise HTTPException(status_code=409, detail=str(exc))
         except FileNotFoundError:
             raise HTTPException(status_code=404, detail=f"no run.jsonl at {run_path}")
@@ -747,13 +784,13 @@ def create_app(run_path: str, *, token: Optional[str] = None):
 
 def serve(run_path: str, *, host: str = "127.0.0.1", port: int = 8787,
           token: Optional[str] = None) -> None:
-    """Run the Viewer under uvicorn, bound to loopback/management ONLY (PS-8). Refuses to
-    bind 0.0.0.0 / a wildcard so an attacker UE (10.45.x) can never reach the mgmt plane."""
+    """Viewer 를 uvicorn 으로 실행, loopback/management 에만(ONLY) 바인딩(PS-8). 0.0.0.0 /
+    와일드카드 바인딩을 거부해 공격자 UE(10.45.x)가 mgmt 평면에 절대 도달 못 하게 한다."""
     h = (host or "").strip()
     if h in ("0.0.0.0", "::", "") or h.endswith(".0.0.0.0"):
         raise ValueError(f"refusing non-loopback bind '{host}' (PS-8: loopback/mgmt only)")
     if h not in _LOOPBACK_HOSTS and not (h.startswith("10.") or h.startswith("172.") or h.startswith("192.168.")):
-        # allow a private management-net address; reject public binds
+        # 사설 management-net 주소는 허용; public 바인딩은 거부
         raise ValueError(f"refusing public bind '{host}' (PS-8: loopback/mgmt-net only)")
     try:
         import uvicorn

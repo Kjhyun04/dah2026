@@ -1,10 +1,10 @@
-"""MissionConfigCollector — config-derived mission context (M1~M3/M8).
+"""MissionConfigCollector — config 로부터 도출한 mission context (M1~M3/M8).
 
-Unlike the sensor collectors this observes no wire/log: it reads the canonical
-mission_profile config and emits a low-frequency mission-context heartbeat so the
-pipeline carries current phase/priority as evidence. Pure config read — no subprocess,
-no network. It only emits when the mission context changes (edge-triggered) plus a
-periodic refresh, so it does not flood the queue.
+sensor collector 들과 달리 wire/log 를 관측하지 않는다: canonical
+mission_profile config 를 읽어 저빈도 mission-context heartbeat 를 emit 하여
+pipeline 이 현재 phase/priority 를 evidence 로 실어 나르게 한다. 순수 config 읽기 —
+subprocess 도 network 도 없다. mission context 가 바뀔 때(edge-triggered)와
+주기적 refresh 시에만 emit 하므로 queue 를 넘치게 하지 않는다.
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ class MissionConfigCollector(BaseCollector):
     domain = "mission"
 
     def __init__(self, *args, profile: Optional[dict] = None, refresh_every: int = 30, **kw):
-        # mission changes slowly; default to a long interval.
+        # mission 은 느리게 변한다; 기본값을 긴 interval 로 둔다.
         kw.setdefault("interval_s", 10.0)
         super().__init__(*args, **kw)
         self._profile = profile

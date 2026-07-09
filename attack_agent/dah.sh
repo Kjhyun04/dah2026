@@ -35,13 +35,15 @@ case "$cmd" in
     # 반드시 있어야 recon/주입 tool 이 동작한다. 없으면 recon 이 reach 를 못 만들어(스크립트 부재)
     # 정찰 무한루프에 빠지고 planner 가 주입에 영영 도달 못 한다(공방전 미성립의 근본원인).
     # ★ 테스트베드 SITL 이미지(dahv2/air, arducopter 포함)와 태그가 충돌하지 않도록 -tools 접미사.
-    #   config.*.yaml 의 tools.image.air 도 dahv2/air-tools 를 가리킨다.
+    #   ★ P4 단일 설정원: 태그는 config.tools.image.air 를 정본으로 읽는다(아래 IMG). 리터럴은 폴백.
     # ★ pymavlink 는 host(.venv)와 동일 버전으로 핀(golden-frame 정합). vendor/aria_gcm.py 는
     #   placeholder 라도 serial5762/forceland(직결 5762 — ARIA·서명 관통) 공방전엔 충분하다.
     #   전 계층 ARIA 공격(forge_aria 등)까지 쓰려면 통제단계에서 실 vendor 를 채운 뒤 재빌드.
     PYMV="$($PY -c 'import pymavlink;print(pymavlink.__version__)' 2>/dev/null || echo 2.4.49)"
-    echo "build dahv2/air-tools (pymavlink=$PYMV) from sidecar/air"
-    exec docker build -t dahv2/air-tools --build-arg PYMAVLINK_VERSION="$PYMV" sidecar/air ;;
+    # 정본: config.tools.image.air (config loader 로 읽어 env 치환까지 반영). 실패 시 리터럴 폴백.
+    IMG="$($PY -c 'from core.common.config import _load_yaml; print(_load_yaml("configs/config.testbed.yaml")["tools"]["image"]["air"])' 2>/dev/null || echo dahv2/air-tools)"
+    echo "build $IMG (pymavlink=$PYMV) from sidecar/air"
+    exec docker build -t "$IMG" --build-arg PYMAVLINK_VERSION="$PYMV" sidecar/air ;;
 
   recon)    # 정찰 폐루프 (오프라인 mock 기본; 실측은 --backend local)
     _load_env

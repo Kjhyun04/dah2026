@@ -1,18 +1,18 @@
-"""MmeLogTail — epc_mme docker-logs stdout tail: attach / IMSI events (P4-5).
+"""MmeLogTail — epc_mme docker-logs stdout tail: attach / IMSI 이벤트 (P4-5).
 
-Per DESIGN_DECISIONS P4-5, attach/IMSI/service-request observation uses the MME log as
-the SINGLE source (the MME :9090 metrics are sparse — only enb/enb_ue/mme_session). Rogue-UE
-attach detection (TM3) is therefore the MME-log tail. The EPC log parse discipline is shared
-(``log_common``): ANSI-strip FIRST, then regex; the timestamp format ``MM/DD HH:MM:SS.mmm``
-is fixed via ``parse_epc_ts``.
+DESIGN_DECISIONS P4-5에 따라, attach/IMSI/service-request 관측은 MME 로그를 단일
+소스로 사용한다(MME :9090 메트릭은 희소함 — enb/enb_ue/mme_session만). 따라서 Rogue-UE
+attach 탐지(TM3)는 MME-로그 tail이다. EPC 로그 파스 규율은 공유된다(``log_common``):
+먼저 ANSI-strip, 그다음 regex; 타임스탬프 형식 ``MM/DD HH:MM:SS.mmm``은 ``parse_epc_ts``로
+고정된다.
 
-This is the P4-5 member of the parser set that ``tests/verify_parsers.py`` exercises. Pure
-observation, state-change-0; the ``docker logs`` read is routed through the safe-exec Backend
-(불변식2.) exactly like the SMF/Mongo log collectors. A dry/mock Backend yields no lines
-(the collector simply emits nothing).
+이는 ``tests/verify_parsers.py``가 실행하는 파서 집합의 P4-5 멤버다. 순수 관측,
+state-change-0; ``docker logs`` 읽기는 SMF/Mongo 로그 collector와 똑같이 safe-exec
+Backend를 통해 라우팅된다(불변식2.). dry/mock Backend는 줄을 산출하지 않는다(collector는
+단순히 아무것도 emit하지 않음).
 
-Boundaries: no docker sdk import, no sock/proxy URL literal here (verify_grep0). Null-safe:
-``parse_mme_line(None)`` -> None (never an ``re.search(None)`` crash).
+경계: 여기에 docker sdk import 없음, sock/proxy URL 리터럴 없음(verify_grep0). Null-safe:
+``parse_mme_line(None)`` -> None (``re.search(None)`` 크래시 없음).
 """
 from __future__ import annotations
 
@@ -23,11 +23,11 @@ from typing import Optional
 from .base import BaseCollector
 from .log_common import ansi_strip, parse_epc_ts
 
-# Open5GS MME lines carry the IMSI as either ``IMSI[001010000000001]`` or the
-# ``IMSI[imsi-001010000000001]`` NAI form; accept both. 15-digit IMSI (6..15 to be lenient).
+# Open5GS MME 줄은 IMSI를 ``IMSI[001010000000001]`` 또는 ``IMSI[imsi-001010000000001]``
+# NAI 형태로 담는다; 둘 다 허용. 15자리 IMSI (관대하게 6..15).
 _IMSI_RE = re.compile(r"IMSI\[(?:imsi-)?(\d{6,15})\]")
 
-# event-kind keywords (attach/identity/auth/service/detach). First hit wins; else "event".
+# event-kind 키워드(attach/identity/auth/service/detach). 첫 매치 우선; 없으면 "event".
 _KIND_KEYWORDS: tuple[tuple[str, str], ...] = (
     ("Attach", "attach"),
     ("attach", "attach"),
@@ -45,7 +45,7 @@ _KIND_KEYWORDS: tuple[tuple[str, str], ...] = (
 class AttachEvent:
     imsi: str
     kind: str = "event"   # attach|detach|service|auth|identity|tau|event
-    ts: str = ""          # raw MM/DD HH:MM:SS.mmm token (P4-5), best-effort
+    ts: str = ""          # 원시 MM/DD HH:MM:SS.mmm 토큰 (P4-5), best-effort
 
 
 def _kind_for(line: str) -> str:
@@ -56,11 +56,11 @@ def _kind_for(line: str) -> str:
 
 
 def parse_mme_line(raw: str) -> Optional[AttachEvent]:
-    """Parse ONE MME log line into an AttachEvent (IMSI + kind + ts), or None.
+    """MME 로그 한 줄을 AttachEvent(IMSI + kind + ts)로 파싱, 없으면 None.
 
-    ANSI-strips first (P4-5). Null-safe over None/"" (returns None; no re.search(None)).
-    A line is an event only if it carries an IMSI token; the kind is a best-effort label
-    from the attach/identity/service/auth keyword vocabulary."""
+    먼저 ANSI-strip(P4-5). None/""에 대해 Null-safe(None 반환; re.search(None) 없음).
+    줄은 IMSI 토큰을 담을 때만 이벤트다; kind는 attach/identity/service/auth 키워드
+    어휘에서 나온 best-effort 라벨이다."""
     line = ansi_strip(raw)
     if not line:
         return None
@@ -71,18 +71,18 @@ def parse_mme_line(raw: str) -> Optional[AttachEvent]:
 
 
 def _docker_logs_argv(container: str, since_s: int) -> list[str]:
-    # bounded --since window (NOT -f) so the daemon read stays deterministic, same as the
-    # SMF/Mongo log collectors. The read-only logs GET is the sock-proxy whitelisted path.
+    # 유계 --since 윈도(-f 아님)로 데몬 읽기를 결정론으로 유지, SMF/Mongo 로그 collector와
+    # 동일. read-only logs GET은 sock-proxy 화이트리스트 경로다.
     return ["docker", "logs", "--since", f"{since_s}s", container]
 
 
 class MmeLogTail(BaseCollector):
-    """Out-of-graph daemon: tails ``docker logs epc_mme`` and emits attach/IMSI events as
-    identity-domain evidence (P4-5). Rogue-UE attach classification (TM3) is left to the
-    correlation layer; this collector is pure attach-event observation.
+    """그래프 외부 데몬: ``docker logs epc_mme``를 tail하고 attach/IMSI 이벤트를
+    identity-도메인 증거로 emit한다(P4-5). Rogue-UE attach 분류(TM3)는 correlation
+    계층에 맡긴다; 이 collector는 순수 attach-이벤트 관측이다.
 
-    Not part of the default 6-collector set (opt-in EPC log-tail, P1-Q3); subprocess goes
-    through the safe-exec Backend only (불변식2.). A dry/mock backend yields no lines."""
+    기본 6-collector 집합에는 포함되지 않음(opt-in EPC log-tail, P1-Q3); subprocess는
+    오직 safe-exec Backend를 통한다(불변식2.). dry/mock backend는 줄을 산출하지 않음."""
     source_id = "mme_log"
     domain = "identity_access"
 
@@ -90,7 +90,7 @@ class MmeLogTail(BaseCollector):
         super().__init__(*args, **kw)
         self.container = container
         self.since_s = since_s
-        self._seen: set[str] = set()               # dedupe within the --since window
+        self._seen: set[str] = set()               # --since 윈도 내 dedupe
 
     def collect(self) -> list[dict]:
         res = self._observe(_docker_logs_argv(self.container, self.since_s))
@@ -106,8 +106,8 @@ class MmeLogTail(BaseCollector):
                 if key in self._seen:
                     continue
                 self._seen.add(key)
-                # attach is the TM3 rogue-UE observation surface; emit as low-band identity
-                # evidence (classification is deferred to correlate). Other kinds are context.
+                # attach는 TM3 rogue-UE 관측면; low-band identity 증거로 emit(분류는
+                # correlate로 지연). 다른 kind는 컨텍스트다.
                 if ev.kind == "attach":
                     payloads.append({
                         "metric": "UE_Attach", "value": 1, "band": "warning",

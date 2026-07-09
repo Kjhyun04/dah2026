@@ -1,9 +1,9 @@
-"""build_graph (PA-1/PA-8) — LangGraph StateGraph assembly.
+"""build_graph (PA-1/PA-8) — LangGraph StateGraph 조립.
 
-Topology (in-graph cycles = 0, all loop-backs -> END):
+Topology (그래프 내 사이클 = 0, 모든 loop-back -> END):
   START = sense
   sense -> correlate -> compute_trust -> compute_impact
-  compute_impact --[band==Green]--> END          (Green tick: no LLM)
+  compute_impact --[band==Green]--> END          (Green 틱: LLM 없음)
   compute_impact --[band in {Yellow,Red}]--> orient
   orient -> select_policy -> rank_recovery -> decide
   decide --[legal ∧ risk in {LOW,MED} ∧ reversible]--> act
@@ -12,18 +12,18 @@ Topology (in-graph cycles = 0, all loop-backs -> END):
   act -> effect_confirm -> END
   escalate -> END
 
-Conditional branch functions live in edges.py and read numeric/bool fields ONLY
-(불변식1.). recon is boot-only (not a node). recursion_limit=16 is passed at invoke
-(driver) as a cycle guard.
+조건부 분기 함수는 edges.py 에 있으며 숫자/불리언 필드만 읽는다
+(불변식1.). recon 은 boot 전용이다 (노드 아님). recursion_limit=16 은 invoke 시
+(driver) 사이클 가드로 전달된다.
 
-SINGLE-SOURCED TOPOLOGY (PA-9): the node roster, the linear spine, the two conditional
-branch points, and the per-node dependency-injection recipe all come from ``core.topology``
-(pure data). ``e2e._TickExecutor`` (the langgraph-free interpreter) consumes the SAME datum,
-so the production graph and the tested executor cannot diverge. This closes the previously
-materialized drift where escalate was bound WITHOUT ``gate`` here but called WITH it there.
+SINGLE-SOURCED TOPOLOGY (PA-9): 노드 로스터, 선형 스파인, 두 조건부
+분기점, 노드별 dependency-injection 레시피가 모두 ``core.topology``
+(순수 데이터)에서 온다. ``e2e._TickExecutor`` (langgraph 없는 인터프리터)가 동일한 datum 을 소비하므로,
+프로덕션 그래프와 테스트 대상 executor 가 발산할 수 없다. 이로써 이전에 실체화되었던
+드리프트(escalate 가 여기서는 ``gate`` 없이 바인딩되었으나 저기서는 함께 호출되던)를 닫는다.
 
-Dependency injection: nodes that need a queue/backend/ledger/clock/llm are bound with
-functools.partial from ``topology.BIND`` so the compiled graph carries no globals.
+Dependency injection: queue/backend/ledger/clock/llm 이 필요한 노드는 ``topology.BIND`` 의
+functools.partial 로 바인딩되어 컴파일된 그래프가 전역을 지니지 않는다.
 """
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ from . import edges, topology
 from .nodes import NODES
 from .state import MDGState
 
-# name -> branch function (resolved here; topology holds only the NAME so it imports nothing heavy)
+# name -> 분기 함수 (여기서 해석; topology 는 NAME 만 지녀 무거운 것을 import 하지 않음)
 _BRANCH = {
     "route_after_impact": edges.route_after_impact,
     "route_after_decide": edges.route_after_decide,
@@ -42,14 +42,14 @@ _BRANCH = {
 
 
 def build_graph(deps: Optional[dict[str, Any]] = None):
-    """Assemble and compile the StateGraph. deps may contain: inbox, verify, clock,
-    llm_orient, llm_decide, backend, ledger, observe, source_domains. Returns a compiled
-    graph. ``source_domains`` ({source_id -> domain}, from build_source_domains(collectors))
-    lets sense attribute a watchdog sensor_loss to a domain for present-set exclusion (P3-Q5).
+    """StateGraph 를 조립하고 컴파일한다. deps 는 다음을 포함할 수 있다: inbox, verify, clock,
+    llm_orient, llm_decide, backend, ledger, observe, source_domains. 컴파일된
+    그래프를 반환한다. ``source_domains`` ({source_id -> domain}, build_source_domains(collectors) 유래)는
+    sense 가 watchdog sensor_loss 를 present-set 제외를 위해 도메인에 귀속시키게 한다 (P3-Q5).
 
-    Requires langgraph installed (python:3.12-slim image). Raises ImportError with a
-    clear message otherwise — verify_graph.py does the static topology check without
-    importing langgraph.
+    langgraph 설치를 요구한다 (python:3.12-slim 이미지). 그렇지 않으면 명확한
+    메시지와 함께 ImportError 를 발생시킨다 — verify_graph.py 는 langgraph 를
+    import 하지 않고 정적 topology 검사를 수행한다.
     """
     try:
         from langgraph.graph import END, START, StateGraph
@@ -61,28 +61,28 @@ def build_graph(deps: Optional[dict[str, Any]] = None):
         ) from exc
 
     d = deps or {}
-    # Phase 0 wiring: normalize the sandbox OPER auto-confirm flag to a guaranteed bool so the
-    # Phase 1 gate/edge can read it without re-parsing. No routing effect yet — topology.BIND does
-    # not reference 'operator_auto' until Phase 1, so control flow is unchanged (불변식1. 무손상,
-    # 회귀 0). Shallow-copy so the caller's deps dict is not mutated.
+    # Phase 0 배선: sandbox OPER auto-confirm 플래그를 보장된 불리언으로 정규화하여
+    # Phase 1 gate/edge 가 재파싱 없이 읽게 한다. 아직 라우팅 영향 없음 — topology.BIND 는
+    # Phase 1 전까지 'operator_auto' 를 참조하지 않으므로 제어 흐름은 불변이다 (불변식1. 무손상,
+    # 회귀 0). caller 의 deps dict 가 변형되지 않도록 shallow-copy 한다.
     d = {**d, "operator_auto": bool(d.get("operator_auto"))}
 
     def _node(name: str):
-        # bind injected deps from the ONE recipe (topology.BIND) — no globals, no drift.
+        # 단일 레시피(topology.BIND)에서 주입 deps 를 바인딩 — 전역 없음, 드리프트 없음.
         return partial(NODES[name], **topology.kwargs_for(name, d))
 
     def _target(label: str):
-        # map the spec's END sentinel to langgraph's END; any other label is a node name.
+        # spec 의 END 센티널을 langgraph 의 END 로 매핑; 그 외 라벨은 노드 이름이다.
         return END if label == topology.END else label
 
     g = StateGraph(MDGState)
-    for name in topology.NODE_ROSTER:              # 11-node roster (PA-8), single-sourced
+    for name in topology.NODE_ROSTER:              # 11-노드 로스터 (PA-8), single-sourced
         g.add_node(name, _node(name))
 
     g.add_edge(START, topology.ENTRY)              # set_entry_point('sense')
-    for src, dst in topology.LINEAR_EDGES.items():  # linear spine (loop-backs already -> END)
+    for src, dst in topology.LINEAR_EDGES.items():  # 선형 스파인 (loop-back 은 이미 -> END)
         g.add_edge(src, _target(dst))
-    for src, (fn_name, mapping) in topology.COND_EDGES.items():  # numeric/bool routing only (불변식1.)
+    for src, (fn_name, mapping) in topology.COND_EDGES.items():  # 숫자/불리언 라우팅만 (불변식1.)
         g.add_conditional_edges(
             src, _BRANCH[fn_name],
             {label: _target(target) for label, target in mapping.items()},

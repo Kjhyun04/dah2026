@@ -1,15 +1,14 @@
-"""Watchdog (G7) — independent liveness monitor for the out-of-graph collectors.
+"""Watchdog (G7) — 그래프 밖(out-of-graph) 콜렉터를 위한 독립 liveness 모니터.
 
-A standalone daemon thread that watches each registered collector's heartbeat. If a
-collector goes silent past ``max_silence_s`` it is marked dead and:
-  - optionally restarted (a fresh thread instance via a supplied factory), and
-  - a signed ``sensor_loss`` envelope is enqueued so the pipeline can SEE the gap.
-    (Wiring this into compute_impact's present-set/all-stale hold is a follow-up per
-    the P0 panel-3 residual note; the watchdog is the missing liveness SOURCE.)
+각 등록된 콜렉터의 하트비트를 감시하는 독립 데몬 스레드. 콜렉터가 ``max_silence_s`` 를 넘겨
+침묵하면 dead 로 표시하고:
+  - 선택적으로 재시작(공급된 factory 로 새 스레드 인스턴스 생성), 그리고
+  - 서명된 ``sensor_loss`` 엔벨로프를 enqueue 해 파이프라인이 그 공백을 볼(SEE) 수 있게 한다.
+    (이를 compute_impact 의 present-set/all-stale hold 로 배선하는 것은 P0 panel-3 잔여 노트에
+    따른 후속 작업; watchdog 은 빠져 있던 liveness 소스(SOURCE)이다.)
 
-The watchdog is deliberately minimal and core-independent: it imports only the ingest
-envelope helpers (to sign a sensor_loss signal that passes the PS-2 gate) and the
-Clock. It never touches MDGState or the graph directly.
+watchdog 은 의도적으로 최소·코어 독립: ingest 엔벨로프 헬퍼(PS-2 게이트를 통과하는 sensor_loss
+시그니처에 서명하기 위함)와 Clock 만 import 한다. MDGState 나 그래프를 직접 건드리지 않는다.
 """
 from __future__ import annotations
 
@@ -41,16 +40,16 @@ class Watchdog(threading.Thread):
         self._seq = 0
         self.dead: set[str] = set()
 
-    # -- liveness check (directly testable) ------------------------------- #
+    # -- liveness 체크(직접 테스트 가능) ---------------------------------- #
     def check_once(self) -> dict[str, bool]:
-        """Return {collector_name: alive}. Emits sensor_loss + optional restart for
-        collectors that crossed the silence threshold (edge-triggered)."""
+        """{collector_name: alive} 를 반환. 침묵 임계를 넘긴 콜렉터에 대해 sensor_loss 를
+        emit 하고 선택적으로 재시작한다(edge-triggered)."""
         now = self.clock.now()
         status: dict[str, bool] = {}
         for i, c in enumerate(self.collectors):
             name = getattr(c, "name", getattr(c, "source_id", f"c{i}"))
             hb = c.heartbeat()
-            # hb==0 means "never reported yet"; only flag after we've had a chance.
+            # hb==0 은 "아직 보고된 적 없음" 을 의미; 기회가 있었던 뒤에만 flag.
             silent = hb > 0 and (now - hb) > self.max_silence_s
             alive = not silent
             status[name] = alive
@@ -60,7 +59,7 @@ class Watchdog(threading.Thread):
                 if self.restart and self.restart_factory is not None:
                     self._restart(i, c)
             elif alive and name in self.dead:
-                self.dead.discard(name)          # recovered
+                self.dead.discard(name)          # 복구됨
         return status
 
     def _restart(self, idx: int, dead_collector) -> None:
@@ -90,7 +89,7 @@ class Watchdog(threading.Thread):
         except Exception:
             pass
 
-    # -- lifecycle -------------------------------------------------------- #
+    # -- 생명주기(lifecycle) ---------------------------------------------- #
     def run(self) -> None:
         while not self._stop.is_set():
             try:

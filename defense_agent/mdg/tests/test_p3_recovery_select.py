@@ -1,20 +1,20 @@
-"""test_p3_recovery_select — Phase 3 (B2): rank_recovery emits a VISIBLE recovery tool.
+"""test_p3_recovery_select — Phase 3 (B2): rank_recovery 는 VISIBLE 복구 도구를 방출한다.
 
-Locks the two-scenario contract without any core _sort_key hardcode (tuning lives only in
-recovery_priors.yaml + the closed _INCIDENT_RECOVERY candidate map):
+core _sort_key 하드코드 없이 2-시나리오 계약을 고정 (튜닝은 오직
+recovery_priors.yaml + 닫힌 _INCIDENT_RECOVERY 후보 맵에만 존재):
 
-  S1 (container isolation, LIVE posture signing=UNKNOWN):
-      single-signal -> select_policy legalizes ONLY backdoor_pause (docker_pause). signed_guided
-      is DOUBLE-GATED out by legality (send_signed_mode requires signing==CONFIRMED_ON), so the
-      live/replay legal set is byte-identical to before Phase 3. rank -> docker_pause, MED, revocable.
+  S1 (컨테이너 격리, LIVE posture signing=UNKNOWN):
+      single-signal -> select_policy 는 backdoor_pause (docker_pause)만 합법화한다. signed_guided
+      는 legality 에 의해 DOUBLE-GATED 로 배제됨 (send_signed_mode 는 signing==CONFIRMED_ON 요구), 따라서
+      live/replay 합법 집합은 Phase 3 이전과 byte-identical 하다. rank -> docker_pause, MED, revocable.
 
-  S2 (flight recovery, testbed posture signing=CONFIRMED_ON + role_verified.gcs):
-      signed_guided ENTERS legal_actions as an OPER/HIGH candidate (the missing wiring — it was an
-      orphan rtype). When it is the sole legal candidate it is CHOSEN (send_signed_mode). When it
-      co-exists with backdoor_pause, backdoor_pause still out-ranks it (priors, no core boost), so
-      admitting signed_guided never perturbs S1.
+  S2 (비행 복구, testbed posture signing=CONFIRMED_ON + role_verified.gcs):
+      signed_guided 는 OPER/HIGH 후보로 legal_actions 에 진입한다 (누락되었던 배선 — orphan
+      rtype 였음). 유일한 합법 후보일 때 선택된다 (send_signed_mode). backdoor_pause 와
+      공존할 때는 backdoor_pause 가 여전히 상위 랭크 (priors, core boost 없음), 따라서
+      signed_guided 를 받아들여도 S1 을 절대 교란하지 않는다.
 
-Runs offline. Executable as a script or under pytest.
+오프라인 실행. 스크립트로 또는 pytest 하에서 실행 가능.
 """
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ def _drive(world: WorldState) -> tuple[list, dict]:
 
 
 # --------------------------------------------------------------------------- #
-# candidate wiring — signed_guided is no longer an ORPHAN rtype
+# 후보 배선 — signed_guided 는 더 이상 ORPHAN rtype 이 아니다
 # --------------------------------------------------------------------------- #
 def test_signed_guided_is_wired_into_single_signal_mapping():
     assert "signed_guided" in _INCIDENT_RECOVERY["single-signal"]
@@ -56,17 +56,17 @@ def test_signed_guided_is_wired_into_single_signal_mapping():
 
 
 # --------------------------------------------------------------------------- #
-# S1 — LIVE posture (signing UNKNOWN): signed_guided is filtered, S1 unchanged
+# S1 — LIVE posture (signing UNKNOWN): signed_guided 필터링됨, S1 불변
 # --------------------------------------------------------------------------- #
 def test_s1_unknown_signing_only_backdoor_pause_legal():
-    # web_backend (backdoor_pause chokepoint) AND gcs_proxy (signed_guided chokepoint) BOTH
-    # verified — proving it is the SIGNING gate, not a role gate, that filters signed_guided.
+    # web_backend (backdoor_pause chokepoint) 와 gcs_proxy (signed_guided chokepoint) 모두
+    # verified — signed_guided 를 필터링하는 것은 role 게이트가 아니라 SIGNING 게이트임을 증명.
     world = _world(signing=SigningObs.UNKNOWN,
                    verified={"web_backend": True, "gcs_proxy": True})
     legal, out = _drive(world)
     rtypes = {a.recovery_type for a in legal}
-    assert rtypes == {"backdoor_pause"}, rtypes           # signed_guided double-gated OUT
-    # rank binds the VISIBLE isolation tool
+    assert rtypes == {"backdoor_pause"}, rtypes           # signed_guided double-gated 로 배제
+    # rank 는 VISIBLE 격리 도구를 바인딩
     chosen = out["chosen_action"]
     assert chosen is not None and chosen.rule == "backdoor_pause"
     assert chosen.tool_id == "docker_pause"
@@ -75,38 +75,38 @@ def test_s1_unknown_signing_only_backdoor_pause_legal():
 
 
 def test_s1_legal_set_byte_identical_to_pre_phase3():
-    # the legal set under the LIVE UNKNOWN posture must be exactly the pre-Phase-3 set so replay
-    # stays byte-identical (불변식1.). Only backdoor_pause — signed_guided never leaks into live.
+    # LIVE UNKNOWN posture 하의 합법 집합은 replay 가 byte-identical 하게 유지되도록 정확히
+    # Phase 3 이전 집합이어야 한다 (불변식1.). backdoor_pause 만 — signed_guided 는 live 로 절대 새지 않음.
     world = _world(signing=SigningObs.UNKNOWN, verified={"web_backend": True, "gcs_proxy": True})
     legal, _ = _drive(world)
     assert [a.recovery_type for a in legal] == ["backdoor_pause"]
 
 
 # --------------------------------------------------------------------------- #
-# S2 — testbed posture (signing CONFIRMED_ON): signed_guided ENTERS as candidate
+# S2 — testbed posture (signing CONFIRMED_ON): signed_guided 가 후보로 진입
 # --------------------------------------------------------------------------- #
 def test_s2_confirmed_signing_admits_signed_guided_candidate():
     world = _world(signing=SigningObs.CONFIRMED_ON,
                    verified={"web_backend": True, "gcs_proxy": True})
     legal, out = _drive(world)
     rtypes = {a.recovery_type for a in legal}
-    assert "signed_guided" in rtypes, rtypes              # the missing wiring is now present
+    assert "signed_guided" in rtypes, rtypes              # 누락되었던 배선이 이제 존재
     assert "backdoor_pause" in rtypes
-    # priors (NOT a core _sort_key boost) still rank backdoor_pause top -> S1 unperturbed even
-    # with signing ON.
+    # priors (core _sort_key boost 아님)는 여전히 backdoor_pause 를 최상위로 랭크 -> signing ON
+    # 이어도 S1 교란 없음.
     assert out["chosen_action"].rule == "backdoor_pause"
 
 
 def test_s2_signed_guided_chosen_when_sole_legal_candidate():
-    # gcs_proxy verified but web_backend NOT -> backdoor_pause filtered, signed_guided sole legal ->
-    # the VISIBLE flight-recovery tool (send_signed_mode) is chosen.
+    # gcs_proxy verified 이지만 web_backend 아님 -> backdoor_pause 필터링됨, signed_guided 유일 합법 ->
+    # VISIBLE 비행 복구 도구 (send_signed_mode)가 선택된다.
     world = _world(signing=SigningObs.CONFIRMED_ON, verified={"gcs_proxy": True})
     legal, out = _drive(world)
     assert [a.recovery_type for a in legal] == ["signed_guided"], [a.recovery_type for a in legal]
     chosen = out["chosen_action"]
     assert chosen is not None and chosen.rule == "signed_guided"
     assert chosen.tool_id == "send_signed_mode"
-    assert out["chosen_action_risk"] == "HIGH"            # flight action -> OPER/HIGH downstream
+    assert out["chosen_action_risk"] == "HIGH"            # 비행 액션 -> 하류 OPER/HIGH
     assert out["chosen_action_reversible"] is False
 
 

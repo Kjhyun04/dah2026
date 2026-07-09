@@ -1,26 +1,26 @@
-"""artifacts.py (P6) — campaign artifacts + CampaignResult -> 6-chapter report mapping.
+"""artifacts.py (P6) — 캠페인 산출물 + CampaignResult -> 6장 보고서 매핑.
 
-Consumes the recorded ``run.jsonl`` (the portability pillar, H-J) and the independent
-Verifier truth to build three reviewer-facing artifacts per attack:
+기록된 ``run.jsonl``(이식성 기둥, H-J)과 독립 Verifier 진실을 소비해 공격마다 리뷰어 대상
+산출물 3종을 만든다:
 
-  * timeline       — per-tick node path + evidence + impact band + decision (replay.play)
-  * decisions      — the agent's decision channel (what it chose, tier, DRY/operator-go)
-  * verifier_truth — the OUT-OF-GRAPH Verifier's per-tick verdict + agent≠truth (verifier.py)
+  * timeline       — 틱별 노드 경로 + 근거 + impact band + decision (replay.play)
+  * decisions      — agent 결정 채널 (무엇을 선택했는지, tier, DRY/operator-go)
+  * verifier_truth — OUT-OF-GRAPH Verifier의 틱별 판정 + agent≠truth (verifier.py)
 
-and folds every attack's outcome into a ``CampaignResult`` mapped onto the report's SIX
-chapters (``to_report``):
+그리고 모든 공격의 결과를 ``CampaignResult``로 접어 보고서의 6개 장(``to_report``)에
+매핑한다:
 
-  1. 개요·범위      scope, 2대 불변식, 운영제약, DRY posture
-  2. 공격 재생      the 6 replayed attacks (scenario + evidence script)
-  3. 탐지           incidents / evidence timeline (detection observation)
-  4. 대응           decisions / tier / inert-DRY dispatch + blast-radius disclosures
-  5. 독립 검증      Verifier truth + agent≠truth divergences (H-K)
-  6. 정직성·한계    honest limitations (V4/5762/mission-weight/unverified/blast-radius)
+  1. 개요·범위      범위·2대 불변식·운영제약·DRY posture
+  2. 공격 재생      재생된 6개 공격 (시나리오 + 근거 스크립트)
+  3. 탐지           incidents / 근거 타임라인 (탐지 관측)
+  4. 대응           decisions / tier / inert-DRY dispatch + blast-radius 공개
+  5. 독립 검증      Verifier 진실 + agent≠truth 발산 (H-K)
+  6. 정직성·한계    정직한 한계 (V4/5762/mission-weight/unverified/blast-radius)
 
-Dependency direction: e2e.py -> artifacts.py -> {honest, verifier, replay.play}. This module
-imports NO mdg.core (it is reporting-side, consuming JSONL) and NO langgraph. The result
-dataclasses live HERE so e2e (which imports the heavy node graph) depends on this light module,
-not the reverse.
+의존 방향: e2e.py -> artifacts.py -> {honest, verifier, replay.play}. 이 모듈은 mdg.core를
+전혀 import하지 않고(보고서 측, JSONL 소비) langgraph도 import하지 않는다. 결과 dataclass가
+여기 있으므로 (무거운 노드 그래프를 import하는) e2e가 이 가벼운 모듈에 의존하며,
+그 반대가 아니다.
 """
 from __future__ import annotations
 
@@ -41,33 +41,33 @@ __all__ = [
 
 
 # --------------------------------------------------------------------------- #
-# Result dataclasses (produced by e2e.run_campaign, consumed by to_report)
+# 결과 dataclass (e2e.run_campaign이 생성, to_report가 소비)
 # --------------------------------------------------------------------------- #
 @dataclass
 class AttackOutcome:
-    """One replayed attack's full outcome (detection + response + verification)."""
+    """재생된 공격 하나의 전체 결과 (탐지 + 대응 + 검증)."""
     attack_id: str
     title: str
     description: str
     run_path: str = ""
-    # detection
+    # 탐지
     detected: bool = False
-    verified_detection: bool = False        # live-grounded observation (D-1 telemetry / B-1 PFCP)
+    verified_detection: bool = False        # 라이브 지상근거 관측 (D-1 telemetry / B-1 PFCP)
     incidents: list[dict] = field(default_factory=list)   # {id, kind, score, target, ...}
     top_impact_band: str = "Green"
     domains_hit: list[str] = field(default_factory=list)
-    # response
+    # 대응
     responded: bool = False
-    response_rule: str = ""                 # recovery_type chosen (or "")
-    response_tool: str = ""                 # registry tool_id
+    response_rule: str = ""                 # 선택된 recovery_type (없으면 "")
+    response_tool: str = ""                 # 레지스트리 tool_id
     response_tier: str = ""                 # AUTO | OPER | NONE
     response_dispatch: str = "none"         # inert_dry | dry_argv | operator_gate | escalated | none
-    revert_cmd: str = ""                    # G3 revert recorded before any side effect
-    live_execution: bool = False            # ALWAYS False (operator-go 유보)
-    # verification (independent Verifier)
+    revert_cmd: str = ""                    # 부작용 전 기록된 G3 revert
+    live_execution: bool = False            # 항상 False (operator-go 유보)
+    # 검증 (독립 Verifier)
     truth_summary: dict = field(default_factory=dict)
     agent_truth_divergences: int = 0
-    # honesty
+    # 정직성
     honest_keys: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
@@ -77,7 +77,7 @@ class AttackOutcome:
 
 @dataclass
 class CampaignResult:
-    """The whole 6-attack campaign result (root object the report is built from)."""
+    """6개 공격 캠페인 전체 결과 (보고서가 만들어지는 루트 객체)."""
     outcomes: list[AttackOutcome] = field(default_factory=list)
     out_dir: str = ""
     banner: dict = field(default_factory=H.banner)
@@ -94,7 +94,7 @@ class CampaignResult:
         "Backend.allow_live=False 기본 → 모든 actuation DRY-RUN.",
     ])
 
-    # -- rollups --------------------------------------------------------- #
+    # -- 롤업 --------------------------------------------------------- #
     @property
     def total(self) -> int:
         return len(self.outcomes)
@@ -117,7 +117,7 @@ class CampaignResult:
 
     @property
     def live_execution_count(self) -> int:
-        return sum(1 for o in self.outcomes if o.live_execution)   # must be 0
+        return sum(1 for o in self.outcomes if o.live_execution)   # 반드시 0
 
     def to_dict(self) -> dict:
         return {
@@ -136,12 +136,12 @@ class CampaignResult:
 
 
 # --------------------------------------------------------------------------- #
-# Per-attack artifacts (from run.jsonl + independent Verifier)
+# 공격별 산출물 (run.jsonl + 독립 Verifier)
 # --------------------------------------------------------------------------- #
 def build_timeline(run_path: str) -> list[dict]:
-    """Per-tick timeline: node path, evidence count, impact band, incidents, decision.
+    """틱별 타임라인: 노드 경로, 근거 수, impact band, incidents, decision.
 
-    Pure read of run.jsonl via replay.play (no re-execution, no testbed, deterministic)."""
+    replay.play를 통한 run.jsonl 순수 읽기 (재실행 없음, testbed 없음, 결정론적)."""
     ticks = play.load_timeline(run_path)
     out: list[dict] = []
     for t in ticks:
@@ -162,7 +162,7 @@ def build_timeline(run_path: str) -> list[dict]:
 
 
 def build_decisions(run_path: str) -> list[dict]:
-    """The agent decision channel across the run (what it chose + enforcement tier)."""
+    """런 전체에 걸친 agent 결정 채널 (무엇을 선택했는지 + enforcement tier)."""
     ticks = play.load_timeline(run_path)
     out: list[dict] = []
     for t in ticks:
@@ -180,10 +180,10 @@ def build_decisions(run_path: str) -> list[dict]:
 
 
 def build_verifier_truth(run_path: str) -> dict:
-    """The INDEPENDENT Verifier's per-tick truth + run summary (H-K agent≠truth).
+    """독립 Verifier의 틱별 진실 + 런 요약 (H-K agent≠truth).
 
-    Calls the standalone Verifier (verifier.py: replay-only, imports NO mdg.core) so the
-    truth column is genuinely independent of the agent's decisions."""
+    독립형 Verifier(verifier.py: replay 전용, mdg.core 미import)를 호출하므로 진실
+    컬럼이 agent의 결정과 진정으로 독립이다."""
     verdicts = V.verify_run(run_path)
     return {
         "summary": V.summarize(verdicts),
@@ -205,7 +205,7 @@ def build_verifier_truth(run_path: str) -> dict:
 
 
 # --------------------------------------------------------------------------- #
-# CampaignResult -> 6-chapter report
+# CampaignResult -> 6장 보고서
 # --------------------------------------------------------------------------- #
 _CHAPTER_TITLES = {
     1: "개요·범위 (Scope & Invariants)",
@@ -216,13 +216,12 @@ _CHAPTER_TITLES = {
     6: "정직성·한계 (Honesty & Limitations)",
 }
 
-# report-role crosswalk (P6-Q report-structure lock): the SIX chapters below are a STANDALONE
-# E2E campaign evidence report — they are NOT "Chapter 6" of the shared competition report.
-# The naming collision (this artifact's 6 chapters vs the shared report's 章 taxonomy) is
-# resolved here, not by restructuring the chapters (which would break test_p6_campaign, the
-# RUNBOOK DRY check, and honest.py's chapter mapping). report-generator MUST consume this
-# artifact via report_role.folds_into and keep the honesty banner intact (verified=2,
-# live_state_changes=0, operator-go) rather than promoting these 6 chapters to top level.
+# report-role 크로스워크 (P6-Q 보고서 구조 락): 아래 6개 章은 자체 완결형 E2E 캠페인
+# 증거 보고서다 — 공동 경쟁 보고서의 "6장"이 아니다. 이름 충돌(이 산출물의 6개 章 vs
+# 공동 보고서의 章 분류)은 章을 재구조화하지 않고 여기서 해소한다(재구조화하면
+# test_p6_campaign, RUNBOOK DRY 체크, honest.py의 章 매핑이 깨진다). report-generator는 이
+# 산출물을 report_role.folds_into로 소비하고 정직성 배너(verified=2,
+# live_state_changes=0, operator-go)를 그대로 유지해야 하며 이 6개 章을 top level로 승격하지 말 것.
 _REPORT_ROLE = {
     "artifact": "e2e_campaign_evidence_report",
     "standalone": True,
@@ -238,14 +237,14 @@ _REPORT_ROLE = {
 
 
 def to_report(campaign: CampaignResult) -> dict:
-    """Map a CampaignResult onto the 6-chapter report structure.
+    """CampaignResult를 6장 보고서 구조에 매핑한다.
 
-    Each chapter is a self-contained dict the report-generator (or a viewer) renders. All
-    per-attack artifacts are rebuilt from the recorded run.jsonl so the report is a pure,
-    reproducible function of the campaign's on-disk records (portability pillar)."""
+    각 章은 report-generator(또는 뷰어)가 렌더하는 자체 완결형 dict다. 공격별 산출물은
+    모두 기록된 run.jsonl에서 재구성되므로 보고서는 캠페인의 온디스크 기록에 대한 순수·
+    재현 가능한 함수다(이식성 기둥)."""
     outcomes = campaign.outcomes
 
-    # rebuild artifacts per attack (from run.jsonl) so the report is JSONL-reproducible
+    # 공격별 산출물을 (run.jsonl에서) 재구성해 보고서가 JSONL로 재현 가능하게 한다
     per_attack_artifacts: dict[str, dict] = {}
     for o in outcomes:
         if o.run_path:
@@ -255,7 +254,7 @@ def to_report(campaign: CampaignResult) -> dict:
                     "decisions": build_decisions(o.run_path),
                     "verifier_truth": build_verifier_truth(o.run_path),
                 }
-            except Exception as exc:            # a missing/corrupt run.jsonl must not crash the report
+            except Exception as exc:            # 누락/손상된 run.jsonl이 보고서를 crash시키면 안 된다
                 per_attack_artifacts[o.attack_id] = {"error": f"{type(exc).__name__}: {exc}"}
 
     ch1 = {
@@ -264,7 +263,7 @@ def to_report(campaign: CampaignResult) -> dict:
         "invariants": campaign.invariants,
         "operating_constraints": campaign.operating_constraints,
         "execution_mode": "DRY (operator-go 유보)",
-        "live_state_changes": campaign.live_execution_count,      # asserted 0
+        "live_state_changes": campaign.live_execution_count,      # 0으로 단언
         "rollup": campaign.to_dict()["rollup"],
     }
 
@@ -305,7 +304,7 @@ def to_report(campaign: CampaignResult) -> dict:
                 "attack_id": o.attack_id, "responded": o.responded,
                 "rule": o.response_rule, "tool": o.response_tool, "tier": o.response_tier,
                 "dispatch": o.response_dispatch, "revert_cmd": o.revert_cmd,
-                "live_execution": o.live_execution,             # ALWAYS False
+                "live_execution": o.live_execution,             # 항상 False
                 "decisions": per_attack_artifacts.get(o.attack_id, {}).get("decisions", []),
             }
             for o in outcomes
@@ -346,16 +345,16 @@ def to_report(campaign: CampaignResult) -> dict:
 
     return {
         "report": "MDG 방어 에이전트 — E2E 캠페인 증거 보고서 (자체 완결형 6장)",
-        "report_role": _REPORT_ROLE,      # crosswalk: standalone artifact, folds into shared §7
+        "report_role": _REPORT_ROLE,      # 크로스워크: 독립 산출물, 공동 §7로 접힘
         "chapters": {"1": ch1, "2": ch2, "3": ch3, "4": ch4, "5": ch5, "6": ch6},
     }
 
 
 def write_report_json(campaign: CampaignResult, path: str) -> str:
-    """Serialize the 6-chapter report to ``path`` (deterministic, secret-free by construction).
+    """6장 보고서를 ``path``에 직렬화한다 (결정론적, 구조상 비밀 없음).
 
-    The report is built only from CampaignResult + run.jsonl artifacts, both of which are
-    already record-time redacted (PS-3); no secret field exists to serialize."""
+    보고서는 CampaignResult + run.jsonl 산출물만으로 만들어지며 둘 다 이미 기록 시점에
+    편집(redact)되어 있어(PS-3) 직렬화할 비밀 필드가 존재하지 않는다."""
     report = to_report(campaign)
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(report, fh, ensure_ascii=False, sort_keys=True, indent=2)

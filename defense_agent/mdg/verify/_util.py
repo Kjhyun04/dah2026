@@ -1,4 +1,4 @@
-"""Shared helpers for verify-suite scripts (pure stdlib; no langgraph/pydantic req)."""
+"""verify-suite 스크립트용 공용 헬퍼 (순수 stdlib; langgraph/pydantic 불필요)."""
 from __future__ import annotations
 
 import ast

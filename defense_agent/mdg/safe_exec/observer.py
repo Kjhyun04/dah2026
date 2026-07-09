@@ -1,40 +1,40 @@
-"""observer (Phase 4) — read-only effect-confirm observers for the recovery lifecycle.
+"""observer (Phase 4) — 회복 라이프사이클을 위한 read-only effect-confirm 관측자.
 
-``make_effect_observer(...)`` returns an ``observe(rule) -> bool`` closure that
-``effect_confirm`` (PA-2) calls to decide whether an applied recovery rule has actually
-TAKEN EFFECT in the live testbed. It is the "회복 완료" signal that flips
-``worldstate.applied[rule].confirmed`` from False -> True.
+``make_effect_observer(...)`` 는 ``observe(rule) -> bool`` 클로저를 반환하며,
+``effect_confirm`` (PA-2) 이 이를 호출하여 적용된 회복 규칙이 live 테스트베드에서 실제로
+효력을 발휘했는지 판단한다. 이는 ``worldstate.applied[rule].confirmed`` 를 False -> True 로
+뒤집는 "회복 완료" 신호이다.
 
-Per-mechanism confirmation (rule resolved to its response_tool via RECOVERY_PRIORS):
-  - ``docker_pause``   (backdoor_pause) : ``docker inspect .State.Paused`` on the enforce_at
-    container is True (the attacker container is frozen).
-  - ``nsenter_input_drop`` (backdoor_drop) : inside the enforce_at container's netns the
-    RECOVERY ENFORCEMENT is in place. PRIMARY signal = the INPUT-chain DROP rule is installed
-    (``iptables -S INPUT`` shows a ``-s <src> -j DROP`` line). SECONDARY = ``ss`` shows NO ESTAB
-    on the backdoor port (5762). Rule-existence is primary because an already-ESTABLISHED server
-    socket is NOT reset by an ingress DROP — the kernel only discards new packets, so the peer
-    ESTAB entry can linger for minutes (keepalive/RTO) after the DROP is effective. Keying the
-    "회복 완료" signal on ESTAB-absence alone would leave backdoor_drop UNCONFIRMED for the whole
-    preliminary window, so ``already_applied`` (applied∧confirmed) would stay False and the
-    NON-idempotent ``iptables -I`` would be re-inserted every debounce window, accumulating
-    duplicate rules a single ``-D`` cannot fully revert (가역성/leak-0 저촉). Rule-existence
-    confirms as soon as the DROP is actually installed, so re-actuation is suppressed idempotently.
-  - ``send_signed_mode`` (signed_*) : downlink telemetry ``rel_alt`` recovered to target
-    (30 m ± tol) AND ``mode`` is an explicit non-landing flight mode (present, not LAND) —
-    flight re-established. A MISSING mode is NOT treated as recovered (altitude alone is too
-    sparse a signal — the vehicle transits 30 m while descending, so a bare altitude match
-    could false-confirm; a positive mode reading is required).
+메커니즘별 확인 (규칙은 RECOVERY_PRIORS 를 통해 response_tool 로 해석):
+  - ``docker_pause``   (backdoor_pause) : enforce_at 컨테이너의 ``docker inspect .State.Paused``
+    가 True (공격자 컨테이너가 동결됨).
+  - ``nsenter_input_drop`` (backdoor_drop) : enforce_at 컨테이너의 netns 안에서 회복 강제가
+    설치되어 있다. PRIMARY 신호 = INPUT 체인 DROP 규칙이 설치됨
+    (``iptables -S INPUT`` 가 ``-s <src> -j DROP`` 라인을 표시). SECONDARY = ``ss`` 가 backdoor
+    포트(5762)에 ESTAB 이 없음을 표시. 규칙 존재가 primary 인 이유: 이미 ESTABLISHED 된 서버
+    소켓은 ingress DROP 으로 리셋되지 않기 때문 — 커널은 새 패킷만 폐기하므로, DROP 이 효력을
+    발휘한 뒤에도 peer ESTAB 항목이 수 분간(keepalive/RTO) 잔존할 수 있다. "회복 완료" 신호를
+    ESTAB 부재만으로 좌우하면 backdoor_drop 은 예선 구간 내내 미확인 상태로
+    남게 되어, ``already_applied`` (applied∧confirmed) 가 False 로 유지되고
+    비멱등 ``iptables -I`` 가 매 debounce 윈도우마다 재삽입되어,
+    단일 ``-D`` 로는 완전히 되돌릴 수 없는 중복 규칙이 누적된다 (가역성/leak-0 저촉). 규칙 존재는
+    DROP 이 실제로 설치되는 즉시 확인되므로 재작동이 멱등적으로 억제된다.
+  - ``send_signed_mode`` (signed_*) : 다운링크 텔레메트리 ``rel_alt`` 가 목표
+    (30 m ± tol)로 회복 AND ``mode`` 가 명시적 비착륙 비행 모드 (존재, LAND 아님) —
+    비행 재확립. 결측 mode 는 회복으로 간주하지 않는다 (고도 단독은 신호가 너무
+    희소 — 기체가 하강 중에 30 m 를 통과하므로, 단순 고도 일치만으로는 오확인이
+    가능; 양성 mode 판독이 필수).
 
-불변식2. (누수-0): EVERY probe here is READ-ONLY. The docker probe is a metadata
-``inspect`` (read_only=True fast-path); the ss probe is an allowlisted observer wrapped in
-the target's netns; telemetry is a passive collector snapshot. NOTHING spawns except through
-the single injected ``Backend`` (``backend.run`` = the sole ``_spawn`` site). No new subprocess
-path is introduced. 불변식1. (결정론): the observer reads live state only; routing never depends
-on it (effect_confirm -> END regardless), so determinism is untouched.
+불변식2. (누수-0): 여기의 모든 probe 는 READ-ONLY 이다. docker probe 는 메타데이터
+``inspect`` (read_only=True fast-path); ss probe 는 대상 netns 로 감싼 allowlist 관측자;
+텔레메트리는 수동 collector 스냅샷이다. 단일 주입 ``Backend`` (``backend.run`` = 유일한 ``_spawn``
+지점)를 통하지 않고는 아무것도 spawn 하지 않는다. 새 subprocess 경로는 도입되지 않는다.
+불변식1. (결정론): 관측자는 live 상태만 읽는다; 라우팅은 이에 절대 의존하지 않으므로
+(effect_confirm -> END 무관), 결정론은 훼손되지 않는다.
 
-Fail-safe: any unresolved target / missing dep / DRY / error yields ``False`` (UNCONFIRMED),
-never a spurious confirm — the next tick re-observes (PA-2). A False-confirm would be the
-dangerous direction (falsely declaring recovery done), so the closure is conservative.
+Fail-safe: 미해석 대상 / 의존성 결여 / DRY / 에러는 모두 ``False`` (미확인)을 낳으며,
+허위 확인은 절대 없다 — 다음 tick 이 재관측한다 (PA-2). 오확인(회복 완료를 거짓으로 선언)이
+위험한 방향이므로, 클로저는 보수적으로 동작한다.
 """
 from __future__ import annotations
 
@@ -43,31 +43,31 @@ from typing import Any, Callable, Optional
 from ..config.defaults import RECOVERY_PRIORS
 from .backend import Backend, ExecRequest
 
-# The 5762 backdoor control port (uav_ue netns). ESTAB on this port == attacker still connected.
+# 5762 backdoor 제어 포트 (uav_ue netns). 이 포트의 ESTAB == 공격자가 여전히 연결됨.
 _BACKDOOR_PORT = 5762
-# signed_* flight recovery target: relative altitude (m) and tolerance band.
+# signed_* 비행 회복 목표: 상대 고도(m)와 허용 오차 band.
 _TARGET_ALT_M = 30.0
 _ALT_TOL_M = 5.0
 
 
 def _tool_for(rule: str, priors: dict) -> Optional[str]:
-    """rule -> response_tool via priors (docker_pause / nsenter_input_drop / send_signed_mode)."""
+    """priors 를 통한 rule -> response_tool (docker_pause / nsenter_input_drop / send_signed_mode)."""
     row = priors.get(rule) or {}
     return row.get("response_tool")  # type: ignore[return-value]
 
 
 def _container_for(rule: str, priors: dict) -> Optional[str]:
-    """rule -> enforce_at container key (== netns_prefix_map / docker-inspect key for these rules)."""
+    """rule -> enforce_at 컨테이너 키 (== 이 규칙들의 netns_prefix_map / docker-inspect 키)."""
     row = priors.get(rule) or {}
     ea = row.get("enforce_at")
     return str(ea) if ea else None
 
 
 def _estab_on_port(ss_stdout: str, port: int) -> bool:
-    """True iff ``ss`` output has an ESTAB row referencing ``:port`` (attacker still connected).
+    """``ss`` 출력에 ``:port`` 를 참조하는 ESTAB 행이 있으면 True (공격자가 여전히 연결됨).
 
-    LISTEN rows are IGNORED: a server socket bound to :5762 legitimately survives the DROP —
-    only an ESTABlished attacker connection is the thing the DROP removes."""
+    LISTEN 행은 무시: :5762 에 바인딩된 서버 소켓은 DROP 뒤에도 정상적으로 존속한다 —
+    DROP 이 제거하는 것은 오직 ESTABlished 된 공격자 연결이다."""
     needle = f":{port}"
     for line in (ss_stdout or "").splitlines():
         toks = line.split()
@@ -77,7 +77,7 @@ def _estab_on_port(ss_stdout: str, port: int) -> bool:
 
 
 def _observe_pause(rule: str, docker: Any, priors: dict) -> bool:
-    """backdoor_pause: enforce_at container's ``.State.Paused`` is True."""
+    """backdoor_pause: enforce_at 컨테이너의 ``.State.Paused`` 가 True."""
     container = _container_for(rule, priors)
     if not container or docker is None:
         return False
@@ -91,14 +91,14 @@ def _observe_pause(rule: str, docker: Any, priors: dict) -> bool:
 
 
 def _input_source_drop_installed(ipt_s_stdout: str) -> bool:
-    """True iff ``iptables -S INPUT`` output has an INPUT ``-s <src> -j DROP`` rule — i.e. the
-    recovery DROP is actually installed in the target netns. This is the PRIMARY, promptly-true
-    backdoor_drop confirmation (rule-existence), independent of the lagging ESTAB teardown."""
+    """``iptables -S INPUT`` 출력에 INPUT ``-s <src> -j DROP`` 규칙이 있으면 True — 즉 회복
+    DROP 이 대상 netns 에 실제 설치되어 있다. 이는 지연되는 ESTAB 해제와 무관하게 즉시 참이 되는
+    PRIMARY backdoor_drop 확인 (규칙 존재)이다."""
     for line in (ipt_s_stdout or "").splitlines():
         toks = line.split()
         if not toks or toks[0] not in ("-A", "-I"):
             continue
-        # an INPUT append/insert that filters a SOURCE with target DROP == our containment rule
+        # SOURCE 를 필터링하고 target 이 DROP 인 INPUT append/insert == 우리의 봉쇄 규칙
         if "INPUT" in toks and "-s" in toks and "DROP" in toks:
             return True
     return False
@@ -106,20 +106,20 @@ def _input_source_drop_installed(ipt_s_stdout: str) -> bool:
 
 def _observe_drop(rule: str, netns_prefix_map: dict, backend: Optional[Backend],
                   priors: dict, port: int) -> bool:
-    """backdoor_drop confirmed when the recovery ENFORCEMENT is in place inside the enforce_at
-    container's netns. PRIMARY: the INPUT DROP rule is installed (``iptables -S INPUT``) — this
-    is what flips ``already_applied`` True and stops the non-idempotent ``-I`` re-insertion. Only
-    if the rule is not (yet) observable do we fall back to the SECONDARY ESTAB-absence signal
-    (which can lag minutes past the DROP being effective, so it is never the sole signal)."""
+    """enforce_at 컨테이너의 netns 안에 회복 강제가 설치되면 backdoor_drop 확인. PRIMARY: INPUT
+    DROP 규칙이 설치됨 (``iptables -S INPUT``) — 이것이 ``already_applied`` 를 True 로 뒤집고
+    비멱등 ``-I`` 재삽입을 멈춘다. 규칙이 (아직) 관측되지 않을 때에만 SECONDARY ESTAB 부재
+    신호로 폴백한다 (이는 DROP 이 효력을 낸 뒤 수 분 지연될 수 있으므로 결코 단독 신호가 되지
+    않는다)."""
     container = _container_for(rule, priors)
     if not container or backend is None:
         return False
     prefix = (netns_prefix_map or {}).get(container)
-    if not prefix:                                  # unresolved netns -> inert (never a false confirm)
+    if not prefix:                                  # 미해석 netns -> inert (오확인 절대 없음)
         return False
-    # PRIMARY — the DROP rule is installed. ``iptables -S`` is read-only in effect (lists rules,
-    # mutates nothing); it is NOT on the read_only fast-path allowlist so it stays operator-go DRY
-    # under allow_live=False (the DROP itself is likewise DRY then, so nothing to confirm — safe).
+    # PRIMARY — DROP 규칙이 설치됨. ``iptables -S`` 는 사실상 read-only (규칙 나열, 변경 없음);
+    # read_only fast-path allowlist 에는 없으므로 allow_live=False 에서는 operator-go DRY 로
+    # 유지된다 (그때는 DROP 자체도 DRY 이므로 확인할 것이 없음 — 안전).
     try:
         rules = backend.run(ExecRequest(argv=[*prefix, "iptables", "-w", "-S", "INPUT"],
                                         timeout_s=6.0))
@@ -129,19 +129,19 @@ def _observe_drop(rule: str, netns_prefix_map: dict, backend: Optional[Backend],
             and getattr(rules, "ok", False)
             and _input_source_drop_installed(rules.stdout or "")):
         return True
-    # SECONDARY — attacker ESTAB on the backdoor port is gone (belt-and-suspenders; lags the DROP).
+    # SECONDARY — backdoor 포트의 공격자 ESTAB 이 사라짐 (이중 안전장치; DROP 보다 지연).
     try:
         res = backend.run(ExecRequest(argv=[*prefix, "ss", "-tan"], timeout_s=6.0, read_only=True))
     except Exception:
         return False
     if res is None or getattr(res, "dry_run", False) or not getattr(res, "ok", False):
-        return False                                # DRY / failure -> unconfirmed
+        return False                                # DRY / 실패 -> 미확인
     return not _estab_on_port(res.stdout or "", port)
 
 
 def _observe_signed(telemetry: Optional[Callable[[], Optional[dict]]],
                     target_alt_m: float, alt_tol_m: float) -> bool:
-    """signed_*: rel_alt recovered to target±tol AND mode != LAND (flight re-established)."""
+    """signed_*: rel_alt 이 target±tol 로 회복 AND mode != LAND (비행 재확립)."""
     if telemetry is None:
         return False
     try:
@@ -154,8 +154,8 @@ def _observe_signed(telemetry: Optional[Callable[[], Optional[dict]]],
     if alt is None:
         return False
     mode = snap.get("mode", snap.get("flight_mode"))
-    # A POSITIVE mode reading is required: altitude alone is too sparse (the vehicle transits the
-    # 30 m band while descending), so a MISSING mode is NOT recovered, and LAND is not recovered.
+    # 양성 mode 판독이 필수: 고도 단독은 너무 희소하므로 (기체가 하강 중에 30 m band 를
+    # 통과), 결측 mode 는 회복 아님, LAND 도 회복 아님.
     if mode is None or str(mode).strip() == "" or str(mode).upper() == "LAND":
         return False
     try:
@@ -171,20 +171,20 @@ def make_effect_observer(docker: Any = None, netns_prefix_map: Optional[dict] = 
                          *, backdoor_port: int = _BACKDOOR_PORT,
                          target_alt_m: float = _TARGET_ALT_M,
                          alt_tol_m: float = _ALT_TOL_M) -> Callable[[str], bool]:
-    """Build the ``observe(rule) -> bool`` closure injected into ``effect_confirm`` (deps["observe"]).
+    """``effect_confirm`` (deps["observe"])에 주입되는 ``observe(rule) -> bool`` 클로저를 만든다.
 
-    ``docker``           : duck-typed backend exposing ``inspect_paused(container) -> bool|None``
-                           (the safe-exec docker backend; read-only ``inspect``).
-    ``netns_prefix_map`` : container -> nsenter prefix (for the ss probe inside the target netns).
-    ``backend``          : the single safe-exec ``Backend`` (sole spawn site; ss goes through it).
-    ``telemetry``        : optional ``() -> {"rel_alt": float, "mode"/"flight_mode": str}|None``
-                           snapshot for signed_* flight recovery. live_autorun wires the
-                           AirTelemetryTap.snapshot (14560/14550 decode) here; None -> the signed
-                           path stays UNCONFIRMED, safe.
-    ``priors``           : rule -> {response_tool, enforce_at, ...} (defaults to RECOVERY_PRIORS).
+    ``docker``           : ``inspect_paused(container) -> bool|None`` 를 노출하는 duck-typed 백엔드
+                           (safe-exec docker 백엔드; read-only ``inspect``).
+    ``netns_prefix_map`` : container -> nsenter prefix (대상 netns 안의 ss probe 용).
+    ``backend``          : 단일 safe-exec ``Backend`` (유일 spawn 지점; ss 는 이를 통과).
+    ``telemetry``        : signed_* 비행 회복용 선택적 ``() -> {"rel_alt": float,
+                           "mode"/"flight_mode": str}|None`` 스냅샷. live_autorun 이 여기에
+                           AirTelemetryTap.snapshot (14560/14550 디코드)를 배선; None -> signed
+                           경로는 미확인으로 유지, 안전.
+    ``priors``           : rule -> {response_tool, enforce_at, ...} (기본값 RECOVERY_PRIORS).
 
-    The returned closure is deterministic given the live world (불변식1.) and probes read-only only
-    (불변식2.). Unknown rule / missing dep / any error -> False (never a spurious confirm)."""
+    반환된 클로저는 live world 하에서 결정론적이며 (불변식1.) probe 는 read-only 전용이다
+    (불변식2.). 미지 rule / 의존성 결여 / 임의 에러 -> False (허위 확인 절대 없음)."""
     priors = priors if priors is not None else RECOVERY_PRIORS
 
     def observe(rule: str) -> bool:
@@ -195,6 +195,6 @@ def make_effect_observer(docker: Any = None, netns_prefix_map: Optional[dict] = 
             return _observe_drop(rule, netns_prefix_map or {}, backend, priors, backdoor_port)
         if tool == "send_signed_mode":
             return _observe_signed(telemetry, target_alt_m, alt_tol_m)
-        return False                                 # unknown/unmapped rule -> unconfirmed
+        return False                                 # 미지/미매핑 rule -> 미확인
 
     return observe

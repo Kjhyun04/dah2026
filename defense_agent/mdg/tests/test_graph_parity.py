@@ -1,19 +1,19 @@
-"""test_graph_parity (PA-9 dynamic guard) — production graph == single-sourced topology.
+"""test_graph_parity (PA-9 dynamic guard) — 프로덕션 그래프 == 단일 출처 토폴로지.
 
-Under D-2 (langgraph not installed) the campaign runs the langgraph-FREE ``_TickExecutor``,
-so the compiled ``core.graph.build_graph`` path is never exercised locally: the code that is
-tested is not the code that ships. This test closes that gap with a capability probe:
+D-2(langgraph 미설치)에서 캠페인은 langgraph 없는 ``_TickExecutor``를 실행하므로,
+컴파일된 ``core.graph.build_graph`` 경로는 로컬에서 결코 실행되지 않는다: 테스트되는
+코드가 실제 배포되는 코드가 아니다. 이 테스트는 능력 탐지(capability probe)로 그 간극을 메운다:
 
-  * ALWAYS (no langgraph needed): the single-sourced ``core.topology`` spec is self-consistent
-    and the two independent copies (topology.NODE_ROSTER, verifier._NODE_ORDER) agree — the
-    structural half of the parity contract, enforced on every machine.
-  * WHEN langgraph IS present (the production image): additionally compile ``build_graph`` and
-    assert its compiled node/edge set matches ``topology.derive_edges()`` — proving the REAL
-    graph and the interpreter share one topology at runtime, not just by hope.
+  * 항상(langgraph 불필요): 단일 출처 ``core.topology`` 사양이 자기 일관적이고
+    두 독립 사본(topology.NODE_ROSTER, verifier._NODE_ORDER)이 일치함 — 모든 머신에서
+    강제되는 패리티 계약의 구조적 절반.
+  * langgraph가 존재할 때(프로덕션 이미지): 추가로 ``build_graph``를 컴파일하고
+    그 컴파일된 노드/엣지 집합이 ``topology.derive_edges()``와 일치함을 단언 — 실제
+    그래프와 인터프리터가 런타임에 하나의 토폴로지를 공유함을 증명(희망이 아닌 실증).
 
-The langgraph half is SKIPPED (never failed) where langgraph is absent, so it cannot break the
-dependency-light local self-verify; it flips to an enforced gate in the image where langgraph
-exists. No testbed contact, no live actuation (structural inspection only).
+langgraph 절반은 langgraph 부재 시 SKIP(실패 아님)되므로 의존성 경량 로컬 자체검증을
+깨뜨릴 수 없다; langgraph가 존재하는 이미지에서는 강제 게이트로 전환된다. testbed 접촉 없음,
+라이브 액추에이션 없음(구조 검사만).
 """
 from __future__ import annotations
 
@@ -32,11 +32,11 @@ _HAS_LANGGRAPH = importlib.util.find_spec("langgraph") is not None
 
 
 def test_topology_self_consistent_always():
-    """Structural half (langgraph-free): the spec is coherent and the roster is single-sourced."""
+    """구조적 절반(langgraph 없음): 사양이 일관적이고 로스터가 단일 출처임."""
     assert topology.ENTRY in topology.NODE_ROSTER
     assert len(topology.NODE_ROSTER) == 11
-    # every non-END target references a real node; every node except the two conditional ones
-    # has a static successor; conditional nodes route only via COND_EDGES.
+    # END이 아닌 모든 타겟은 실제 노드를 참조; 조건부 두 노드를 제외한 모든 노드는
+    # 정적 후속자를 가짐; 조건부 노드는 COND_EDGES로만 라우팅.
     cond = set(topology.COND_EDGES)
     for name in topology.NODE_ROSTER:
         if name in cond:
@@ -49,29 +49,29 @@ def test_topology_self_consistent_always():
     for src, (_fn, mapping) in topology.COND_EDGES.items():
         for target in mapping.values():
             assert target == topology.END or target in topology.NODE_ROSTER
-    # the independent Verifier trust-root copy agrees on order (checked by TEXT here, and it
-    # imports no core — this test reads V._NODE_ORDER, it does not make the Verifier import core).
+    # 독립적인 Verifier trust-root 사본이 순서에 대해 일치(여기서는 TEXT로 확인하며, core를
+    # import하지 않음 — 이 테스트는 V._NODE_ORDER를 읽을 뿐 Verifier가 core를 import하게 만들지 않음).
     assert V._NODE_ORDER == list(topology.NODE_ROSTER)
 
 
 @pytest.mark.skipif(not _HAS_LANGGRAPH, reason="langgraph absent (D-2): compiled-graph parity is operator-go")
 def test_compiled_graph_matches_topology():
-    """Dynamic half (langgraph present): the compiled graph's edges == topology.derive_edges()."""
+    """동적 절반(langgraph 존재): 컴파일된 그래프의 엣지 == topology.derive_edges()."""
     from mdg.core.graph import build_graph
 
-    compiled = build_graph({})               # deps all None -> deterministic fallback; no live actuation
+    compiled = build_graph({})               # deps 전부 None -> 결정론 폴백; 라이브 액추에이션 없음
     try:
         drawn = compiled.get_graph()
         nodes = set(getattr(drawn, "nodes", {}))
         drawn_edges = {(e.source, e.target) for e in getattr(drawn, "edges", [])}
-    except Exception as exc:                  # pragma: no cover - langgraph API shape drift
+    except Exception as exc:                  # pragma: no cover - langgraph API 형태 변화
         pytest.skip(f"langgraph graph introspection unavailable: {exc!r}")
 
-    # every roster node is present in the compiled graph
+    # 모든 로스터 노드가 컴파일된 그래프에 존재
     for name in topology.NODE_ROSTER:
         assert name in nodes, f"compiled graph missing node {name}"
 
-    # normalize sentinels: topology uses 'START'/'END'; langgraph uses '__start__'/'__end__'.
+    # 센티널 정규화: topology는 'START'/'END' 사용; langgraph는 '__start__'/'__end__' 사용.
     def _norm(n: str) -> str:
         return {"START": "__start__", "END": "__end__"}.get(n, n)
 

@@ -1,26 +1,26 @@
-"""safeexec — R1~R6 teardown/reap primitives behind the single subprocess path.
+"""safeexec — 단일 subprocess 경로 뒤의 R1~R6 teardown/reap 프리미티브.
 
-``backend.Backend`` is the sole spawn owner (it imports subprocess and feeds the
-secret on stdin — verify_no_fw_subproc / verify_keys pin that). This module holds the
-teardown discipline Backend delegates to, so the spawn site stays small and the
-reap/label logic is shared and independently testable.
+``backend.Backend`` 가 유일한 spawn 소유자다 (subprocess 를 import 하고
+비밀을 stdin 으로 넣는다 — verify_no_fw_subproc / verify_keys 가 이를 고정). 이 모듈은
+Backend 가 위임하는 teardown discipline 을 담아, spawn 지점을 작게 유지하고
+reap/label 로직을 공유·독립 테스트 가능하게 한다.
 
-Robo-Duck-derived teardown guarantees (R1~R6):
-  R1  hard timeout       — Backend enforces a wall-clock deadline; on expiry it calls
-                           ``kill_group`` here to SIGKILL the whole process group.
-  R2  session isolation  — ``session_popen_kwargs`` sets start_new_session (setsid) so
-                           children share one killable process group.
-  R3  labelling          — ``child_env`` stamps DAH_DEF_LABEL=dah_def on every managed
-                           unit so orphans are discoverable for scoped reap.
-  R4  container-scoped    — ``reap_labelled`` scans ONLY this container's /proc and kills
-      reap                 leftover units bearing the label (never host-wide).
-  R5  secret hygiene     — secrets go on stdin (Backend), never argv/env.
-  R6  idempotent no-leak  — ``reap_proc`` always runs in Backend's finally and is
-      teardown              idempotent, so a raised exception still leaks 0 side effects.
+Robo-Duck 유래 teardown 보장 (R1~R6):
+  R1  hard timeout       — Backend 가 wall-clock 데드라인을 강제; 만료 시 여기의
+                           ``kill_group`` 를 호출해 전체 프로세스 그룹을 SIGKILL.
+  R2  session isolation  — ``session_popen_kwargs`` 가 start_new_session (setsid)을 설정하여
+                           자식들이 하나의 죽일 수 있는 프로세스 그룹을 공유하게 한다.
+  R3  labelling          — ``child_env`` 가 모든 관리 단위에 DAH_DEF_LABEL=dah_def 를 찍어
+                           orphan 을 scoped reap 용으로 발견 가능하게 한다.
+  R4  container-scoped    — ``reap_labelled`` 가 오직 이 컨테이너의 /proc 만 스캔하여 라벨을 단
+      reap                 잔여 단위를 죽인다 (호스트 전역 절대 아님).
+  R5  secret hygiene     — 비밀은 stdin (Backend)으로 가며, argv/env 에는 절대 아니다.
+  R6  idempotent no-leak  — ``reap_proc`` 는 항상 Backend 의 finally 에서 실행되며
+      teardown              멱등적이므로, 예외가 발생해도 side effect 누수가 0 이다.
 
-POSIX (python:3.12-slim runtime) uses setsid + killpg + /proc scan. On non-POSIX
-(local Windows dev) these degrade to best-effort so imports and dry/mock stay runnable;
-live actuation is Linux-only.
+POSIX (python:3.12-slim 런타임)는 setsid + killpg + /proc 스캔을 쓴다. 비-POSIX
+(로컬 Windows dev)에서는 이들이 best-effort 로 강등되어 import 와 dry/mock 이 실행 가능하게 유지되고;
+live 작동은 Linux 전용이다.
 """
 from __future__ import annotations
 
@@ -28,13 +28,13 @@ import os
 import signal
 import subprocess
 
-LABEL = "dah_def"                 # R3: container-scope reap label
-LABEL_ENV = "DAH_DEF_LABEL"       # env key carrying the label on every managed unit
+LABEL = "dah_def"                 # R3: 컨테이너 범위 reap 라벨
+LABEL_ENV = "DAH_DEF_LABEL"       # 모든 관리 단위에 라벨을 실어 나르는 env 키
 _IS_POSIX = os.name == "posix"
 
 
 def child_env(label: str = LABEL, extra: dict | None = None) -> dict:
-    """R3: env for a managed child, tagged with the reap label across the subtree."""
+    """R3: 관리 자식용 env, subtree 전반에 reap 라벨을 태깅."""
     env = dict(os.environ)
     env[LABEL_ENV] = label
     if extra:
@@ -43,15 +43,15 @@ def child_env(label: str = LABEL, extra: dict | None = None) -> dict:
 
 
 def session_popen_kwargs() -> dict:
-    """R2: process-group isolation kwargs so the whole tree is reapable at once."""
+    """R2: 전체 트리를 한 번에 reap 가능하게 하는 프로세스 그룹 격리 kwargs."""
     if _IS_POSIX:
         return {"start_new_session": True}
-    # Windows dev: new process group so we can signal the tree.  # pragma: no cover
+    # Windows dev: 트리에 시그널을 보낼 수 있도록 새 프로세스 그룹.  # pragma: no cover
     return {"creationflags": getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)}
 
 
 def kill_group(proc: "subprocess.Popen") -> None:
-    """R1/R2: SIGKILL the whole process group (setsid) so no child survives."""
+    """R1/R2: 자식이 살아남지 않도록 전체 프로세스 그룹 (setsid)을 SIGKILL."""
     try:
         if _IS_POSIX:
             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
@@ -65,8 +65,8 @@ def kill_group(proc: "subprocess.Popen") -> None:
 
 
 def reap_proc(proc: "subprocess.Popen") -> None:
-    """R6: idempotent teardown of one managed process — kill group if still alive and
-    close pipes to avoid fd leaks. Safe to call in a finally on any code path."""
+    """R6: 관리 프로세스 하나의 멱등 teardown — 아직 살아 있으면 group 을 죽이고
+    fd 누수를 막기 위해 파이프를 닫는다. 어떤 코드 경로의 finally 에서도 호출 안전."""
     try:
         if proc.poll() is None:
             kill_group(proc)
@@ -86,10 +86,10 @@ def reap_proc(proc: "subprocess.Popen") -> None:
 
 
 def iter_labelled_pids(label: str = LABEL) -> list[int]:
-    """R4: scan THIS container's /proc for processes carrying LABEL_ENV=label.
+    """R4: LABEL_ENV=label 을 지닌 프로세스를 찾아 이 컨테이너의 /proc 를 스캔한다.
 
-    Container-scoped by construction: a container's /proc only lists its own PID
-    namespace, so this never reaches the host. Excludes our own pid. POSIX only.
+    구조적으로 컨테이너 범위: 컨테이너의 /proc 는 자신의 PID
+    namespace 만 나열하므로, 이것은 결코 호스트에 도달하지 않는다. 자기 pid 는 제외. POSIX 전용.
     """
     if not _IS_POSIX or not os.path.isdir("/proc"):          # pragma: no cover (dev)
         return []
@@ -112,8 +112,8 @@ def iter_labelled_pids(label: str = LABEL) -> list[int]:
 
 
 def reap_labelled(label: str = LABEL) -> list[int]:
-    """R4: kill any leftover labelled process in this container. Returns reaped pids.
-    Idempotent (R6) — safe to call repeatedly (boot recovery / watchdog / shutdown)."""
+    """R4: 이 컨테이너의 남은 라벨 프로세스를 모두 죽인다. reap 된 pid 를 반환.
+    멱등 (R6) — 반복 호출 안전 (boot recovery / watchdog / shutdown)."""
     reaped: list[int] = []
     for pid in iter_labelled_pids(label):
         try:

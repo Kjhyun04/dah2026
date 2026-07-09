@@ -1,27 +1,26 @@
-"""behavioral — consume ``RoleSpec.verify_anchor`` into the ``behaviorally_verified``
-predicate (finding P2-1, GATE2 resolve+verify item A-1).
+"""behavioral — ``RoleSpec.verify_anchor`` 를 ``behaviorally_verified`` 술어로
+소비한다(발견 P2-1, GATE2 resolve+verify 항목 A-1).
 
-Why this module exists: ``resolve.py`` sets ``RoleBinding.verified`` from PRESENCE only
-(container exists via inspect .State.Pid; UE-pool roles additionally require the live tun
-IP to sit inside ``ue_pool_cidr``). Presence is a TOPOLOGY check — a container that exists
-but emits no HEARTBEAT / the wrong sysid / no backdoor-port state would still be
-``verified=True``, overstating GATE2 assurance. The declared ``RoleSpec.verify_anchor``
-(``lo_14550_heartbeat_sys1`` etc.) was a DEAD field, read by no code.
+이 모듈이 존재하는 이유: ``resolve.py`` 는 ``RoleBinding.verified`` 를 PRESENCE(존재)로만
+설정한다(inspect .State.Pid 로 컨테이너 존재; UE-pool 역할은 추가로 라이브 tun IP 가
+``ue_pool_cidr`` 안에 있어야 함). 존재는 TOPOLOGY(위상) 검사다 — 컨테이너는 존재하나
+HEARTBEAT 미방출 / 잘못된 sysid / backdoor-port 상태 없음이어도 여전히
+``verified=True`` 가 되어 GATE2 확신을 과대 표현한다. 선언된 ``RoleSpec.verify_anchor``
+(``lo_14550_heartbeat_sys1`` 등)는 어떤 코드도 읽지 않는 DEAD 필드였다.
 
-This module makes ``verify_anchor`` LIVE: it maps each anchor token to a predicate over
-observed behavioural evidence and produces the DISTINCT ``behaviorally_verified`` bit that
-the GATE2 behavioural probe reads — leaving ``verified`` (and therefore legality's
-``role_verified``) as the pure presence/resolution predicate.
+이 모듈은 ``verify_anchor`` 를 LIVE 로 만든다: 각 anchor 토큰을 관측된 행위 증거에 대한
+술어로 매핑하고, GATE2 행위 프로브가 읽는 별개의(DISTINCT) ``behaviorally_verified`` 비트를
+생성한다 — ``verified``(따라서 적법성의 ``role_verified``)는 순수 존재/해석 술어로 남긴다.
 
-Operator-go note: the underlying live observations (air-side tcpdump HEARTBEAT decode, ss
-5762 state, uav_proxy signing drop-log) are collected out-of-graph and are state-change-0
-read-only, but on the sandbox testbed the live taps are operator-go reserved. Absent
-evidence => every anchor is UNconfirmed (False) — the honest boot posture. ``recon_boot``
-seeds ``behaviorally_verified`` all-False; the runtime feeds live ``AnchorEvidence`` at the
-collector/effect-confirm phase (``apply_behavioral_verification``) as observations arrive.
+operator-go 주의: 기저 라이브 관측(air 측 tcpdump HEARTBEAT 디코드, ss 5762 상태,
+uav_proxy signing drop-log)은 그래프 밖에서 수집되며 상태변경-0 read-only 이나,
+샌드박스 테스트베드에서 라이브 탭은 operator-go 유보다. 증거 부재 => 모든 anchor 는
+미확인(False) — 정직한 boot 자세. ``recon_boot`` 은 ``behaviorally_verified`` 를 전부
+False 로 시딩하고, 런타임은 관측이 도착하는 대로 collector/effect-confirm 단계
+(``apply_behavioral_verification``)에서 라이브 ``AnchorEvidence`` 를 공급한다.
 
-Boundaries: pure functions over a plain dataclass; NO subprocess, NO docker/sock literal,
-NO import of the resolve stage. Unknown/empty anchor => False (fail-closed, never crashes).
+경계: 평범한 dataclass 위의 순수 함수; subprocess 없음, docker/sock 리터럴 없음,
+resolve 단계 import 없음. 미지/빈 anchor => False(fail-closed, 절대 크래시 안 함).
 """
 from __future__ import annotations
 
@@ -33,41 +32,41 @@ from .inputspec import RoleSpec
 
 @dataclass
 class AnchorEvidence:
-    """Observed behavioural signals for ONE role, distilled from live collector output.
+    """하나의(ONE) 역할에 대해 관측된 행위 신호, 라이브 collector 출력에서 정제됨.
 
-    All fields default to the 'not observed' value so an empty AnchorEvidence (the boot /
-    operator-go posture) confirms nothing. The runtime populates these from the same
-    collector payloads that feed ``sense`` (air-side HEARTBEAT decode, ss 5762 state,
-    uav_proxy signing drop-log) — this module never observes anything itself.
+    모든 필드는 '관측 안 됨' 값으로 기본 설정되어 빈 AnchorEvidence(boot /
+    operator-go 자세)는 아무것도 확인하지 않는다. 런타임은 ``sense`` 를 공급하는 동일한
+    collector 페이로드(air 측 HEARTBEAT 디코드, ss 5762 상태,
+    uav_proxy signing drop-log)로부터 이를 채운다 — 이 모듈은 스스로 아무것도 관측하지 않는다.
     """
-    heartbeat_sys: Optional[int] = None   # decoded MAVLink system id on uav_ue lo:14550 (None = none seen)
-    command_entry_seen: bool = False      # a packet observed on the gcs_proxy command-entry UDP:14556 tap
-    port_5762_listen: bool = False        # 5762 in LISTEN (web_backend backdoor port present)
-    port_5762_estab: bool = False         # 5762 has an ESTABLISHED connection (attacker backdoor attempt)
-    signing_drop_seen: bool = False       # uav_proxy signing-verify-fail drop line observed (§9-B ON)
+    heartbeat_sys: Optional[int] = None   # uav_ue lo:14550 에서 디코드된 MAVLink system id (None = 미관측)
+    command_entry_seen: bool = False      # gcs_proxy command-entry UDP:14556 탭에서 패킷 관측됨
+    port_5762_listen: bool = False        # 5762 가 LISTEN 상태(web_backend backdoor 포트 존재)
+    port_5762_estab: bool = False         # 5762 에 ESTABLISHED 연결 존재(공격자 backdoor 시도)
+    signing_drop_seen: bool = False       # uav_proxy signing-verify-fail drop 라인 관측됨(§9-B ON)
 
 
-# anchor token -> predicate over AnchorEvidence. Adding a role's anchor here is the ONLY
-# wiring needed to make it live-consumed (keeps the config anchor and its check colocated).
+# anchor 토큰 -> AnchorEvidence 위의 술어. 역할의 anchor 를 여기에 추가하는 것이
+# 라이브 소비되게 하는 유일한(ONLY) 배선이다(config anchor 와 그 검사를 한 곳에 둔다).
 _ANCHOR_CHECKS: dict[str, Callable[[AnchorEvidence], bool]] = {
-    # uav: a HEARTBEAT with system id == 1 on the uav_ue lo:14550 cross-tap (D-1).
+    # uav: uav_ue lo:14550 교차 탭에서 system id == 1 인 HEARTBEAT(D-1).
     "lo_14550_heartbeat_sys1": lambda e: e.heartbeat_sys == 1,
-    # gcs_proxy: command-entry plane is live on UDP:14556 (the uplink command entry, §P).
+    # gcs_proxy: command-entry 평면이 UDP:14556 에서 라이브(업링크 command entry, §P).
     "command_entry_udp_14556": lambda e: e.command_entry_seen,
-    # attacker: an ESTABLISHED connection on the 5762 backdoor = a backdoor attempt.
+    # attacker: 5762 backdoor 의 ESTABLISHED 연결 = backdoor 시도.
     "port_5762_backdoor_attempt": lambda e: e.port_5762_estab,
-    # web_backend: 5762 present/LISTEN (backdoor port bound; ESTAB also satisfies presence).
+    # web_backend: 5762 존재/LISTEN(backdoor 포트 바인딩됨; ESTAB 도 존재를 만족).
     "port_5762_listen": lambda e: e.port_5762_listen or e.port_5762_estab,
-    # uav_proxy: the §9-B signing-verify-fail drop line (authoritative enforcement signal).
+    # uav_proxy: §9-B signing-verify-fail drop 라인(권위 있는 강제 신호).
     "signing_drop_log_uav_proxy": lambda e: e.signing_drop_seen,
 }
 
 
 def confirm_behavioral_anchor(anchor: str, evidence: Optional[AnchorEvidence]) -> bool:
-    """True iff the role's declared ``verify_anchor`` is satisfied by ``evidence``.
+    """역할의 선언된 ``verify_anchor`` 가 ``evidence`` 로 만족되면 True.
 
-    Fail-closed: unknown/empty anchor or missing evidence -> False. This is the single
-    consumer of ``RoleSpec.verify_anchor`` (it is no longer a dead field)."""
+    Fail-closed: 미지/빈 anchor 또는 증거 부재 -> False. 이것이 ``RoleSpec.verify_anchor``
+    의 유일한 소비처다(더 이상 dead 필드가 아님)."""
     if not anchor or evidence is None:
         return False
     check = _ANCHOR_CHECKS.get(anchor)
@@ -78,12 +77,12 @@ def apply_behavioral_verification(
     roles: list[RoleSpec],
     evidence: Optional[dict[str, AnchorEvidence]] = None,
 ) -> dict[str, bool]:
-    """container -> behaviorally_verified, from each role's ``verify_anchor`` + live evidence.
+    """container -> behaviorally_verified, 각 역할의 ``verify_anchor`` + 라이브 증거로부터.
 
-    ``evidence`` is keyed by container (matching ``world.role_verified`` / ``world.roles``);
-    a container absent from the map => no evidence => False (operator-go / not-yet-observed).
-    Returns a bit for EVERY declared role so the GATE2 probe sees the full role set with a
-    behavioural verdict distinct from the presence verdict."""
+    ``evidence`` 는 container 로 키잉된다(``world.role_verified`` / ``world.roles`` 와 일치);
+    맵에 없는 container => 증거 없음 => False(operator-go / 아직 미관측).
+    선언된 모든(EVERY) 역할에 대해 비트를 반환하여 GATE2 프로브가 존재 판정과 별개인
+    행위 판정으로 전체 역할 집합을 보게 한다."""
     ev_map = evidence or {}
     return {
         r.container: confirm_behavioral_anchor(r.verify_anchor, ev_map.get(r.container))

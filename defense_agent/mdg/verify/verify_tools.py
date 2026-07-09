@@ -1,11 +1,11 @@
 """verify_tools — 27 tool 계약 완전·유령0·Literal 화이트리스트 (H-A/G · DESIGN §2).
 
-Enforces:
-  - DefToolId Literal set == REGISTRY keys, exactly 27 (no ghost, no missing)
-  - every spec fully registered (owner/category/backend/consumes/produces/T)
-  - response tools bind exec (safe-exec) AND declare effect
+강제:
+  - DefToolId Literal 집합 == REGISTRY keys, 정확히 27 (유령 없음, 누락 없음)
+  - 모든 spec 완전 등록 (owner/category/backend/consumes/produces/T)
+  - response 도구는 exec(safe-exec)를 바인딩 AND effect 를 선언
   - send_signed_mode (flight) risk == HIGH (operator)
-  - secrets declared as stdin (never argv, R6)
+  - secret 은 stdin 으로 선언 (argv 절대 금지, R6)
 """
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ def _check() -> Report:
     rep.check(ssm is not None and ssm.risk == "HIGH", "send_signed_mode must be risk=HIGH (operator)")
     rep.check(ssm is not None and ssm.secret == "stdin", "send_signed_mode secret must be stdin (R6)")
 
-    # response exec bindings must reference safe_exec.* (single subprocess owner)
+    # response exec 바인딩은 safe_exec.* 를 참조해야 한다 (유일한 subprocess 소유자)
     for tid, spec in REGISTRY.items():
         if spec.category == "response":
             rep.check(spec.exec.startswith("safe_exec."),

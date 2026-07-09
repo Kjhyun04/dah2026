@@ -1,19 +1,19 @@
-"""play.py (H-J) — offline replay: reconstruct the tick timeline from run.jsonl.
+"""play.py (H-J) — 오프라인 리플레이: run.jsonl 로부터 tick 타임라인을 재구성한다.
 
-The portability pillar (V3 §8): a reviewer with NO testbed drives the Viewer/Verifier
-from ``run.jsonl`` alone. This module re-executes NOTHING (no graph, no testbed, no
-subprocess) — it is a pure stdlib reader that normalizes recorded node updates into a
-per-tick timeline. It tolerates two on-disk schemas:
+이식성 축(V3 §8): 테스트베드가 전혀 없는 리뷰어가 ``run.jsonl`` 만으로 Viewer/Verifier를
+구동한다. 이 모듈은 아무것도 재실행하지 않는다(graph 없음, 테스트베드 없음,
+subprocess 없음) — 기록된 node 업데이트를 tick별 타임라인으로 정규화하는 순수 stdlib 리더다.
+두 가지 on-disk 스키마를 허용한다:
 
   - canonical (record.py):  {"seq": n, "node": "sense", "patch": {...}}
-  - legacy (core.driver):   {"sense": {...}, ...}   (one or more node->patch keys)
+  - legacy (core.driver):   {"sense": {...}, ...}   (하나 이상의 node->patch 키)
 
-Tick boundary = a ``sense`` node update (sense is the graph entry, PA-1: 1 tick starts at
-sense). Patches within a tick are merged (last-writer-wins per channel; accumulators are
-concatenated) into a read-only TickView the Viewer/Verifier consume.
+tick 경계 = ``sense`` node 업데이트(sense가 graph 진입점, PA-1: 1 tick은 sense에서
+시작). 한 tick 내 patch들은 병합되어(채널별 last-writer-wins; accumulator는 연결)
+Viewer/Verifier가 소비하는 read-only TickView가 된다.
 
-Optionally builds the replay VirtualClock (record.build_virtual_clock) and, if the
-standalone Verifier is present, emits truth.jsonl — but re-execution stays out of scope.
+선택적으로 리플레이 VirtualClock(record.build_virtual_clock)을 만들고, 독립형
+Verifier가 있으면 truth.jsonl을 방출한다 — 다만 재실행은 범위 밖으로 유지된다.
 """
 from __future__ import annotations
 
@@ -32,10 +32,10 @@ _ORDER_IX = {n: i for i, n in enumerate(_ORDER)}
 # Load + normalize
 # --------------------------------------------------------------------------- #
 def load_run(path: str) -> list[dict]:
-    """Read run.jsonl into a list of canonical records {"seq","node","patch"}.
+    """run.jsonl을 canonical record {"seq","node","patch"} 리스트로 읽는다.
 
-    Legacy driver lines ({node: patch}) are expanded to one canonical record per node,
-    preserving on-disk order (seq synthesized when absent). Blank/corrupt lines skipped.
+    legacy driver 라인({node: patch})은 node별 canonical record 하나로 확장되며,
+    on-disk 순서를 보존한다(seq는 없을 때 합성). 빈/손상 라인은 건너뛴다.
     """
     out: list[dict] = []
     seq = 0
@@ -56,7 +56,7 @@ def load_run(path: str) -> list[dict]:
                 out.append(rec)
                 seq = rec["seq"] + 1
             else:
-                # legacy {node: patch[, node2: patch2]} — expand in a stable order
+                # legacy {node: patch[, node2: patch2]} — 안정적 순서로 확장
                 for node in sorted(obj.keys(), key=lambda n: _ORDER_IX.get(n, 99)):
                     patch = obj[node]
                     out.append({"seq": seq, "node": str(node),
@@ -67,16 +67,16 @@ def load_run(path: str) -> list[dict]:
 
 @dataclass
 class TickView:
-    """Merged read-only view of one tick (all node patches folded together)."""
+    """한 tick의 병합된 read-only 뷰(모든 node patch를 함께 접음)."""
     index: int
-    nodes: list[str] = field(default_factory=list)          # nodes that ran this tick
+    nodes: list[str] = field(default_factory=list)          # 이 tick에 실행된 node들
     tick_i: Optional[int] = None
     config_version: str = ""
     worldstate: dict = field(default_factory=dict)
     evidence: list = field(default_factory=list)
     impact: dict = field(default_factory=dict)
     trust: dict = field(default_factory=dict)
-    decisions: list = field(default_factory=list)           # accumulated this tick
+    decisions: list = field(default_factory=list)           # 이 tick에 누적됨
     incidents: list = field(default_factory=list)
     ledger: list = field(default_factory=list)
     goal_reached: bool = False
@@ -93,7 +93,7 @@ def _fold(view: TickView, node: str, patch: dict) -> None:
             if isinstance(v, list):
                 cur.extend(v)
         elif k == "evidence" and isinstance(v, list):
-            view.evidence = v                       # sense replaces the snapshot
+            view.evidence = v                       # sense가 스냅샷을 대체
         elif k == "worldstate" and isinstance(v, dict):
             view.worldstate = v
         elif k == "impact" and isinstance(v, dict):
@@ -109,8 +109,8 @@ def _fold(view: TickView, node: str, patch: dict) -> None:
 
 
 def reconstruct_ticks(records: list[dict]) -> list[TickView]:
-    """Group canonical records into per-tick TickViews. A new tick opens on each ``sense``
-    node update (PA-1 entry). Records before the first sense (rare/none) form tick 0."""
+    """canonical record를 tick별 TickView로 묶는다. 각 ``sense`` node 업데이트마다
+    새 tick이 열린다(PA-1 진입). 첫 sense 이전 record(드묾/없음)는 tick 0을 이룬다."""
     ticks: list[TickView] = []
     cur: Optional[TickView] = None
     for rec in records:
@@ -128,10 +128,10 @@ def load_timeline(path: str) -> list[TickView]:
 
 
 # --------------------------------------------------------------------------- #
-# Replay VirtualClock (re-export so the driver can inject it on re-execution)
+# 리플레이 VirtualClock (driver가 재실행 시 주입할 수 있도록 재export)
 # --------------------------------------------------------------------------- #
 def build_virtual_clock(records: list[dict], start: float = 0.0):
-    from .record import build_virtual_clock as _bvc  # local import (keeps play stdlib-first)
+    from .record import build_virtual_clock as _bvc  # 로컬 import (play를 stdlib-first로 유지)
     return _bvc(records, start=start)
 
 
@@ -169,7 +169,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     print(_summarize(ticks))
     if truth_out:
         try:
-            # standalone Verifier (stdlib, does not import core) computes independent truth
+            # 독립형 Verifier (stdlib, core를 import하지 않음)가 독립적 truth를 계산
             from mdg.verifier import verifier as V
             verdicts = V.verify_run(path)
             V.write_truth(verdicts, truth_out)

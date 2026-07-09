@@ -1,27 +1,27 @@
-"""signer_shim — operator-gate token binding (PS-9) + KEY-FREE signed-mode emitter (P3-Q1 / C-2).
+"""signer_shim — operator-gate 토큰 바인딩 (PS-9) + KEY-FREE signed-mode emitter (P3-Q1 / C-2).
 
-C-2 SoD resolution (locked): MDG holds NO uplink-signing key on ANY path. The false premise —
-"the operator-gate must co-locate with the signing key" — is dropped: ``uav_proxy`` already
-ENFORCES uplink signing on the drone side and ``gcs_c2`` already signs with its own key. So
-MDG's autonomous (act) path never needs a signing key (the only AUTO response is the netns
-DROP). The operator-gate here issues an AUTHORIZATION token, not a signature.
+C-2 SoD 해소 (locked): MDG 는 어떤 경로에서도 uplink-signing 키를 보유하지 않는다. 거짓 전제 —
+"operator-gate 는 signing 키와 같은 곳에 있어야 한다" — 는 폐기된다: ``uav_proxy`` 는 이미
+드론 측에서 uplink signing 을 강제하고 ``gcs_c2`` 는 이미 자기 키로 서명한다. 따라서
+MDG 의 자율 (act) 경로는 signing 키가 결코 필요 없다 (유일한 AUTO 대응은 netns
+DROP). 여기의 operator-gate 는 서명이 아니라 인가 토큰을 발급한다.
 
-This module provides two things:
+이 모듈은 두 가지를 제공한다:
 
-  1. Command-bound OperatorRequest (PS-9). The token is an HMAC over
-     ``(decision_id, command_digest, nonce, expiry)`` — so a CAPTURED approval cannot authorize
-     a DIFFERENT command (its command_digest differs, so the HMAC no longer verifies). The nonce
-     is single-use and issue/consume timestamps are MONOTONIC (replay + continuity).
+  1. 명령 결속 OperatorRequest (PS-9). 토큰은
+     ``(decision_id, command_digest, nonce, expiry)`` 에 대한 HMAC 이다 — 그래서 포착된 승인은
+     다른 명령을 인가할 수 없다 (그 command_digest 가 다르므로 HMAC 이 더 이상 검증되지 않음). nonce 는
+     단일 사용이고 issue/consume 타임스탬프는 단조 증가 (replay + 연속성).
 
-  2. A KEY-FREE signed-mode emitter. ``emit_signed`` NEVER opens or references any signing-key
-     path: with allow_live=False it computes ONLY the command_digest (token material); a live
-     promotion DELEGATES to the gcs_c2 out-of-band signing endpoint (operator-go 유보) over an
-     authenticated channel — re-mounting the key is FORBIDDEN (E11 non-proliferation).
+  2. KEY-FREE signed-mode emitter. ``emit_signed`` 는 어떤 signing-key
+     경로도 결코 열거나 참조하지 않는다: allow_live=False 에서는 오직 command_digest (토큰 재료)만
+     계산; live 승격은 인증된 채널로 gcs_c2 out-of-band signing 엔드포인트 (operator-go 유보)에
+     위임한다 — 키 재장착은 금지 (E11 non-proliferation).
 
-Secret hygiene (PS-3 / PS-5 #3): the operator-gate HMAC key lives in THIS module's process
-memory ONLY — never MDGState, replay JSONL, or the checkpointer. It is a SEPARATE secret from the
-uplink-signing key. No signing-key path literal and no key file read appear here (the emitter is
-statically key-free — verify_signer_no_keyopen).
+Secret hygiene (PS-3 / PS-5 #3): operator-gate HMAC 키는 오직 이 모듈의 프로세스
+메모리에만 존재한다 — MDGState, replay JSONL, checkpointer 에는 절대 아니다. 이는
+uplink-signing 키와 별개의 비밀이다. signing-key 경로 리터럴도, 키 파일 읽기도 여기 나타나지 않는다 (emitter 는
+정적으로 key-free — verify_signer_no_keyopen).
 """
 from __future__ import annotations
 
@@ -33,47 +33,47 @@ import warnings
 from dataclasses import dataclass, field
 from typing import Optional
 
-from .backend import ExecRequest  # single-spawn owner request type (불변식2.); NO subprocess here
+from .backend import ExecRequest  # 단일 spawn 소유자 request 타입 (불변식2.); 여기 subprocess 없음
 
-# --- key-free emitter binding: the SoD contract in one place (load-bearing comment) --------- #
-# MDG delegates the actual signature to the container that already holds the key. We name the
-# delegate endpoint but NEVER a key path — the emitter must remain key-free.
-GCS_SIGN_DELEGATE = "gcs_c2"          # out-of-band signer (already holds its own key)
-# LIVE-VERIFIED delegation path (2026-07-09): the recovery is delegated to gcs_c2 by WRITING a
-# TRIGGER FILE, not by exec-ing a standalone sender. Inside gcs_c2, ``gcs.py`` is the SOLE owner of
-# the SITL signing link (it alone holds the udpin:14550 socket and did setup_signing(sign_outgoing=
-# True) with its own in-container key). A second process cannot receive telemetry or emit on that link, so a
-# standalone sender (the old assets/gcs_signed_correct.py approach) does NOT work. Instead gcs.py
-# polls ``GCS_TRIGGER_FILE`` each loop; when present it reads "<MODE> <ALT>" and issues the SIGNED
-# set_mode(GUIDED)+arm+takeoff(alt) over ITS OWN link, then deletes the file. MDG's delegation is
-# therefore "record the trigger", never "run a signer": this module still names no key path and
-# opens no file (verify_signer_no_keyopen); the signature stays entirely inside gcs_c2 (E11).
-GCS_TRIGGER_FILE = "/tmp/mdg_correct"  # recovery trigger polled by gcs.py inside gcs_c2 (MDG writes it)
-_RECOVERY_MODE = "GUIDED"             # the flight mode that accepts the 30 m reposition (S2 return)
-_RECOVERY_ALT_M = 30                  # home/hover relative altitude (arducopter --home=...,30)
-# Backend spawn hard deadline for the TRIGGER-FILE write (R1). The spawn only runs
-# ``docker exec gcs_c2 sh -c 'printf "%s %s" "$1" "$2" > /tmp/mdg_correct' sh <MODE> <ALT>`` — a near-instant metadata
-# write — so this deadline bounds ONLY a hung ``docker exec`` (daemon / IO stall), not any flight
-# sequence. The ACTUAL signed actuation happens ASYNCHRONOUSLY inside gcs.py's poll loop and is
-# decoupled from (never truncated by) this deadline. 30s leaves ample headroom for a busy docker
-# daemon while still SIGKILLing a truly stuck spawn.
+# --- key-free emitter 바인딩: SoD 계약을 한곳에 (load-bearing 주석) --------- #
+# MDG 는 실제 서명을 이미 키를 보유한 컨테이너에 위임한다. delegate 엔드포인트는
+# 명명하되 키 경로는 절대 아니다 — emitter 는 key-free 로 유지되어야 한다.
+GCS_SIGN_DELEGATE = "gcs_c2"          # out-of-band signer (이미 자기 키 보유)
+# LIVE 검증된 위임 경로 (2026-07-09): 회복은 독립 sender 를 exec 하는 게 아니라 TRIGGER FILE 을
+# 씀으로써 gcs_c2 에 위임된다. gcs_c2 내부에서 ``gcs.py`` 가 SITL signing 링크의 유일한 소유자다
+# (그것만이 udpin:14550 소켓을 보유하며 자기 in-container 키로 setup_signing(sign_outgoing=
+# True) 를 했다). 두 번째 프로세스는 그 링크에서 텔레메트리를 받거나 emit 할 수 없으므로, 독립
+# sender (구 assets/gcs_signed_correct.py 방식)는 작동하지 않는다. 대신 gcs.py 가
+# 매 루프마다 ``GCS_TRIGGER_FILE`` 를 폴링; 존재하면 "<MODE> <ALT>" 를 읽어 자기 링크로 SIGNED
+# set_mode(GUIDED)+arm+takeoff(alt) 를 발행한 뒤 파일을 삭제한다. 따라서 MDG 의 위임은
+# "트리거를 기록"이지 결코 "signer 를 실행"이 아니다: 이 모듈은 여전히 키 경로를 명명하지 않고
+# 파일을 열지 않는다 (verify_signer_no_keyopen); 서명은 전적으로 gcs_c2 안에 머문다 (E11).
+GCS_TRIGGER_FILE = "/tmp/mdg_correct"  # gcs_c2 내부 gcs.py 가 폴링하는 회복 트리거 (MDG 가 씀)
+_RECOVERY_MODE = "GUIDED"             # 30 m 재배치를 수락하는 비행 모드 (S2 복귀)
+_RECOVERY_ALT_M = 30                  # home/hover 상대 고도 (arducopter --home=...,30)
+# TRIGGER-FILE 쓰기를 위한 Backend spawn hard 데드라인 (R1). 이 spawn 은 오직
+# ``docker exec gcs_c2 sh -c 'printf "%s %s" "$1" "$2" > /tmp/mdg_correct' sh <MODE> <ALT>`` 만 실행한다 — 거의 즉각적인 메타데이터
+# 쓰기 — 따라서 이 데드라인은 오직 멈춘 ``docker exec`` (daemon / IO stall)만 제한하며, 어떤 flight
+# 시퀀스도 아니다. 실제 signed 작동은 gcs.py 의 폴링 루프 안에서 비동기로 일어나며
+# 이 데드라인과 분리되어 있다 (결코 이에 의해 잘리지 않음). 30s 는 바쁜 docker
+# daemon 에 충분한 여유를 주면서도 진짜 멈춘 spawn 은 SIGKILL 한다.
 _DELEGATE_TIMEOUT_S = 30.0
 
 
 def _canonical(*parts: object) -> bytes:
-    """Deterministic canonical byte-join for digest/HMAC (order-fixed, NUL-separated)."""
+    """digest/HMAC 용 결정론적 canonical 바이트 결합 (순서 고정, NUL 구분)."""
     return b"\x00".join(str(p).encode("utf-8") for p in parts)
 
 
 def command_digest(intent) -> str:
-    """sha256 hex over the command's identifying fields (KEY-FREE — no secret involved).
+    """명령의 식별 필드에 대한 sha256 hex (KEY-FREE — 비밀 미개입).
 
-    Binds decision_id|rule|tool_id|config_version|sorted(params)|target|target_kind|enforce_at. Two
-    different commands (or the same command scoped to a DIFFERENT source OR enforcement selector,
-    P4-Q1/P4-2) yield different digests, so a captured approval minted for one cannot verify against
-    another — operator approval is scoped to (command, source, enforcement chokepoint). (The
-    dispatch-resolved live src_ip binding is operator-go RESERVED: src_ip is only resolved on the
-    AUTO netns-DROP path, not at escalate.)
+    decision_id|rule|tool_id|config_version|sorted(params)|target|target_kind|enforce_at 를 결속한다.
+    서로 다른 두 명령 (또는 다른 source 또는 강제 selector 로 스코프된 동일 명령,
+    P4-Q1/P4-2)은 서로 다른 digest 를 낳으므로, 하나를 위해 발행된 포착 승인은 다른 것에 대해
+    검증될 수 없다 — operator 승인은 (명령, source, 강제 chokepoint)로 스코프된다. (dispatch 가
+    해석한 live src_ip 바인딩은 operator-go 유보: src_ip 는 오직
+    AUTO netns-DROP 경로에서만 해석되며, escalate 에서는 아니다.)
     """
     params = getattr(intent, "params", None) or {}
     if isinstance(params, dict):
@@ -95,31 +95,31 @@ def command_digest(intent) -> str:
 
 @dataclass
 class OperatorRequest:
-    """The command-bound request the operator approves (NON-secret; goes to the ledger)."""
+    """operator 가 승인하는 명령 결속 request (비밀 아님; ledger 로 감)."""
     decision_id: str
     command_digest: str
     nonce: str
-    expiry: float          # absolute deadline (issued_ts + ttl_s)
+    expiry: float          # 절대 데드라인 (issued_ts + ttl_s)
     issued_ts: float
 
 
 class OperatorGate:
-    """Issues/verifies command-bound operator approvals (PS-9). Holds the HMAC key in process
-    memory ONLY (never State). nonce single-use + monotonic timestamps prevent replay.
+    """명령 결속 operator 승인을 발급/검증한다 (PS-9). HMAC 키를 오직 프로세스
+    메모리에만 보유한다 (State 에는 절대 아님). nonce 단일 사용 + 단조 타임스탬프가 replay 를 막는다.
 
-    KEY BOOTSTRAP (P4-Q2, locked): ``key=None`` is the NORMAL MDG-runtime posture, NOT a
-    degraded mode. The autonomous path (escalate) calls ONLY ``issue()`` (key-free), so the MDG
-    process needs NO approval secret — a compromised MDG then has NO material to forge a
-    self-approval (sign()/verify() share ``self._key``: verify-capable == forge-capable, so
-    holding the key inside MDG would let MDG self-approve and bypass the whole PS-9 binding).
-    ``verify()`` returning fail-closed under key=None is therefore an INTENDED contract
-    (structural "runtime cannot self-approve"), not a bug.
+    KEY BOOTSTRAP (P4-Q2, locked): ``key=None`` 은 정상 MDG-runtime 자세이지,
+    강등 모드가 아니다. 자율 경로 (escalate)는 오직 ``issue()`` (key-free)만 호출하므로, MDG
+    프로세스는 승인 비밀이 필요 없다 — 침해된 MDG 는 그때
+    self-approval 을 위조할 재료가 없다 (sign()/verify() 가 ``self._key`` 를 공유: verify 가능 == 위조 가능,
+    따라서 MDG 안에 키를 두면 MDG 가 self-approve 하여 PS-9 결속 전체를 우회할 수 있음).
+    따라서 key=None 하에서 ``verify()`` 가 fail-closed 를 반환하는 것은 의도된 계약이지
+    (구조적 "runtime 은 self-approve 할 수 없음"), 버그가 아니다.
 
-    Provisioning of a real key is OUT-OF-BAND and lives in the operator/verifier trust domain
-    (tmpfs 0400 secret file, operator-go RESERVED, PS-5) — it does NOT flow through MDG. ``key``
-    may be injected for that verifier-domain deployment or unit tests. The env fallback
-    ``MDG_OPERATOR_GATE_KEY`` is DEV/replay ONLY (it is exposed via ``docker inspect`` Config.Env,
-    a PS-1 leak surface) and emits a warning; production keys never arrive via env.
+    실제 키의 프로비저닝은 OUT-OF-BAND 이며 operator/verifier 신뢰 도메인에 존재한다
+    (tmpfs 0400 비밀 파일, operator-go 유보, PS-5) — MDG 를 통해 흐르지 않는다. ``key`` 는
+    그 verifier-도메인 배포나 단위 테스트를 위해 주입될 수 있다. env 폴백
+    ``MDG_OPERATOR_GATE_KEY`` 는 DEV/replay 전용 (``docker inspect`` Config.Env,
+    즉 PS-1 누수면으로 노출됨)이며 경고를 낸다; 프로덕션 키는 결코 env 로 도착하지 않는다.
     """
 
     _ENV_KEY = "MDG_OPERATOR_GATE_KEY"
@@ -128,9 +128,9 @@ class OperatorGate:
         if key is None:
             env = os.environ.get(self._ENV_KEY)
             if env:
-                # DEV/replay ONLY — env is visible in `docker inspect` Config.Env (PS-1 surface).
-                # Production provisions via a tmpfs 0400 secret in the operator/verifier domain
-                # (operator-go RESERVED, PS-5); MDG runtime stays key-free (key=None).
+                # DEV/replay 전용 — env 는 `docker inspect` Config.Env 에 보임 (PS-1 면).
+                # 프로덕션은 operator/verifier 도메인의 tmpfs 0400 비밀로 프로비저닝
+                # (operator-go 유보, PS-5); MDG runtime 은 key-free 로 유지 (key=None).
                 warnings.warn(
                     "OperatorGate key read from env MDG_OPERATOR_GATE_KEY (DEV/replay only; "
                     "docker inspect exposes Config.Env). Production provisions the key via a "
@@ -138,11 +138,11 @@ class OperatorGate:
                     stacklevel=2,
                 )
                 key = env.encode("utf-8")
-        self._key: Optional[bytes] = key            # process-memory only, never State (PS-3)
+        self._key: Optional[bytes] = key            # 프로세스 메모리 전용, State 에는 절대 아님 (PS-3)
         self._clock = clock
-        # PS-9 anti-replay is durable when a secret-free operator-ledger is injected (P4-Q3):
-        # the token is NEVER persisted; only the consumed-nonce set survives a reboot so a
-        # captured-but-unexpired token cannot be replayed after a crash.
+        # 비밀 없는 operator-ledger 가 주입되면 PS-9 anti-replay 가 durable 하다 (P4-Q3):
+        # 토큰은 결코 영속되지 않고; 오직 consumed-nonce 집합만 리부트를 넘겨 살아남아
+        # 포착됐지만 만료되지 않은 토큰이 크래시 후 replay 될 수 없게 한다.
         self._ledger = ledger
         seed = set()
         if ledger is not None:
@@ -150,9 +150,9 @@ class OperatorGate:
                 seed = set(ledger.recover_on_boot())
             except Exception:
                 seed = set()
-        self._seen_nonces: set[str] = seed           # single-use enforcement (durable if ledger)
-        self._last_issue_ts: float = 0.0             # monotonic issue continuity
-        self._last_consume_ts: float = 0.0           # monotonic consume continuity
+        self._seen_nonces: set[str] = seed           # 단일 사용 강제 (ledger 있으면 durable)
+        self._last_issue_ts: float = 0.0             # 단조 issue 연속성
+        self._last_consume_ts: float = 0.0           # 단조 consume 연속성
 
     def _now(self, now: Optional[float] = None) -> float:
         if now is not None:
@@ -161,14 +161,14 @@ class OperatorGate:
             return float(self._clock.now())
         return time.time()
 
-    # -- issue (KEY-FREE: building the request needs no key) --------------- #
+    # -- issue (KEY-FREE: request 구성에 키 불필요) --------------- #
     def issue(self, intent, *, nonce: str, ttl_s: float, now: Optional[float] = None,
               digest: Optional[str] = None) -> OperatorRequest:
-        """Mint a command-bound OperatorRequest. Timestamp continuity: issue ts is clamped to be
-        monotonic (never earlier than the last issue), so a stale clock cannot rewind the series.
+        """명령 결속 OperatorRequest 를 발행한다. 타임스탬프 연속성: issue ts 는 단조가 되도록
+        clamp 된다 (지난 issue 보다 결코 이르지 않음), 그래서 낡은 시계가 시퀀스를 되돌릴 수 없다.
         """
         t = self._now(now)
-        if t < self._last_issue_ts:                  # continuity: no rewind
+        if t < self._last_issue_ts:                  # 연속성: 되돌림 없음
             t = self._last_issue_ts
         self._last_issue_ts = t
         dg = digest if digest is not None else command_digest(intent)
@@ -176,11 +176,11 @@ class OperatorGate:
             decision_id=getattr(intent, "decision_id", ""),
             command_digest=dg, nonce=nonce, expiry=t + float(ttl_s), issued_ts=t,
         )
-        # P4-Q3: durably mint the nonce lifecycle (ISSUED receipt — secret-free, NO token).
+        # P4-Q3: nonce 라이프사이클을 durable 하게 발행 (ISSUED 영수증 — 비밀 없음, 토큰 없음).
         self._record(req, verdict="ISSUED", consumed_ts=None)
         return req
 
-    # -- durable secret-free receipt (P4-Q3; token is NEVER persisted) ----- #
+    # -- durable 비밀 없는 영수증 (P4-Q3; 토큰은 결코 영속되지 않음) ----- #
     def _record(self, req: OperatorRequest, *, verdict: str, consumed_ts) -> None:
         if self._ledger is None:
             return
@@ -189,12 +189,12 @@ class OperatorGate:
                                  nonce=req.nonce, expiry=req.expiry, verdict=verdict,
                                  issued_ts=req.issued_ts, consumed_ts=consumed_ts)
         except Exception:
-            # ledger write must not crash the gate; anti-replay still holds in memory this run.
+            # ledger 쓰기가 gate 를 크래시시켜선 안 됨; anti-replay 는 이번 실행 메모리에서 여전히 유지.
             pass
 
-    # -- sign / verify (KEY required) ------------------------------------- #
+    # -- sign / verify (KEY 필요) ------------------------------------- #
     def sign(self, req: OperatorRequest) -> str:
-        """Operator-side HMAC token over the FULL binding. Requires the key (else '' fail-closed)."""
+        """전체 바인딩에 대한 operator 측 HMAC 토큰. 키 필요 (없으면 '' fail-closed)."""
         if self._key is None:
             return ""
         mac = hmac.new(self._key,
@@ -204,11 +204,11 @@ class OperatorGate:
 
     def verify(self, req: OperatorRequest, token: str, *, now: Optional[float] = None,
                expected_digest: Optional[str] = None) -> tuple[bool, str]:
-        """Verify a command-bound approval (PS-9). Rejects: no key, wrong/absent token, expired,
-        replayed nonce, non-monotonic consume ts, and (if given) a command_digest mismatch — so a
-        captured token minted for command A cannot authorize command B.
+        """명령 결속 승인을 검증한다 (PS-9). 거부: 키 없음, 잘못된/부재 토큰, 만료,
+        replay 된 nonce, 비단조 consume ts, 그리고 (주어졌다면) command_digest 불일치 — 그래서
+        명령 A 를 위해 발행된 포착 토큰은 명령 B 를 인가할 수 없다.
 
-        On success the nonce is marked seen and the consume-ts advances (single-use + continuity).
+        성공 시 nonce 는 seen 으로 표시되고 consume-ts 가 전진한다 (단일 사용 + 연속성).
         """
         if self._key is None:
             return False, "no operator-gate key (fail-closed)"
@@ -217,15 +217,15 @@ class OperatorGate:
         t = self._now(now)
         if t > req.expiry:
             return False, "expired (TTL elapsed)"
-        if t < self._last_consume_ts:                # continuity: consume ts must be monotonic
+        if t < self._last_consume_ts:                # 연속성: consume ts 는 단조여야 함
             return False, "non-monotonic timestamp (replay/continuity violation)"
         if req.nonce in self._seen_nonces:
             return False, "nonce already consumed (replay)"
         expected = self.sign(req)
         if not expected or not hmac.compare_digest(expected, token or ""):
             return False, "HMAC mismatch (unauthorized / tampered binding)"
-        # Record the GRANTED receipt (fsync) BEFORE returning True so an actuation-then-crash
-        # cannot re-approve the same nonce on reboot (P4-Q3 — token itself is NOT persisted).
+        # 작동-후-크래시가 리부트에서 같은 nonce 를 재승인할 수 없도록 True 반환 전에
+        # GRANTED 영수증을 기록 (fsync) (P4-Q3 — 토큰 자체는 영속되지 않음).
         self._seen_nonces.add(req.nonce)
         self._last_consume_ts = t
         self._record(req, verdict="GRANTED", consumed_ts=t)
@@ -233,7 +233,7 @@ class OperatorGate:
 
 
 # --------------------------------------------------------------------------- #
-# KEY-FREE signed-mode emitter — NEVER opens any signing-key path (verify_signer_no_keyopen)
+# KEY-FREE signed-mode emitter — 어떤 signing-key 경로도 결코 열지 않음 (verify_signer_no_keyopen)
 # --------------------------------------------------------------------------- #
 @dataclass
 class SignerEmit:
@@ -246,12 +246,12 @@ class SignerEmit:
 
 
 def _recovery_mode_alt(intent) -> tuple[str, int]:
-    """Resolve the (mode, relative-altitude-m) recovery parameters MDG hands to the gcs_c2 sender.
+    """MDG 가 gcs_c2 sender 에 넘기는 (mode, 상대-고도-m) 회복 파라미터를 해석한다.
 
-    These are NOT secrets and NOT a raw actuation payload — the actual signed MAVLink command is
-    built and signed INSIDE gcs_c2 (which holds the key). Defaults are the S2 physical-return
-    contract (GUIDED + 30 m home/hover). An Intent may override via ``params`` (mode/alt) if present;
-    a malformed alt falls back to the 30 m default (fail-safe to the home altitude)."""
+    이들은 비밀도 아니고 raw 작동 페이로드도 아니다 — 실제 signed MAVLink 명령은
+    gcs_c2 (키 보유) 안에서 만들어지고 서명된다. 기본값은 S2 물리-복귀
+    계약 (GUIDED + 30 m home/hover)이다. Intent 는 존재하면 ``params`` (mode/alt)로 override 할 수 있고;
+    잘못된 alt 는 30 m 기본값으로 폴백한다 (home 고도로 fail-safe)."""
     params = getattr(intent, "params", None) or {}
     if isinstance(params, dict):
         mode = str(params.get("mode", _RECOVERY_MODE)) or _RECOVERY_MODE
@@ -266,32 +266,32 @@ def _recovery_mode_alt(intent) -> tuple[str, int]:
 
 
 def _delegate_argv(mode: str, alt: int) -> list[str]:
-    """The single Backend-spawn argv: WRITE the recovery TRIGGER FILE inside gcs_c2.
+    """단일 Backend-spawn argv: gcs_c2 안에 회복 TRIGGER FILE 을 쓴다.
 
     ``docker exec gcs_c2 sh -c 'printf "%s %s" "$1" "$2" > /tmp/mdg_correct' sh <mode> <alt>``
 
-    MDG only RECORDS "<MODE> <ALT>" (e.g. ``GUIDED 30``) into gcs_c2's trigger file. The deployed
-    gcs.py — the SOLE owner of the SITL signing link — polls that file and issues the SIGNED
-    set_mode(GUIDED)+arm+takeoff(alt) with ITS OWN key, then removes the file. MDG never passes,
-    names, or opens a key (E11 non-proliferation). ``mode``/``alt`` are handed to ``sh`` as POSITIONAL
-    args ($1/$2), never interpolated into the shell string, so there is no injection surface."""
+    MDG 는 오직 "<MODE> <ALT>" (예: ``GUIDED 30``)를 gcs_c2 의 트리거 파일에 기록할 뿐이다. 배포된
+    gcs.py — SITL signing 링크의 유일한 소유자 — 가 그 파일을 폴링하여 자기 키로 SIGNED
+    set_mode(GUIDED)+arm+takeoff(alt) 를 발행한 뒤 파일을 삭제한다. MDG 는 결코 키를 넘기거나
+    명명하거나 열지 않는다 (E11 non-proliferation). ``mode``/``alt`` 는 ``sh`` 에 위치
+    인자 ($1/$2)로 전달되며, 셸 문자열에 보간되지 않으므로 injection 면이 없다."""
     return ["docker", "exec", GCS_SIGN_DELEGATE, "sh", "-c",
             f'printf "%s %s" "$1" "$2" > {GCS_TRIGGER_FILE}', "sh", mode, str(alt)]
 
 
 def emit_signed(intent, backend=None) -> SignerEmit:
-    """Emit a signed-mode correction command WITHOUT MDG ever holding a key.
+    """MDG 가 키를 결코 보유하지 않은 채 signed-mode 교정 명령을 emit 한다.
 
-    allow_live=False (default / operator-go 유보): compute ONLY the command_digest (the token
-    material) and return a DRY result — NO spawn, NO file access (unchanged legacy behaviour).
+    allow_live=False (기본 / operator-go 유보): 오직 command_digest (토큰
+    재료)만 계산하고 DRY 결과를 반환 — spawn 없음, 파일 접근 없음 (기존 레거시 동작 그대로).
 
-    allow_live=True (operator-approved live promotion): DELEGATE the signature to ``gcs_c2`` (which
-    already holds its own key) by WRITING the recovery TRIGGER FILE, through the SOLE subprocess owner
-    ``Backend.run`` (불변식2., a single spawn site):
-    ``docker exec gcs_c2 sh -c 'printf "%s %s" "$1" "$2" > /tmp/mdg_correct' sh <MODE> <ALT>``. The deployed gcs.py — the
-    only owner of the SITL signing link — polls that file and issues the SIGNED set_mode(GUIDED)+arm+
-    takeoff(alt) with its own key, then removes it. This function never opens, reads, or names a
-    signing-key path (verify_signer_no_keyopen); it only builds an argv and hands it to Backend.run.
+    allow_live=True (operator 승인 live 승격): 유일한 subprocess 소유자
+    ``Backend.run`` (불변식2., 단일 spawn 지점)을 통해 회복 TRIGGER FILE 을 씀으로써 서명을
+    ``gcs_c2`` (이미 자기 키 보유)에 위임한다:
+    ``docker exec gcs_c2 sh -c 'printf "%s %s" "$1" "$2" > /tmp/mdg_correct' sh <MODE> <ALT>``. 배포된 gcs.py —
+    SITL signing 링크의 유일한 소유자 — 가 그 파일을 폴링하여 자기 키로 SIGNED set_mode(GUIDED)+arm+
+    takeoff(alt) 를 발행한 뒤 삭제한다. 이 함수는 signing-key 경로를 결코 열거나 읽거나
+    명명하지 않는다 (verify_signer_no_keyopen); 오직 argv 를 만들어 Backend.run 에 넘길 뿐이다.
     """
     dg = command_digest(intent)
     live = bool(getattr(backend, "allow_live", False))
@@ -299,10 +299,10 @@ def emit_signed(intent, backend=None) -> SignerEmit:
         return SignerEmit(ok=True, dry_run=True, command_digest=dg,
                           note="operator-go 유보: key-free digest only; sign delegated to gcs_c2 "
                                "(no signing key held, E11 non-proliferation)")
-    # Live promotion: authorization must have been operator-approved (OperatorGate.verify). The
-    # signature is issued by the gcs_c2 delegate out-of-band (gcs.py polls the trigger file); MDG only
-    # RECORDS the trigger via the single Backend spawn and never re-mounts the key. A missing/invalid
-    # backend fails inert (no spawn).
+    # Live 승격: 인가는 operator 승인을 받았어야 한다 (OperatorGate.verify). 서명은
+    # gcs_c2 delegate 가 out-of-band 로 발행한다 (gcs.py 가 트리거 파일을 폴링); MDG 는 오직
+    # 단일 Backend spawn 을 통해 트리거를 기록할 뿐 키를 재장착하지 않는다. 부재/무효
+    # backend 는 inert 로 실패 (spawn 없음).
     if not callable(getattr(backend, "run", None)):
         return SignerEmit(ok=False, dry_run=True, command_digest=dg,
                           note="live emit requested but no Backend spawn owner supplied (inert)")

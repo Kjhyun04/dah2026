@@ -1,24 +1,24 @@
-"""litellm structured-completion wrapper (FRAMEWORK_STACK §0/§6 · PA-5 · P3-Q6).
+"""litellm 구조화 컴플리션 래퍼 (FRAMEWORK_STACK §0/§6 · PA-5 · P3-Q6).
 
-Single narrow surface onto litellm. Enforced invariants:
-  * temperature = 0 for sampling-accepting model families (forced here, not trusted from
-    config) — replay determinism. Reject-sampling families (Opus 4.8/4.7, Sonnet 5, Fable/
-    Mythos) 400 on any `temperature`; for those the field is OMITTED (their fixed decoding
-    already satisfies determinism). See `_emit_temperature`. `drop_params=True` is the
-    second safety net for any model this gate misclassifies (P3-Q6 ADD-3/FIX-4).
-  * `num_retries=0` — litellm may otherwise retry internally, which (a) blows the 5s wall so
-    `timeout_s` stops being a true deadline and (b) injects nondeterministic multi-call
-    behavior. The hand-rolled `for model in models` loop is the ONLY fallback mechanism.
-  * timeout (models.yaml timeout_s, default 5s) per attempt; on timeout/error the caller
-    raises -> node deterministic fallback (G6/E13).
-  * structured output: response_format=json_schema (a best-effort provider constraint on the
-    anthropic provider; bare json_object is only weakly emulated). The AUTHORITATIVE gate is
-    the local `model_cls.model_validate_json` under strict bounds (extra='forbid' + constr/
-    Literal, PA-5). A raw-byte cap runs BEFORE parse to bound parse-side DoS. Provider-side
-    enforcement is never the security control — parse failure -> LLMUnavailable.
+litellm 위의 단일 좁은 표면. 강제 불변식:
+  * 샘플링을 수용하는 모델 계열에는 temperature = 0 (config 를 신뢰하지 않고 여기서
+    강제) — 리플레이 결정론. reject-sampling 계열(Opus 4.8/4.7, Sonnet 5, Fable/
+    Mythos)은 어떤 `temperature` 에도 400 을 낸다; 그런 계열에는 이 필드를 생략한다(고정 디코딩이
+    이미 결정론을 만족). `_emit_temperature` 참조. `drop_params=True` 는 이 게이트가
+    오분류하는 모든 모델에 대한 2차 안전망이다(P3-Q6 ADD-3/FIX-4).
+  * `num_retries=0` — 그러지 않으면 litellm 이 내부적으로 재시도할 수 있는데, 이는 (a) 5s 벽을 넘겨
+    `timeout_s` 가 진짜 데드라인이 아니게 만들고 (b) 비결정적 다중호출
+    동작을 주입한다. 손수 짠 `for model in models` 루프가 유일한 폴백 메커니즘이다.
+  * 시도마다 timeout(models.yaml timeout_s, 기본 5s); 타임아웃/에러 시 호출자가
+    raise -> 노드 결정론 폴백(G6/E13).
+  * 구조화 출력: response_format=json_schema (anthropic provider 상의 best-effort provider
+    제약; 맨 json_object 는 약하게만 흉내낸다). authoritative 게이트는 엄격한 경계 하의
+    로컬 `model_cls.model_validate_json` 이다(extra='forbid' + constr/
+    Literal, PA-5). raw-byte 상한이 파싱 전에 돌아 parse-side DoS 를 제한한다. provider 측
+    강제는 결코 보안 통제가 아니다 — 파싱 실패 -> LLMUnavailable.
 
-Secrets (PS-3): ANTHROPIC_API_KEY is read by litellm from the process env — it is NEVER
-placed in messages, State, or logs. Prompts carry derived features only (PS-7).
+시크릿(PS-3): ANTHROPIC_API_KEY 는 litellm 이 프로세스 env 에서 읽는다 — 결코 메시지·State·로그에
+넣지 않는다. 프롬프트는 파생 피처만 실어 나른다(PS-7).
 """
 from __future__ import annotations
 
@@ -30,19 +30,19 @@ from pydantic import BaseModel
 from ..config import loader
 from .render import LLMUnavailable
 
-# Anthropic families that REJECT `temperature`/sampling params with HTTP 400 (current-gen:
-# Opus 4.8/4.7, Sonnet 5, Fable/Mythos). Emitting temperature=0 to these is a silent
-# kill-switch -> permanent G6 fallback. Substring-matched on the litellm model id.
+# HTTP 400 으로 `temperature`/샘플링 파라미터를 거부(REJECT)하는 Anthropic 계열(현세대:
+# Opus 4.8/4.7, Sonnet 5, Fable/Mythos). 이들에 temperature=0 을 보내는 것은 조용한
+# kill-switch -> 영구 G6 폴백이다. litellm 모델 id 에 부분문자열 매칭한다.
 _REJECT_SAMPLING = ("opus-4-8", "opus-4-7", "sonnet-5", "fable", "mythos")
 
-# Anthropic families KNOWN to ACCEPT `temperature` (older sampling decoders). An Anthropic
-# model in NEITHER list is treated as reject-sampling (FAIL-SAFE): the newest generations
-# reject sampling, so an unlisted FUTURE Anthropic model must not be sent temperature — a
-# 400 would silently and permanently fall it back. Omitting only forgoes the determinism=0 nudge.
+# `temperature` 를 수용(ACCEPT)한다고 알려진 Anthropic 계열(구형 샘플링 디코더). 두 목록 어디에도
+# 없는 Anthropic 모델은 reject-sampling 으로 취급한다(FAIL-SAFE): 최신 세대는 샘플링을
+# 거부하므로, 목록에 없는 미래(FUTURE) Anthropic 모델에는 temperature 를 보내면 안 된다 —
+# 400 이 조용히 영구적으로 폴백시킬 것이다. 생략은 determinism=0 넛지를 포기할 뿐이다.
 _ACCEPT_SAMPLING = ("sonnet-4-5", "haiku-4-5")
 
-# Hard cap on the raw response string fed to model_validate_json (parse-side DoS bound;
-# pydantic field limits run AFTER the parse). thresholds.yaml override -> constant default.
+# model_validate_json 에 넣는 raw 응답 문자열의 하드 상한(parse-side DoS 경계;
+# pydantic 필드 제한은 파싱 후에 돈다). thresholds.yaml 오버라이드 -> 상수 기본값.
 _DEFAULT_MAX_BYTES = 16384
 
 
@@ -54,29 +54,34 @@ def litellm_available() -> bool:
         return False
 
 
+# P4 단일 설정원: api_key_env 미지정 시의 기본 env 이름을 한 곳에서만 정의한다(has_api_key/
+#   resolve_api_key 두 곳의 리터럴 중복 제거 → 드리프트 방지). provider 는 models.yaml api_key_env 로 선택.
+_DEFAULT_API_KEY_ENV = "ANTHROPIC_API_KEY"
+
+
 def has_api_key(api_key_env: str | None = None) -> bool:
     """LLM 크리덴셜 존재 여부. provider 를 하드코딩하지 않는다 — models.yaml 의 최상위
-    ``api_key_env`` (없으면 ANTHROPIC_API_KEY) 가 가리키는 환경변수를 확인한다. OpenRouter 경유
+    ``api_key_env`` (없으면 _DEFAULT_API_KEY_ENV) 가 가리키는 환경변수를 확인한다. OpenRouter 경유
     운영 시 운영자는 models.yaml 에 ``api_key_env: OPENROUTER_API_KEY`` 를 두면 된다."""
-    return bool(os.environ.get(api_key_env or "ANTHROPIC_API_KEY"))
+    return bool(os.environ.get(api_key_env or _DEFAULT_API_KEY_ENV))
 
 
 def resolve_api_key(models_cfg: dict | None = None) -> str | None:
-    """Resolve the key VALUE from the env NAME in models.yaml (api_key_env), to pass
-    EXPLICITLY to litellm so ANY provider authenticates from the operator's single .env key
-    even under a non-conventional env name (e.g. MDG_LLM_API_KEY). None => unset (caller is
-    already gated by has_api_key). Never logged / never placed in messages/State (PS-3)."""
+    """models.yaml 의 env 이름(api_key_env)에서 키 값(VALUE)을 해석해, litellm 에 명시적으로
+    전달한다 — 관례를 벗어난 env 이름(예: MDG_LLM_API_KEY)에서도 어떤 provider 든 운영자의 단일
+    .env 키로 인증하도록. None => 미설정(호출자는 이미 has_api_key 로 게이트됨). 결코 로그에
+    남기지 않고 / 메시지·State 에 넣지 않는다(PS-3)."""
     name = models_cfg.get("api_key_env") if isinstance(models_cfg, dict) else None
-    return os.environ.get(name or "ANTHROPIC_API_KEY") or None
+    return os.environ.get(name or _DEFAULT_API_KEY_ENV) or None
 
 
 def _emit_temperature(model: str) -> bool:
-    """True iff we should send `temperature=0` to `model`.
+    """`model` 에 `temperature=0` 을 보내야 하면(iff) True.
 
-    Reject-sampling Anthropic family -> False (omit; else HTTP 400). Known sampling-
-    accepting Anthropic family -> True (emit 0 for determinism). UNKNOWN Anthropic model
-    -> False (FAIL-SAFE: assume newest-gen reject-sampling; omit rather than 400-and-die).
-    Non-Anthropic provider -> True (accepts temperature; emit 0 for determinism)."""
+    reject-sampling Anthropic 계열 -> False(생략; 아니면 HTTP 400). 샘플링을 수용한다고
+    알려진 Anthropic 계열 -> True(결정론 위해 0 방출). 알 수 없는(UNKNOWN) Anthropic 모델
+    -> False(FAIL-SAFE: 최신세대 reject-sampling 으로 가정; 400 으로 죽기보다 생략).
+    non-Anthropic provider -> True(temperature 수용; 결정론 위해 0 방출)."""
     m = (model or "").lower()
     if any(fam in m for fam in _REJECT_SAMPLING):
         return False
@@ -96,7 +101,7 @@ def _response_max_bytes() -> int:
 
 
 def _extract_json(content: str) -> str:
-    """Strip an optional ```json ... ``` fence some models emit around JSON."""
+    """일부 모델이 JSON 주위에 내는 선택적 ```json ... ``` 펜스를 벗겨낸다."""
     s = (content or "").strip()
     if s.startswith("```"):
         s = s[3:]
@@ -109,8 +114,8 @@ def _extract_json(content: str) -> str:
 
 
 def _parse_capped(content: str, model_cls: Type[BaseModel]) -> BaseModel:
-    """Byte-cap the raw response, then local validate (authoritative gate). Oversized or
-    unparseable -> raises (caught by the caller's fallback loop)."""
+    """raw 응답을 byte-cap 한 뒤 로컬 검증(authoritative 게이트). 초과 크기이거나
+    파싱 불가 -> raise(호출자의 폴백 루프가 잡음)."""
     raw = content or ""
     cap = _response_max_bytes()
     if len(raw.encode("utf-8", "ignore")) > cap:
@@ -119,8 +124,8 @@ def _parse_capped(content: str, model_cls: Type[BaseModel]) -> BaseModel:
 
 
 def _schema_response_format(model_cls: Type[BaseModel]) -> dict:
-    """json_schema response_format (best-effort provider constraint; local parse is the
-    real gate). drop_params=True drops it if the route rejects it."""
+    """json_schema response_format(best-effort provider 제약; 로컬 파싱이 진짜
+    게이트). 라우트가 거부하면 drop_params=True 가 이를 드롭한다."""
     return {
         "type": "json_schema",
         "json_schema": {"name": model_cls.__name__, "schema": model_cls.model_json_schema()},
@@ -130,11 +135,11 @@ def _schema_response_format(model_cls: Type[BaseModel]) -> dict:
 def complete_structured(role_cfg: dict, system: str, user: str,
                         model_cls: Type[BaseModel], timeout_s: float = 5.0,
                         api_key: str | None = None) -> BaseModel:
-    """Call litellm with the role's model chain and parse into ``model_cls``.
+    """role 의 모델 체인으로 litellm 을 호출해 ``model_cls`` 로 파싱한다.
 
-    Raises LLMUnavailable if litellm is absent, no model is configured, or every model
-    in the chain errors/times out / returns unparseable/oversized output. The orient/decide
-    node catches this and falls back deterministically (G6)."""
+    litellm 이 없거나, 설정된 모델이 없거나, 체인의 모든 모델이 에러/타임아웃 /
+    파싱불가·초과크기 출력을 반환하면 LLMUnavailable 를 raise 한다. orient/decide
+    노드가 이를 잡아 결정론적으로 폴백한다(G6)."""
     if not litellm_available():
         raise LLMUnavailable("litellm not installed")
     import litellm
@@ -157,8 +162,8 @@ def complete_structured(role_cfg: dict, system: str, user: str,
                 ],
                 max_tokens=max_tokens,
                 timeout=timeout_s,
-                num_retries=0,               # 5s deadline is real; loop is the ONLY fallback
-                drop_params=True,            # provider-unsupported params dropped, not 400
+                num_retries=0,               # 5s 데드라인은 실효적; 루프가 유일한 폴백
+                drop_params=True,            # provider 미지원 파라미터는 400 대신 드롭
             )
             if api_key:
                 kwargs["api_key"] = api_key   # provider-agnostic: 운영자의 단일 .env 키를 명시 주입
@@ -172,8 +177,8 @@ def complete_structured(role_cfg: dict, system: str, user: str,
                 kwargs["temperature"] = 0    # FORCED for sampling-accepting families
             resp = litellm.completion(**kwargs)
             content = resp["choices"][0]["message"]["content"]
-            return _parse_capped(content, model_cls)     # byte-cap + authoritative local parse
-        except Exception as exc:                     # network/timeout/parse/schema/cap
+            return _parse_capped(content, model_cls)     # byte-cap + authoritative 로컬 파싱
+        except Exception as exc:                     # 네트워크/타임아웃/파싱/스키마/cap
             last_exc = exc
             continue
     raise LLMUnavailable(f"all models failed for {model_cls.__name__}: {last_exc}")

@@ -1,28 +1,26 @@
-"""run_driver (PA-1/PA-7) — the OUT-OF-GRAPH while loop that owns the loop-back.
+"""run_driver (PA-1/PA-7) — loop-back 을 소유하는 그래프 외부(OUT-OF-GRAPH) while 루프.
 
-Each iteration = exactly ONE graph execution = 1 tick. A tick is driven by a single
-graph.stream(inp, cfg, stream_mode='updates') pass: the stream IS the execution, its
-updates are recorded (PS-3 redact), and the resulting tick state is read back from the
-checkpointer via graph.get_state(cfg). There is NO separate graph.invoke() — running
-both would fire the act node's side effect TWICE per iteration (violates 불변식2. 누수-0)
-and desync the recorded tick from the loop-condition state (violates 불변식1.).
+각 반복 = 정확히 ONE graph 실행 = 1 tick. 한 틱은 단일
+graph.stream(inp, cfg, stream_mode='updates') 패스로 구동된다: 스트림이 곧 실행이며, 그
+update 는 기록되고(PS-3 redact), 그 결과 틱 상태는 graph.get_state(cfg) 로 checkpointer 에서
+다시 읽는다. 별도의 graph.invoke() 는 없다 — 둘 다 실행하면 반복당 act 노드의 부작용이 두 번
+발화되어(불변식2. 누수-0 위반) 기록된 틱과 루프 조건 상태가 어긋난다(불변식1. 위반).
 
-Tick continuity (CORRECTED — S-2 live finding): every tick's graph terminates at END
-(all loop-backs -> END, by topology). In LangGraph a thread that reached END has NO
-pending work, so ``graph.stream(None, cfg)`` on it yields ZERO updates and does not
-re-run — the earlier "fixed thread_id + stream(None)" scheme silently froze after tick 0
-(tick_i never advanced -> break condition never met -> infinite no-op loop). Continuity is
-therefore carried by RE-SEEDING: each tick runs a FULL graph execution on a FRESH
-per-tick thread_id, seeded with the prior tick's read-back state as input. A fresh
-thread_id makes the Annotated[list, operator.add] channels (ledger/decisions/incidents)
-reduce onto the carried value EXACTLY ONCE (verified: no double-accumulation); re-seeding
-the SAME thread would double them, which is why input was previously withheld. The driver
-READS counters only (nodes own the increments). recursion_limit=16 guards against any
-accidental in-graph cycle.
+틱 연속성(수정됨 — S-2 라이브 발견): 모든 틱의 그래프는 END 에서 종료된다
+(위상상 모든 loop-back -> END). LangGraph 에서 END 에 도달한 스레드는 대기 작업이 없으므로
+그 위에서 ``graph.stream(None, cfg)`` 는 update 0 개를 내고 재실행하지 않는다 — 앞선
+"fixed thread_id + stream(None)" 방식은 tick 0 이후 조용히 멈췄다
+(tick_i 가 전진하지 않음 -> break 조건 미충족 -> 무한 no-op 루프). 따라서 연속성은
+RE-SEEDING 으로 이어진다: 각 틱은 FRESH per-tick thread_id 에서 FULL 그래프 실행을 돌리고,
+이전 틱의 read-back 상태를 입력으로 seed 한다. fresh thread_id 는
+Annotated[list, operator.add] 채널(ledger/decisions/incidents)이 carried 값 위로 정확히 한 번
+reduce 되게 한다(검증: 이중 누적 없음); 동일 스레드를 재-seed 하면 이들이 두 배가 되며, 그래서
+이전에는 입력을 보류했다. driver 는 카운터를 읽기만 한다(증가는 노드가 소유). recursion_limit=16 은
+우발적 in-graph 사이클을 방지한다.
 
-Recording hook (PS-3): each streamed update -> redact() at record creation time ->
-run.jsonl append. Secrets are structurally absent from State, and redact() additionally
-scrubs any residual secret pattern.
+기록 훅(PS-3): 스트림된 각 update -> 레코드 생성 시점의 redact() ->
+run.jsonl append. secret 은 State 에서 구조적으로 부재하며, redact() 는 추가로 잔여 secret
+패턴을 scrub 한다.
 """
 from __future__ import annotations
 
@@ -32,10 +30,10 @@ from ..config import defaults as D
 from ..redact_patterns import SECRET_PATTERNS as _SECRET_PATTERNS
 from .state import MDGState
 
-# residual-secret scrub patterns (PS-3) — belt-and-suspenders over structural absence.
-# Applied to string LEAVES only (never to serialized JSON) so structure stays valid.
-# The pattern list is the shared single source (mdg.redact_patterns) so the record-time
-# scrub here and the viewer load-time scan cannot drift.
+# 잔여-secret scrub 패턴(PS-3) — 구조적 부재 위의 이중 안전장치.
+# 문자열 LEAF 에만 적용한다(직렬화된 JSON 에는 절대 안 함) 그래야 구조가 유효하게 유지된다.
+# 패턴 리스트는 공유 단일 소스(mdg.redact_patterns)이므로 여기 record-time
+# scrub 과 viewer load-time 스캔이 어긋날 수 없다.
 
 
 def _scrub_str(s: str) -> str:
@@ -45,8 +43,8 @@ def _scrub_str(s: str) -> str:
 
 
 def redact(record):
-    """Scrub residual secret patterns at RECORD CREATION time (not viewer time).
-    Recurses over the structure and scrubs string leaves only (PS-3)."""
+    """레코드 생성(RECORD CREATION) 시점에 잔여 secret 패턴을 scrub 한다(viewer 시점 아님).
+    구조를 재귀 순회하며 문자열 leaf 만 scrub 한다(PS-3)."""
     if isinstance(record, str):
         return _scrub_str(record)
     if isinstance(record, dict):
@@ -60,10 +58,10 @@ def run_driver(graph, run_id: str, cfg: Optional[dict] = None, state0: Optional[
                jsonl_path: str = "", max_iters: Optional[int] = None,
                max_pivots: Optional[int] = None, k_dry: Optional[int] = None,
                forever: bool = False, tick_interval_s: float = 0.0) -> MDGState:
-    """Drive the compiled graph. Returns the final state. Break conditions (PA-1):
+    """컴파일된 그래프를 구동한다. 최종 상태를 반환한다. Break 조건(PA-1):
     goal_reached ∨ tick_i>=max_iters ∨ pivots>=max_pivots ∨ dry_streak>=k_dry.
-    Safe operator LAND is budget-exempt (G10) — enforced by not counting escalate
-    ticks as dry (escalate does not increment dry_streak).
+    안전한 operator LAND 는 예산 면제(G10) — escalate 틱을 dry 로 세지 않음으로써 강제된다
+    (escalate 는 dry_streak 을 증가시키지 않는다).
 
     forever (24/7 감시 모드): True 면 위 break 조건을 전부 무시하고 KeyboardInterrupt/프로세스
     종료까지 계속 관측한다 — 평시(quiescence)에 멈추지 않는 상시 탐지 데몬. tick_interval_s>0 이면
@@ -77,20 +75,20 @@ def run_driver(graph, run_id: str, cfg: Optional[dict] = None, state0: Optional[
     rlimit = budgets["recursion_limit"]
 
     def _thread_id(tick: int) -> str:
-        # single-sourced per-tick thread id (used by both _cfg and the P3 pruner so they
-        # cannot drift). deterministic (run_id-t<tick>) so replay stays byte-identical.
+        # 단일 소스 per-tick thread id(_cfg 와 P3 pruner 가 함께 사용하므로 서로
+        # 어긋날 수 없다). 결정론적(run_id-t<tick>)이라 replay 가 byte-identical 로 유지된다.
         return f"{run_id}-t{tick}"
 
     def _cfg(tick: int) -> dict:
-        # FRESH thread_id per tick (S-2): each tick is one full graph run terminating at
-        # END; a fresh thread lets the carried state re-seed the operator.add channels
-        # exactly once. thread_id is deterministic (run_id-t<tick>) so replay stays
-        # byte-identical (GATE2). recursion_limit guards accidental in-graph cycles.
+        # 틱마다 FRESH thread_id (S-2): 각 틱은 END 에서 종료되는 하나의 full 그래프 실행이다;
+        # fresh 스레드는 carried 상태가 operator.add 채널을 정확히 한 번 re-seed 하게 한다.
+        # thread_id 는 결정론적(run_id-t<tick>)이라 replay 가 byte-identical 로 유지된다(GATE2).
+        # recursion_limit 은 우발적 in-graph 사이클을 방지한다.
         return {"configurable": {"thread_id": _thread_id(tick)}, "recursion_limit": rlimit}
 
-    # tick 0: seed from state0. seq is a monotonic node-update index carried ACROSS ticks so
-    # the canonical run.jsonl is byte-identical (GATE2): every identical deterministic run
-    # yields the same {seq,node,patch} sequence from seq=0.
+    # tick 0: state0 에서 seed. seq 는 틱을 가로질러 이어지는 단조 node-update 인덱스라
+    # 정규 run.jsonl 이 byte-identical(GATE2)하다: 동일한 결정론 실행마다
+    # seq=0 부터 동일한 {seq,node,patch} 시퀀스를 낸다.
     state, seq = _tick(graph, state0, _cfg(0), jsonl_path, 0)
 
     tick = 1
@@ -102,34 +100,34 @@ def run_driver(graph, run_id: str, cfg: Optional[dict] = None, state0: Optional[
         if tick_interval_s and tick_interval_s > 0:
             import time as _t
             _t.sleep(tick_interval_s)              # 상시 감시: collector interval 에 맞춰 관측(스핀 방지)
-        # re-seed with the prior tick's read-back state on a FRESH thread (NOT stream(None),
-        # which is a no-op on an END-terminated thread). Carrying the full state forward
-        # advances tick_i and accumulates ledger/decisions/incidents exactly once.
+        # 이전 틱의 read-back 상태로 FRESH 스레드에서 re-seed(stream(None) 이 아님,
+        # 그것은 END 로 종료된 스레드에서 no-op). full 상태를 앞으로 이어가면
+        # tick_i 가 전진하고 ledger/decisions/incidents 가 정확히 한 번 누적된다.
         state, seq = _tick(graph, state, _cfg(tick), jsonl_path, seq)
-        # P3 pruning: this tick's post-state is now read back and carried into the next
-        # seed, so the just-superseded prior thread (t{tick-1}) holds nothing the loop still
-        # needs (replay reads run.jsonl, not the checkpointer). Drop it to bound the
-        # InMemorySaver at O(1) threads instead of O(ticks x state). Deleting it does NOT
-        # touch the recorded stream, the current/next tick (fresh thread, seeded by value),
-        # or run_driver's return -> replay stays byte-identical, tick progression unchanged.
+        # P3 pruning: 이번 틱의 post-state 는 이제 read back 되어 다음 seed 로 이어졌으므로,
+        # 방금 대체된 이전 스레드(t{tick-1})는 루프가 아직 필요로 하는 것을 아무것도 갖지
+        # 않는다(replay 는 checkpointer 가 아니라 run.jsonl 을 읽는다). 이를 버려서
+        # InMemorySaver 를 O(ticks x state) 대신 O(1) 스레드로 유계화한다. 삭제해도
+        # 기록된 스트림, 현재/다음 틱(fresh 스레드, 값으로 seed), run_driver 의 반환에
+        # 영향을 주지 않는다 -> replay 는 byte-identical, 틱 진행은 불변.
         _prune_thread(graph, _thread_id(tick - 1))
         tick += 1
     return state
 
 
 def _prune_thread(graph, thread_id: str) -> None:
-    """Bound checkpointer memory (audit P3) by deleting a superseded per-tick thread.
+    """대체된 per-tick 스레드를 삭제하여 checkpointer 메모리를 유계화한다(감사 P3).
 
-    delete_thread(thread_id) is defined on BaseCheckpointSaver/InMemorySaver only in
-    langgraph-checkpoint >= 2.0.25 (verified: absent through 2.0.24, present 2.0.25/2.0.26;
-    InMemorySaver overrides it to drop storage/writes/blobs for that thread). langgraph==0.2.60
-    pins langgraph-checkpoint ^2.0.4 (>=2.0.4,<3.0.0) and requirements.txt does not pin the
-    checkpoint sub-package, so an older resolved build may lack the method. Feature-detect and
-    no-op if absent — fail-safe: on >=2.0.25 memory is bounded, on older builds the loop still
-    runs correctly (just unpruned, as before). The compiled graph exposes the saver as the
-    public ``.checkpointer`` attribute (Pregel field; None when compiled without one, e.g.
-    tests). Any pruning error is swallowed: pruning is best-effort and must never crash a tick.
-    leak-0 is untouched (no subprocess; delete_thread is a pure in-memory dict delete)."""
+    delete_thread(thread_id) 는 langgraph-checkpoint >= 2.0.25 에서만 BaseCheckpointSaver/
+    InMemorySaver 에 정의된다(검증: 2.0.24 까지 부재, 2.0.25/2.0.26 에 존재;
+    InMemorySaver 는 이를 오버라이드하여 해당 스레드의 storage/writes/blobs 를 버린다). langgraph==0.2.60
+    은 langgraph-checkpoint ^2.0.4 (>=2.0.4,<3.0.0)을 고정하고 requirements.txt 는
+    checkpoint 하위 패키지를 고정하지 않으므로, 더 오래된 해석 빌드에는 이 메서드가 없을 수 있다. 기능 탐지 후
+    없으면 no-op — fail-safe: >=2.0.25 에서는 메모리가 유계, 더 오래된 빌드에서도 루프는 여전히
+    올바르게 동작한다(단지 이전처럼 pruning 안 됨). 컴파일된 그래프는 saver 를
+    공개 ``.checkpointer`` 속성으로 노출한다(Pregel 필드; 없이 컴파일되면 None, 예:
+    테스트). 모든 pruning 오류는 삼켜진다: pruning 은 best-effort 이며 틱을 절대 크래시시키면 안 된다.
+    leak-0 은 불변(subprocess 없음; delete_thread 는 순수 in-memory dict 삭제)."""
     saver = getattr(graph, "checkpointer", None)
     if saver is None:
         return
@@ -144,19 +142,19 @@ def _prune_thread(graph, thread_id: str) -> None:
 
 def _tick(graph, inp: Any, invoke_cfg: dict, jsonl_path: str,
           seq_start: int = 0) -> tuple[MDGState, int]:
-    """Run EXACTLY ONE graph execution (1 tick); return ``(final_state, next_seq)``.
+    """정확히 ONE graph 실행(1 tick)을 돌린다; ``(final_state, next_seq)`` 를 반환한다.
 
-    The single graph.stream() pass IS the execution (불변식2.: the act side effect runs
-    once per tick, never twice). Recording is DELEGATED to replay.record.record_update —
-    the ONE canonical recorder (project -> redact -> canonical sort_keys serialization -> final
-    scrub), so the production driver and the tested recorder are a single byte-identical
-    contract emitting the canonical {seq,node,patch} schema (not the legacy {node:patch}).
-    Recording failures never crash the driver. The tick's final state is read back from the
-    checkpointer (graph.get_state) so the recorded tick and the loop-condition state are one
-    and the same execution (불변식1.).
+    단일 graph.stream() 패스가 곧 실행이다(불변식2.: act 부작용은 틱당 한 번 실행,
+    절대 두 번 아님). 기록은 replay.record.record_update 로 위임된다 —
+    유일한 정규 recorder(project -> redact -> 정규 sort_keys 직렬화 -> 최종
+    scrub), 따라서 production driver 와 테스트된 recorder 는 정규 {seq,node,patch} 스키마를
+    내는 단일 byte-identical 계약이다(레거시 {node:patch} 아님).
+    기록 실패는 driver 를 절대 크래시시키지 않는다. 틱의 최종 상태는
+    checkpointer 에서 read back 된다(graph.get_state) 그래야 기록된 틱과 루프 조건 상태가
+    하나의 동일한 실행이 된다(불변식1.).
     """
-    # Lazy import: record.py imports driver (redact/_scrub_str), so importing it at module
-    # load would form a cycle. It is import-safe here (no langgraph/fastapi dependency).
+    # 지연 import: record.py 가 driver(redact/_scrub_str)를 import 하므로, 모듈
+    # 로드 시 import 하면 사이클이 생긴다. 여기서는 import-safe(langgraph/fastapi 의존 없음).
     from ..replay.record import record_update
 
     seq = seq_start
@@ -167,20 +165,20 @@ def _tick(graph, inp: Any, invoke_cfg: dict, jsonl_path: str,
         except Exception:
             fh = None
     try:
-        # consuming the stream drives the graph exactly once; record each update.
+        # 스트림을 소비하면 그래프가 정확히 한 번 구동된다; 각 update 를 기록한다.
         for update in graph.stream(inp, invoke_cfg, stream_mode="updates"):
             if not isinstance(update, dict):
                 continue
             if fh is not None:
-                seq = record_update(fh, seq, update)   # canonical, byte-identical
+                seq = record_update(fh, seq, update)   # 정규, byte-identical
             else:
-                seq += len(update)                     # keep seq monotonic even without I/O
+                seq += len(update)                     # I/O 없이도 seq 를 단조 유지
     finally:
         if fh is not None:
             try:
                 fh.close()
             except Exception:
                 pass
-    # the checkpointer holds the post-tick state; read it back (single source of truth)
+    # checkpointer 가 post-tick 상태를 보유한다; 이를 read back(단일 진실원)
     snap = graph.get_state(invoke_cfg)
     return snap.values, seq

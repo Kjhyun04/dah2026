@@ -37,7 +37,7 @@ _OPERATOR_GO = os.environ.get("MDG_OPERATOR_GO") == "1"
 
 class _LeakyStr:
     """default=str 우회 경로 검증용: __str__ 이 카나리를 흘린다(PP-2)."""
-    def __str__(self) -> str:  # pragma: no cover - exercised via json default=str
+    def __str__(self) -> str:  # pragma: no cover - json default=str 경유로 실행
         return "leaked=MDG_CANARY_OP token=sk-ant-CANARYcanary01234567"
 
 

@@ -1,22 +1,22 @@
-"""verify_models — role-to-model routing alignment (DEFENSE_AGENT_DEV_WORKFLOW line 202:
+"""verify_models — role-to-model 라우팅 정합 (DEFENSE_AGENT_DEV_WORKFLOW line 202:
 'verify_models(role-to-model 라우팅 Orient=Sonnet·Decide=Opus·폴백리스트)').
 
-Static check (no langgraph/pydantic/pyyaml required) that the config side (models.yaml
-roles) and the code side (make_orient_llm/make_decide_llm factories + graph llm_orient/
-llm_decide slots) agree and are NOT swapped:
+config 측(models.yaml roles)과 code 측(make_orient_llm/make_decide_llm 팩토리 + graph
+llm_orient/llm_decide 슬롯)이 일치하고 뒤바뀌지 않았음을 검사하는 정적 검사
+(langgraph/pydantic/pyyaml 불필요):
 
-  - core.topology.BIND maps the orient node's llm kwarg to slot 'llm_orient' and the decide
-    node's to 'llm_decide' (the single recipe both build_graph and e2e._TickExecutor consume,
-    PA-9) — the orient slot feeds the orient node, the decide slot the decide node (a swap
-    would misroute Sonnet/Opus);
-  - build_llm_deps returns exactly {'llm_orient','llm_decide'} via make_orient/decide_llm;
-  - the orient factory reads roles['orient'] + OrientNote; decide reads roles['decide'] +
-    DecideNote;
-  - models.yaml roles.orient -> Sonnet family + OrientNote, roles.decide -> Opus family +
-    DecideNote, each with a non-empty fallback list whose head differs from the primary.
+  - core.topology.BIND 는 orient 노드의 llm kwarg 를 슬롯 'llm_orient' 에, decide 노드의
+    것을 'llm_decide' 에 매핑(build_graph 와 e2e._TickExecutor 가 함께 소비하는 단일 recipe,
+    PA-9) — orient 슬롯은 orient 노드에, decide 슬롯은 decide 노드에 공급(뒤바뀌면
+    Sonnet/Opus 오라우팅);
+  - build_llm_deps 는 make_orient/decide_llm 을 통해 정확히 {'llm_orient','llm_decide'} 를 반환;
+  - orient 팩토리는 roles['orient'] + OrientNote 를 읽고, decide 는 roles['decide'] +
+    DecideNote 를 읽음;
+  - models.yaml roles.orient -> Sonnet 계열 + OrientNote, roles.decide -> Opus 계열 +
+    DecideNote, 각각 head 가 primary 와 다른 비어있지 않은 fallback 리스트를 가짐.
 
-Model-ID CURRENCY (opus-4-8 / sonnet-4-5 / haiku-4-5 not retired) is a domain sign-off item
-(panel ref-align), NOT decidable statically — this verifier checks ROUTING/WIRING only.
+Model-ID CURRENCY (opus-4-8 / sonnet-4-5 / haiku-4-5 미폐기)는 정적으로 결정 불가한
+도메인 sign-off 항목(panel ref-align)이며 — 이 verifier 는 라우팅/배선만 검사한다.
 """
 from __future__ import annotations
 
@@ -27,15 +27,15 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from mdg.core import topology  # noqa: E402  (pure data: no langgraph/pydantic)
+from mdg.core import topology  # noqa: E402  (순수 데이터: langgraph/pydantic 없음)
 from mdg.verify._util import MDG_ROOT, Report, parse, read, run  # noqa: E402
 
 CORE = os.path.join(MDG_ROOT, "core")
 LLM = os.path.join(MDG_ROOT, "llm")
 CONFIG = os.path.join(MDG_ROOT, "config")
 
-# role -> (factory file, factory fn, expected response-model name, expected llm slot,
-#          graph node partial'd with that slot, model-family substring)
+# role -> (팩토리 파일, 팩토리 fn, 기대 response-model 이름, 기대 llm 슬롯,
+#          그 슬롯으로 partial 된 graph 노드, model-계열 substring)
 _ROLE_SPEC = {
     "orient": ("orient.py", "make_orient_llm", "OrientNote", "llm_orient", "orient", "sonnet"),
     "decide": ("decide.py", "make_decide_llm", "DecideNote", "llm_decide", "decide", "opus"),
@@ -43,19 +43,19 @@ _ROLE_SPEC = {
 
 
 # --------------------------------------------------------------------------- #
-# topology.BIND — which llm slot is bound to which node (single-sourced, PA-9)
+# topology.BIND — 어느 llm 슬롯이 어느 노드에 바인딩되는가 (단일 소스, PA-9)
 # --------------------------------------------------------------------------- #
 def _graph_slot_map() -> dict[str, str]:
-    """{node_name -> llm slot string} for each node whose BIND recipe binds kwarg 'llm'.
+    """BIND recipe 가 kwarg 'llm' 을 바인딩하는 각 노드에 대한 {node_name -> llm 슬롯 문자열}.
 
-    Since PA-9 the llm slot binding lives in the ONE recipe ``core.topology.BIND`` that both
-    ``graph.build_graph`` and ``e2e._TickExecutor`` consume — so checking BIND checks BOTH
-    execution paths at once (previously this AST-scanned graph.py's hand-written partials)."""
+    PA-9 이후 llm 슬롯 바인딩은 ``graph.build_graph`` 와 ``e2e._TickExecutor`` 가 함께 소비하는
+    단일 recipe ``core.topology.BIND`` 에 존재 — 따라서 BIND 를 검사하면 두 실행 경로를 한 번에
+    검사한다(이전에는 graph.py 의 수작성 partial 을 AST 스캔했다)."""
     return {node: b["llm"] for node, b in topology.BIND.items() if "llm" in b}
 
 
 def _fn_source(path: str, fn_name: str) -> str:
-    """Return the source text of a top-level function (const/name scan target)."""
+    """최상위 함수의 소스 텍스트를 반환(const/name 스캔 대상)."""
     tree = parse(path)
     src = read(path)
     for node in tree.body:
@@ -65,7 +65,7 @@ def _fn_source(path: str, fn_name: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
-# models.yaml — role facts (pyyaml if present, else a small indentation scan)
+# models.yaml — role facts (pyyaml 있으면 사용, 없으면 작은 들여쓰기 스캔)
 # --------------------------------------------------------------------------- #
 def _role_facts_yaml() -> dict:
     try:
@@ -87,11 +87,11 @@ def _role_facts_yaml() -> dict:
 
 
 def _role_facts_scan() -> dict:
-    """pyyaml-free fallback: read model/response_model/fallback under each role block."""
+    """pyyaml 없는 폴백: 각 role 블록 아래 model/response_model/fallback 를 읽는다."""
     text = read(os.path.join(CONFIG, "models.yaml"))
     out: dict = {}
     for role in _ROLE_SPEC:
-        # capture the role block: '  <role>:' up to the next 2-space-indented key or EOF
+        # role 블록 캡처: '  <role>:' 부터 다음 2-space 들여쓰기 키 또는 EOF 까지
         m = re.search(rf"^  {role}:\s*$(?P<body>.*?)(?=^\S|^  \w|\Z)", text,
                       re.MULTILINE | re.DOTALL)
         body = m.group("body") if m else ""
@@ -116,24 +116,24 @@ def _check() -> Report:
     facts = _role_facts_yaml() or _role_facts_scan()
 
     for role, (ffile, ffn, note, slot, node, family) in _ROLE_SPEC.items():
-        # 1) topology.BIND binds the RIGHT slot to the RIGHT node (not swapped); both graph.py
-        #    and e2e._TickExecutor consume this single recipe (PA-9).
+        # 1) topology.BIND 가 올바른 슬롯을 올바른 노드에 바인딩(뒤바뀌지 않음); graph.py 와
+        #    e2e._TickExecutor 가 이 단일 recipe 를 소비(PA-9).
         rep.check(slot_map.get(node) == slot,
                   f"topology.BIND['{node}'] must map llm -> '{slot}' "
                   f"(got {slot_map.get(node)!r})")
 
-        # 2) build_llm_deps exposes this slot via the matching factory
+        # 2) build_llm_deps 가 매칭 팩토리를 통해 이 슬롯을 노출
         rep.check(f'"{slot}"' in deps_src or f"'{slot}'" in deps_src,
                   f"build_llm_deps must expose '{slot}'")
         rep.check(ffn in deps_src, f"build_llm_deps must call {ffn}()")
 
-        # 3) the factory reads roles['<role>'] and returns the matching note type
+        # 3) 팩토리가 roles['<role>'] 를 읽고 매칭 note 타입을 반환
         fsrc = _fn_source(os.path.join(LLM, ffile), ffn)
         rep.check(f'"{role}"' in fsrc or f"'{role}'" in fsrc,
                   f"{ffile}:{ffn} must look up roles['{role}']")
         rep.check(note in fsrc, f"{ffile}:{ffn} must produce {note}")
 
-        # 4) models.yaml role facts: family routing + response_model + fallback list
+        # 4) models.yaml role facts: 계열 라우팅 + response_model + fallback 리스트
         f = facts.get(role, {})
         rep.check(family in f.get("model", "").lower(),
                   f"models.yaml roles.{role}.model must be the {family} family "
@@ -150,7 +150,7 @@ def _check() -> Report:
 
 
 def test_verify_models_alignment():
-    """pytest entry: config<->code role-to-model routing must align (no swap)."""
+    """pytest 진입점: config<->code role-to-model 라우팅이 정합해야 함(뒤바뀜 없음)."""
     rep = _check()
     assert not rep.fails, "; ".join(rep.fails)
 

@@ -1,20 +1,20 @@
-"""Ingest gRPC server (:50051) — mTLS transport that relays envelopes to sense (PS-5/8).
+"""Ingest gRPC 서버 (:50051) — envelope 를 sense 로 중계하는 mTLS 전송 계층 (PS-5/8).
 
-Design points:
-  - Transport-only: this server authenticates the CLIENT (mTLS, require_client_auth)
-    and relays the raw envelope to the in-proc queue. It does NOT verify the envelope
-    HMAC/seq — that is the consumption gate (PS-2, ingest.verify) at sense drain, so
-    the in-proc and gRPC paths share one authentication standard.
-  - Bind loopback (127.0.0.1) or a dedicated mgmt netns — NEVER 0.0.0.0 (PS-8), so an
-    attacker UE (10.45.0.x) cannot reach it.
-  - Pre-auth DoS caps (PS-8): mTLS enforced before any RPC work, max_message_length
-    256 KiB, bounded thread pool / max concurrent RPCs.
-  - No protobuf codegen: uses a generic unary-unary handler carrying the envelope as
-    canonical JSON bytes, so the module needs only grpcio (no protoc step).
+설계 포인트:
+  - 전송 전용: 이 서버는 CLIENT 를 인증(mTLS, require_client_auth)하고 raw envelope 를
+    in-proc 큐로 중계한다. envelope 의 HMAC/seq 는 검증하지 않는다 — 그것은 sense drain
+    시점의 소비 게이트(PS-2, ingest.verify)이며, 그 결과 in-proc 경로와 gRPC 경로가
+    하나의 인증 표준을 공유한다.
+  - loopback(127.0.0.1) 또는 전용 mgmt netns 에 바인드 — 절대 0.0.0.0 금지(PS-8), 그래야
+    공격자 UE(10.45.0.x)가 도달할 수 없다.
+  - 인증 전 DoS 상한(PS-8): 모든 RPC 작업 전에 mTLS 강제, max_message_length 256 KiB,
+    유계 스레드 풀 / 최대 동시 RPC 수.
+  - protobuf 코드 생성 없음: envelope 를 canonical JSON 바이트로 실어 나르는 generic
+    unary-unary 핸들러를 사용하므로 모듈은 grpcio 만 필요(protoc 단계 불필요).
 
-grpcio may be absent in a given environment (local dev); the module imports cleanly and
-raises a clear error only when ``serve`` is actually called without grpcio. The
-envelope codec and the enqueue servicer are grpc-independent and unit-testable.
+grpcio 는 특정 환경(로컬 개발)에서 부재할 수 있다. 모듈은 깔끔하게 import 되며 ``serve`` 가
+grpcio 없이 실제로 호출될 때만 명확한 오류를 낸다. envelope 코덱과 enqueue servicer 는
+grpc 비의존이며 단위 테스트 가능하다.
 """
 from __future__ import annotations
 
@@ -24,11 +24,11 @@ from typing import Optional
 
 from ..collector.ingest import SensorEnvelope
 
-_MAX_MSG = 256 * 1024              # PS-8 pre-auth DoS cap: 256 KiB
+_MAX_MSG = 256 * 1024              # PS-8 인증 전 DoS 상한: 256 KiB
 _SERVICE = "mdg.ingest.Ingest"
 _METHOD = "Submit"
 
-try:                              # optional dependency
+try:                              # 선택적 의존성
     import grpc                   # type: ignore
     _HAS_GRPC = True
 except Exception:                 # pragma: no cover
@@ -37,7 +37,7 @@ except Exception:                 # pragma: no cover
 
 
 # --------------------------------------------------------------------------- #
-# Envelope codec (grpc-independent, testable)
+# Envelope 코덱 (grpc 비의존, 테스트 가능)
 # --------------------------------------------------------------------------- #
 def encode_envelope(env: SensorEnvelope) -> bytes:
     return json.dumps({
@@ -59,8 +59,8 @@ def decode_envelope(data: bytes) -> SensorEnvelope:
 
 
 class EnqueueServicer:
-    """Transport servicer: decode envelope -> put on the in-proc queue. Reusable
-    without grpc (drives the same logic the generic handler calls)."""
+    """전송 servicer: envelope 디코드 -> in-proc 큐에 넣기. grpc 없이도 재사용 가능
+    (generic 핸들러가 호출하는 것과 동일한 로직을 구동)."""
     def __init__(self, inbox: "queue.Queue"):
         self.inbox = inbox
         self.accepted = 0
@@ -76,36 +76,36 @@ class EnqueueServicer:
                 context.set_details(str(exc))
             return b'{"ok":false}'
         try:
-            self.inbox.put_nowait(env)          # relay; consumption gate verifies later
+            self.inbox.put_nowait(env)          # 중계; 소비 게이트가 나중에 검증
             self.accepted += 1
             return b'{"ok":true}'
         except queue.Full:
-            self.rejected += 1                  # backpressure, not a crash
+            self.rejected += 1                  # 크래시가 아닌 backpressure
             return b'{"ok":false,"reason":"full"}'
 
 
 # --------------------------------------------------------------------------- #
-# mTLS credentials + server
+# mTLS 자격증명 + 서버
 # --------------------------------------------------------------------------- #
 def build_server_credentials(server_key: bytes, server_cert: bytes, root_ca: bytes):
-    """mTLS server creds with client auth REQUIRED (PS-5/PS-8). Short-lived certs +
-    CRL are managed out of band (tmpfs mount, PS-5); this binds the handshake policy."""
+    """클라이언트 인증을 필수로 하는 mTLS 서버 자격증명(PS-5/PS-8). 단명 인증서 + CRL 은
+    대역 외로 관리되며(tmpfs 마운트, PS-5), 이 함수는 핸드셰이크 정책을 고정한다."""
     if not _HAS_GRPC:                            # pragma: no cover
         raise ImportError("grpcio is required for mTLS credentials")
     return grpc.ssl_server_credentials(          # type: ignore
         [(server_key, server_cert)],
         root_certificates=root_ca,
-        require_client_auth=True,                # reject any client without a valid cert
+        require_client_auth=True,                # 유효한 인증서 없는 클라이언트는 거부
     )
 
 
 def serve(inbox: "queue.Queue", *, host: str = "127.0.0.1", port: int = 50051,
           credentials=None, max_workers: int = 8, max_concurrent_rpcs: int = 32):
-    """Start the gRPC server bound to loopback with mTLS + DoS caps. Returns
-    (server, servicer). Caller keeps the server handle and calls ``server.stop(...)``.
+    """loopback 에 바인드된 gRPC 서버를 mTLS + DoS 상한과 함께 시작. (server, servicer) 를
+    반환한다. 호출자는 server 핸들을 보유하고 ``server.stop(...)`` 을 호출한다.
 
-    Refuses to bind 0.0.0.0 (PS-8) and refuses insecure/no-mTLS bind in production —
-    ``credentials`` must be provided (mTLS). Raises if grpcio is unavailable.
+    0.0.0.0 바인드를 거부하고(PS-8) 운영에서 insecure/mTLS 없는 바인드를 거부한다 —
+    ``credentials`` 가 반드시 제공되어야 한다(mTLS). grpcio 가 없으면 예외를 낸다.
     """
     if not _HAS_GRPC:
         raise ImportError(
@@ -133,13 +133,13 @@ def serve(inbox: "queue.Queue", *, host: str = "127.0.0.1", port: int = 50051,
 
     handler = grpc.unary_unary_rpc_method_handler(  # type: ignore
         servicer.submit,
-        request_deserializer=lambda b: b,        # raw bytes in
-        response_serializer=lambda b: b,         # raw bytes out
+        request_deserializer=lambda b: b,        # raw 바이트 입력
+        response_serializer=lambda b: b,         # raw 바이트 출력
     )
     generic = grpc.method_handlers_generic_handler(  # type: ignore
         _SERVICE, {_METHOD: handler})
     server.add_generic_rpc_handlers((generic,))
 
-    server.add_secure_port(f"{host}:{port}", credentials)   # mTLS only, loopback
+    server.add_secure_port(f"{host}:{port}", credentials)   # mTLS 전용, loopback
     server.start()
     return server, servicer

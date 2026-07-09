@@ -1,7 +1,8 @@
-"""decide (LLM2, PA-4/PA-5) — advice ONLY. Writes decide_note; NEVER sets
-chosen_action/chosen_action_risk/chosen_action_reversible (those are rank_recovery's,
-PA-4). Emits a Decision record. Render/error -> deterministic fallback (G6). The
-decide-edge reads risk/reversible fields set upstream, not this note.
+"""decide (LLM2, PA-4/PA-5) — advice 전용(ONLY). decide_note 를 쓴다;
+chosen_action/chosen_action_risk/chosen_action_reversible 는 절대(NEVER) 설정하지 않는다
+(그것들은 rank_recovery 의 몫, PA-4). Decision record 를 emit 한다. Render/error 시
+-> deterministic fallback (G6). decide-edge 는 이 note 가 아니라 upstream 에서 설정된
+risk/reversible 필드를 읽는다.
 """
 from __future__ import annotations
 
@@ -33,7 +34,7 @@ def decide(state: MDGState, llm=None, clock=None) -> dict:
         except Exception:
             note = _fallback_note()
 
-    # Decision record (flight action enforcement always operator_confirm, X2)
+    # Decision record (비행 action enforcement 은 항상 operator_confirm, X2)
     risk = state.get("chosen_action_risk", "LOW")
     enforcement = "operator_confirm" if risk == "HIGH" else "auto"
     decision = Decision(
@@ -46,7 +47,7 @@ def decide(state: MDGState, llm=None, clock=None) -> dict:
         mission_impact=getattr(impact, "score", 0),
     )
 
-    out: dict = {"decide_note": note, "decisions": [decision]}       # decisions accumulator
+    out: dict = {"decide_note": note, "decisions": [decision]}       # decisions 누산기
     if chosen is None:
-        out["dry_streak"] = int(state.get("dry_streak", 0)) + 1      # no-legal -> dry (PA-1)
+        out["dry_streak"] = int(state.get("dry_streak", 0)) + 1      # legal 없음 -> dry (PA-1)
     return out

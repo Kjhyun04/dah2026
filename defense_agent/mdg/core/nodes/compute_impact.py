@@ -1,17 +1,17 @@
 """compute_impact (E8/M5/M7) — 0-100 mission impact, Green/Yellow/Red.
 
-overall_impact = max( weighted_mean , criticality_floor )   (P0 panel-3 contract):
-  weighted_mean = Σ w·distrust / Σw over the PRESENT domain set (distrust = 100-trust),
-  criticality_floor = max_d floor(domain, distrust)  (weight-independent safety tier).
-The plain weighted mean alone is compensatory and would dilute a single safety-critical
-domain's full compromise to Green (e.g. command trust=0 -> 20 = Green); the floor pins it
-to Red. Absent/stale domains are EXCLUDED (not defaulted to trust=100), else a dead
-collector reads as full marks and masks the impact (fail-open). All domains stale -> hold
-the prior band (never Green) + emit a sensor-loss Incident.
+overall_impact = max( weighted_mean , criticality_floor )   (P0 panel-3 계약):
+  weighted_mean = Σ w·distrust / Σw, PRESENT 도메인 집합 대상 (distrust = 100-trust),
+  criticality_floor = max_d floor(domain, distrust)  (가중치 독립 안전 등급).
+단순 가중평균만으로는 보상적이어서 단일 안전 크리티컬
+도메인의 완전 침해를 Green으로 희석한다 (예: command trust=0 -> 20 = Green); floor가 그것을
+Red로 고정. 부재/stale 도메인은 EXCLUDE (trust=100으로 기본값 처리 안 함), 아니면 죽은
+collector가 만점으로 읽혀 impact를 가린다 (fail-open). 모든 도메인 stale -> 이전
+band 유지 (Green 절대 아님) + sensor-loss Incident 발행.
 
-Confidence used ONCE: lowest-present-domain confidence bumps the risk band up one step
-(conservative), NOT a multiplicative double penalty. Green tick ends before orient
-(route_after_impact) and increments dry_streak.
+Confidence는 한 번만 사용: 최저-present-도메인 confidence가 risk band를 한 단계 올림
+(보수적), 곱셈적 이중 페널티 아님. Green tick은 orient
+(route_after_impact) 전에 끝나고 dry_streak을 증가시킨다.
 """
 from __future__ import annotations
 
@@ -29,8 +29,8 @@ def compute_impact(state: MDGState) -> dict:
     weights = profile.get("mission_weight", {})
     floor_table = profile.get("criticality_floor", {})
 
-    # PRESENT-set only: a domain absent from trust (stale/dead collector) is EXCLUDED,
-    # NOT injected as trust=100 — injecting 100 would dilute the mean and mask impact.
+    # PRESENT-set만: trust에 없는 도메인(stale/죽은 collector)은 EXCLUDE,
+    # trust=100으로 주입 안 함 — 100 주입은 평균을 희석하고 impact를 가린다.
     distrust: dict[str, float] = {}
     min_conf = 1.0
     for dom, w in weights.items():
@@ -38,12 +38,12 @@ def compute_impact(state: MDGState) -> dict:
             continue
         t = trust.get(dom)
         if t is None:
-            continue                                           # stale/absent -> excluded from D
+            continue                                           # stale/부재 -> D에서 제외
         distrust[dom] = 100.0 - float(t.trust_score)
         min_conf = min(min_conf, float(t.confidence))
 
     if not distrust:
-        # all domains stale -> hold prior band, never emit Green (contract #1)
+        # 모든 도메인 stale -> 이전 band 유지, Green 절대 발행 안 함 (contract #1)
         prev = state.get("impact") or ImpactObj()
         held = prev.band if prev.band != "Green" else "Yellow"
         return {
@@ -56,12 +56,12 @@ def compute_impact(state: MDGState) -> dict:
     overall, _raw = agg_overall(distrust, weights, floor_table)
     score, band, shift = score_impact(overall, min_conf)
 
-    # CR01 co-occurrence bump: a same-tick correlation incident (e.g. PFCP_Delete_Attempt +
-    # Unauthorized_Command, min_members=2) means multiple domains are attacked at once even
-    # when each alone sits below its criticality floor. Bump the band one step (never past
-    # Red) so the 2-signal correlation leaves Green -> orient. Scoped to THIS tick's incident
-    # id (endswith '-<tick>') so it is not a permanent bump. Deterministic (incident.kind +
-    # tick, no LLM field) -> routing purity kept; the routed recovery (pfcp_firewall) is reversible.
+    # CR01 동시발생 bump: 동일 tick 상관 incident (예: PFCP_Delete_Attempt +
+    # Unauthorized_Command, min_members=2)는 각각은 criticality floor 아래에 있어도
+    # 여러 도메인이 동시에 공격받았음을 뜻한다. band를 한 단계 올려 (Red 초과
+    # 안 함) 2-signal 상관이 Green을 벗어나 -> orient. THIS tick의 incident
+    # id에 스코프(endswith '-<tick>')되어 영구 bump 아님. 결정론적 (incident.kind +
+    # tick, LLM 필드 없음) -> 라우팅 순수성 유지; 라우팅된 회복(pfcp_firewall)은 되돌릴 수 있음.
     tick = int(state.get("tick_i", 0))
     corr_now = any(
         getattr(inc, "kind", None) in D.CORRELATION_RULES
@@ -75,6 +75,6 @@ def compute_impact(state: MDGState) -> dict:
 
     out: dict = {"impact": impact}
     if band == "Green":
-        # Green-END path increments dry_streak (PA-1)
+        # Green-END 경로는 dry_streak을 증가시킴 (PA-1)
         out["dry_streak"] = int(state.get("dry_streak", 0)) + 1
     return out

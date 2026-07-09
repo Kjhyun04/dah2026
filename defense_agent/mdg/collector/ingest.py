@@ -1,9 +1,9 @@
-"""SensorEnvelope + verify_envelope — consumption-layer ingest auth (PS-2).
+"""SensorEnvelope + verify_envelope — 소비 계층 ingest 인증 (PS-2).
 
-Both gRPC (:50051) and in-proc queue collectors enqueue this envelope. ``sense``
-verifies HMAC + seq at the DRAIN moment (not transport layer) before any WorldState
-merge. Failure -> discard payload + emit tamper Incident (fail-closed for forgery),
-drain continues (fail-open for empty). Keyring holds current+previous kid (PS-5).
+gRPC(:50051)와 in-proc queue collector 모두 이 envelope를 enqueue한다. ``sense``는
+WorldState merge 이전에 DRAIN 시점(전송 계층이 아님)에 HMAC + seq를 검증한다. 실패 시
+-> payload 폐기 + tamper Incident emit(위조에 대해 fail-closed), drain은 계속된다
+(비어 있음에 대해 fail-open). Keyring은 current+previous kid를 보유한다 (PS-5).
 """
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ def compute_hmac(env: SensorEnvelope, key: bytes) -> str:
 
 @dataclass
 class Keyring:
-    """Per-kid HMAC keys (current+previous, PS-5). Keys live here only — NOT in State."""
+    """kid별 HMAC 키(current+previous, PS-5). 키는 여기에만 존재 — State에는 없음."""
     keys: dict[str, bytes] = field(default_factory=dict)
 
     def get(self, kid: str) -> bytes | None:
@@ -47,7 +47,7 @@ class Keyring:
 
 
 def verify_envelope(env: SensorEnvelope, keyring: Keyring, seqwm: SeqWatermark) -> tuple[bool, str]:
-    """Return (ok, reason). ok=False -> tamper (discard + tamper Incident)."""
+    """(ok, reason)을 반환한다. ok=False -> tamper (폐기 + tamper Incident)."""
     key = keyring.get(env.kid)
     if key is None:
         return False, f"unknown kid: {env.kid}"

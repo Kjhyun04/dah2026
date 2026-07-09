@@ -1,11 +1,11 @@
-"""Closed tool registry — 27 tool contracts (H-A/G, DESIGN_DECISIONS §2).
+"""닫힌 도구 레지스트리 — 27개 도구 계약(H-A/G, DESIGN_DECISIONS §2).
 
-DefToolId is a Literal whitelist: the LLM may only *choose* an id, never *invent*
-one. Every tool is FULLY registered (requires/consumes/produces/effect/exec/risk/T)
-— no ghost/dangling tools (E20). ``verify_tools`` enforces:
-  - DefToolId Literal == REGISTRY keys (exactly 27, no ghost, no missing)
-  - every spec has all contract fields populated
-  - response tools bind exec=safe-exec; flight (send_signed_mode) risk=HIGH=operator
+DefToolId 는 Literal 화이트리스트다: LLM 은 id 를 *선택*만 할 수 있고 절대 *발명*할 수
+없다. 모든 도구는 완전히 등록된다(requires/consumes/produces/effect/exec/risk/T)
+— ghost/dangling 도구 없음(E20). ``verify_tools`` 가 강제하는 것:
+  - DefToolId Literal == REGISTRY 키(정확히 27개, ghost 없음, 누락 없음)
+  - 모든 spec 이 모든 계약 필드를 채우고 있음
+  - response 도구는 exec=safe-exec 를 바인딩; flight(send_signed_mode) risk=HIGH=operator
 """
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-# --- closed id whitelist (LLM chooses, cannot create) --- 27 ids ---
+# --- 닫힌 id 화이트리스트(LLM 이 선택, 생성 불가) --- 27 ids ---
 DefToolId = Literal[
     # sensor (11)
     "tap_mavlink_cmd", "tap_telemetry_14560", "tail_signing_drops", "read_port_state",
@@ -35,20 +35,20 @@ Secret = Literal["none", "stdin"]
 
 
 class DefToolSpec(BaseModel):
-    """One registry row. Complete registration required (no dangling)."""
+    """레지스트리 한 행. 완전한 등록 필요(dangling 없음)."""
     id: DefToolId
     owner: str
     category: Category
     backend: str
-    requires: list[str] = Field(default_factory=list)     # worldstate predicates / preconds
-    consumes: list[str] = Field(default_factory=list)     # payload types read
-    produces: list[str] = Field(default_factory=list)     # payload types emitted
-    effect: Optional[str] = None                          # state transition (response) or None
-    exec: Optional[str] = None                            # safe-exec binding (response) or None
+    requires: list[str] = Field(default_factory=list)     # worldstate 술어 / 사전조건
+    consumes: list[str] = Field(default_factory=list)     # 읽는 payload 타입
+    produces: list[str] = Field(default_factory=list)     # 방출하는 payload 타입
+    effect: Optional[str] = None                          # 상태 전이(response) 또는 None
+    exec: Optional[str] = None                            # safe-exec 바인딩(response) 또는 None
     risk: Risk = "LOW"
     tier: Tier = "RO"
-    secret: Secret = "none"                               # R6: secret via stdin, never argv
-    T: str = "SensorEv"                                   # payload type name
+    secret: Secret = "none"                               # R6: secret 은 stdin 경유, 절대 argv 아님
+    T: str = "SensorEv"                                   # payload 타입 이름
 
 
 def _s(**kw) -> DefToolSpec:
@@ -56,7 +56,7 @@ def _s(**kw) -> DefToolSpec:
 
 
 REGISTRY: dict[str, DefToolSpec] = {t.id: t for t in [
-    # ---------------- sensor (11) ---------------- (RO, no effect, no exec) ----
+    # ---------------- sensor (11) ---------------- (RO, effect 없음, exec 없음) ----
     _s(id="tap_mavlink_cmd", owner="col_gcs", category="sensor", backend="pymavlink",
        requires=["reach.gcs14556"], consumes=["wire"], produces=["SensorEv"], T="SensorEv",
        tier="RO"),
@@ -81,7 +81,7 @@ REGISTRY: dict[str, DefToolSpec] = {t.id: t for t in [
        requires=[], consumes=["probe"], produces=["SensorEv"], T="SensorEv", tier="RO"),
     _s(id="tail_mongo_conn", owner="col_mongo", category="sensor", backend="mongod-log",
        requires=["reach.mongo27017"], consumes=["log"], produces=["SensorEv"], T="SensorEv", tier="RO"),
-    # ---------------- analysis (9) ---------------- (RO, deterministic) --------
+    # ---------------- analysis (9) ---------------- (RO, 결정론적) --------
     _s(id="build_evidence", owner="evidence_engine", category="analysis", backend="asyncio",
        consumes=["SensorEv"], produces=["SensorEv"], T="SensorEv", tier="RO"),
     _s(id="correlate_window", owner="correlation_engine", category="analysis", backend="asyncio",

@@ -1,18 +1,18 @@
-"""test_live_autorun — P2 production launcher lifecycle (shutdown leak-0, operator-go).
+"""test_live_autorun — P2 프로덕션 런처 생명주기(shutdown 누수-0, operator-go).
 
-Pins the audit-P2 fix: the launcher OWNS the observer lifecycle and ALWAYS reclaims it.
-No langgraph / live threads needed — the ``run`` seams are injected with fakes so the
-try/finally shutdown path is exercised deterministically.
+audit-P2 수정을 고정: 런처가 observer 생명주기를 소유하며 항상 회수한다.
+langgraph / 라이브 스레드 불필요 — ``run``의 이음새(seam)에 fake를 주입하여
+try/finally shutdown 경로를 결정론적으로 실행한다.
 
-Covers:
-  (a) parse_allow_live: operator-go default False; only explicit truthy tokens flip it.
-  (b) _shutdown: stop() + join() every collector then Backend.teardown(), and one raising
-      collector cannot strand the rest or the teardown (exception-safe).
-  (c) run(): on a driver EXCEPTION the finally still stops/joins collectors and tears the
-      backend down (종료 누수-0), and the exception propagates.
-  (d) run(): happy path returns the driver result and still shuts everything down.
+포함 범위:
+  (a) parse_allow_live: operator-go 기본값 False; 명시적 truthy 토큰만 이를 뒤집음.
+  (b) _shutdown: 모든 collector를 stop() + join() 후 Backend.teardown(), 그리고 하나의
+      collector가 예외를 던져도 나머지나 teardown을 방치하지 않음(예외 안전).
+  (c) run(): 드라이버 예외 발생 시 finally가 여전히 collector를 stop/join하고 backend를
+      teardown(종료 누수-0), 그리고 예외는 전파됨.
+  (d) run(): 정상 경로는 드라이버 결과를 반환하고 여전히 전부 shutdown함.
 
-Run: ``python mdg/tests/test_live_autorun.py`` (no pytest / langgraph needed).
+실행: ``python mdg/tests/test_live_autorun.py`` (pytest / langgraph 불필요).
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ from mdg import live_autorun  # noqa: E402
 
 
 # --------------------------------------------------------------------------- #
-# fakes
+# fake 객체
 # --------------------------------------------------------------------------- #
 class _FakeCollector:
     def __init__(self, name="c", stop_raises=False):
@@ -35,7 +35,7 @@ class _FakeCollector:
         self.joined = False
         self.started = False
         self._stop_raises = stop_raises
-        # attrs read by build_source_domains (absent domain -> omitted)
+        # build_source_domains가 읽는 속성(부재 도메인 -> 생략)
         self.source_id = name
         self.domain = None
 
@@ -87,10 +87,10 @@ def test_parse_allow_live_truthy():
 
 
 # --------------------------------------------------------------------------- #
-# (a') parse_operator_auto (Phase 0 — sandbox OPER auto-confirm gate)
+# (a') parse_operator_auto (Phase 0 — 샌드박스 OPER 자동확인 게이트)
 # --------------------------------------------------------------------------- #
 def test_parse_operator_auto_default_false():
-    # safe default: absent/blank/0/false/garbage -> False (OPER stays escalate).
+    # 안전 기본값: 부재/공백/0/false/쓰레기값 -> False (OPER는 escalate 유지).
     assert live_autorun.parse_operator_auto({}) is False
     assert live_autorun.parse_operator_auto({"MDG_OPERATOR_AUTO": ""}) is False
     assert live_autorun.parse_operator_auto({"MDG_OPERATOR_AUTO": "0"}) is False
@@ -104,7 +104,7 @@ def test_parse_operator_auto_truthy():
 
 
 def test_run_threads_operator_auto_into_deps():
-    # Phase 0 wiring: run() must pass operator_auto through to the graph builder's deps.
+    # Phase 0 배선: run()은 operator_auto를 graph builder의 deps로 전달해야 함.
     cols = [_FakeCollector("a")]
     be = _FakeBackend()
     seen = {}
@@ -122,9 +122,9 @@ def test_run_threads_operator_auto_into_deps():
 
 
 def test_run_seeds_operator_auto_into_state_channel():
-    # Phase 1 env->STATE wire (regression for the dead route_after_decide branch): deps carrying
-    # operator_auto is NOT enough — the conditional edge reads the STATE channel, so run() MUST
-    # seed state0["operator_auto"]. Capture the state0 the launcher hands the driver and assert it.
+    # Phase 1 env->STATE 배선(죽은 route_after_decide 분기에 대한 회귀): operator_auto를 담은
+    # deps만으로는 부족 — 조건부 엣지가 STATE 채널을 읽으므로 run()은 반드시
+    # state0["operator_auto"]를 시드해야 함. 런처가 드라이버에 넘기는 state0을 포착해 단언.
     cols = [_FakeCollector("a")]
     be = _FakeBackend()
     seen = {}
@@ -135,12 +135,12 @@ def test_run_seeds_operator_auto_into_state_channel():
 
     with tempfile.TemporaryDirectory() as d:
         live_autorun.run(d, "runw", operator_auto=True, driver_fn=_driver, **_run_kwargs(cols, be))
-    # env->state wire live: route_after_decide can now actually see operator_auto every tick.
+    # env->state 배선 라이브: route_after_decide가 이제 매 tick마다 operator_auto를 실제로 볼 수 있음.
     assert seen["operator_auto"] is True
 
 
 def test_run_operator_auto_default_off_absent_from_state():
-    # Safe default (operator_auto=0): state channel is False -> legacy escalate posture (회귀 0).
+    # 안전 기본값(operator_auto=0): state 채널이 False -> 레거시 escalate 태세(회귀 0).
     cols = [_FakeCollector("a")]
     be = _FakeBackend()
     seen = {}
@@ -166,23 +166,23 @@ def test_shutdown_stops_joins_and_teardown():
 
 
 def test_shutdown_is_exception_safe():
-    # first collector raises in stop(); the rest must still stop/join and backend still tears down.
+    # 첫 collector가 stop()에서 예외; 나머지는 여전히 stop/join하고 backend도 teardown되어야 함.
     bad = _FakeCollector("bad", stop_raises=True)
     good = _FakeCollector("good")
     be = _FakeBackend()
     live_autorun._shutdown([bad, good], be, join_timeout=0.1)
-    assert bad.stopped is False        # it raised
-    assert bad.joined is True          # join still attempted
+    assert bad.stopped is False        # 예외를 던짐
+    assert bad.joined is True          # join은 여전히 시도됨
     assert good.stopped and good.joined
     assert be.torn_down is True
 
 
 def test_shutdown_tolerates_none_backend():
-    live_autorun._shutdown([_FakeCollector("a")], None, join_timeout=0.1)  # must not raise
+    live_autorun._shutdown([_FakeCollector("a")], None, join_timeout=0.1)  # 예외를 던지면 안 됨
 
 
 # --------------------------------------------------------------------------- #
-# (c)(d) run(): finally always reclaims observers
+# (c)(d) run(): finally는 항상 observer를 회수
 # --------------------------------------------------------------------------- #
 def _run_kwargs(cols, be):
     return dict(
@@ -210,7 +210,7 @@ def test_run_shuts_down_on_driver_exception():
         except RuntimeError:
             raised = True
         assert raised, "driver exception must propagate"
-    # finally ran: every collector started then reclaimed, backend torn down (누수-0)
+    # finally 실행됨: 모든 collector가 시작 후 회수, backend teardown됨(누수-0)
     assert all(c.started and c.stopped and c.joined for c in cols)
     assert be.torn_down is True
 
@@ -239,7 +239,7 @@ def test_run_happy_path_returns_and_shuts_down():
 
 
 # --------------------------------------------------------------------------- #
-# standalone runner
+# 독립 실행 러너
 # --------------------------------------------------------------------------- #
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]

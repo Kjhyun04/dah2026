@@ -1,11 +1,11 @@
-"""verify_routing — 불변식1. + PA-7 (static AST of edges.py + nodes).
+"""verify_routing — 불변식1. + PA-7 (edges.py + nodes 의 정적 AST).
 
-Enforces:
-  - route_after_impact / route_after_decide read ONLY the allowed numeric/bool keys
-    (impact.band, chosen_action, chosen_action_risk, chosen_action_reversible) and
-    NEVER LLM-derived fields (orient_note, decide_note)
-  - no node does a direct time.* call (Clock injection only, PA-7)
-  - no async def in any node (sync graph, PA-7)
+강제:
+  - route_after_impact / route_after_decide 는 허용된 numeric/bool 키만 읽음
+    (impact.band, chosen_action, chosen_action_risk, chosen_action_reversible) 그리고
+    LLM-파생 필드(orient_note, decide_note)는 절대 읽지 않음
+  - 어떤 노드도 직접 time.* 호출을 하지 않음 (Clock 주입만, PA-7)
+  - 어떤 노드에도 async def 없음 (동기 graph, PA-7)
 """
 from __future__ import annotations
 
@@ -21,11 +21,11 @@ ALLOWED_STATE_KEYS = {
     "impact", "band", "chosen_action", "chosen_action_risk", "chosen_action_reversible",
 }
 FORBIDDEN_KEYS = {"orient_note", "decide_note", "trust", "legal_actions",
-                  # P4-Q1/P4-2 — the opaque pivot/containment selectors are DATA-only; no edge may
-                  # branch on any of them.
+                  # P4-Q1/P4-2 — opaque pivot/containment 셀렉터는 DATA-only; 어떤 edge 도
+                  # 이들 중 무엇으로도 분기 불가.
                   "target", "target_kind", "enforce_at",
-                  # [B] SensorEv.source — opaque attribution selector carried for correlation/
-                  # dispatch only; DATA-only, edge-invisible (no edge may branch on it).
+                  # [B] SensorEv.source — correlation/dispatch 용으로만 운반되는 opaque attribution
+                  # 셀렉터; DATA-only, edge-invisible (어떤 edge 도 이것으로 분기 불가).
                   "source"}
 
 
@@ -39,22 +39,20 @@ def _string_consts_in(fn: ast.FunctionDef) -> set[str]:
     return out
 
 
-# decision-relevant modules (Q-A regression guard). edges.py route_* functions are PURE
-# routing, so the whole function is scanned above. These modules are NODES/gates that mix
-# control flow with data plumbing — they LEGITIMATELY carry opaque selectors (target,
-# target_kind, enforce_at, legal_actions, source) as DATA (dict values, call args, for-loop
-# iterables, return payloads). So the scan here is scoped to control-flow CONDITIONS ONLY,
-# i.e. the positions where a value would STEER which branch executes. A data reference never
-# false-positives; branching on any forbidden LLM-advisory/trust/opaque-selector key fails.
+# 결정 관련 모듈 (Q-A 회귀 가드). edges.py route_* 함수는 순수 라우팅이므로 함수 전체를
+# 위에서 스캔한다. 이 모듈들은 제어 흐름과 데이터 배관을 섞는 NODES/게이트로 — opaque 셀렉터
+# (target, target_kind, enforce_at, legal_actions, source)를 DATA(dict 값, 호출 인자, for-loop
+# iterable, return 페이로드)로 정당하게 운반한다. 그래서 여기 스캔은 제어-흐름 CONDITION 에만
+# 한정된다. 즉 값이 어느 분기를 실행할지 STEER 하는 위치들. 데이터 참조는 절대 오탐하지
+# 않으며, 금지된 LLM-advisory/trust/opaque-셀렉터 키로 분기하면 실패한다.
 DECISION_MODULES = ("gate.py", "legality.py", "rank_recovery.py", "select_policy.py")
 
 
 def _condition_subtrees(tree: ast.AST):
-    """Yield every control-flow CONDITION expression: the ``test`` of if/while/ternary plus
-    comprehension guard clauses (``for ... if <cond>``). These are the ONLY positions where a
-    key influences which branch runs (불변식1. deterministic control flow). Assignments, dict
-    values, call args, return payloads and for-loop iterables are deliberately excluded — a
-    node may carry a forbidden selector as data without steering on it."""
+    """모든 제어-흐름 CONDITION 표현식을 yield: if/while/ternary 의 ``test`` 및 comprehension
+    가드 절(``for ... if <cond>``). 이들이 키가 어느 분기를 실행할지 영향을 주는 유일한
+    위치다(불변식1. 결정론적 제어 흐름). 할당, dict 값, 호출 인자, return 페이로드, for-loop
+    iterable 은 의도적으로 제외 — 노드는 금지 셀렉터를 steer 하지 않고 데이터로 운반 가능."""
     for node in ast.walk(tree):
         if isinstance(node, (ast.If, ast.While, ast.IfExp)):
             yield node.test
@@ -84,17 +82,17 @@ def _check() -> Report:
 
     for fn in route_fns:
         consts = _string_consts_in(fn)
-        # any state-key-looking string that is forbidden -> fail
+        # 금지된, state-key 처럼 보이는 문자열 -> 실패
         for bad in FORBIDDEN_KEYS:
             rep.check(bad not in consts,
                       f"edges.{fn.name} references forbidden LLM-derived key '{bad}'")
-        # ensure it references at least one allowed routing key
+        # 최소 하나의 허용 라우팅 키를 참조하는지 확인
         rep.check(bool(consts & ALLOWED_STATE_KEYS),
                   f"edges.{fn.name} reads no allowed routing key")
 
-    # Q-A 불변식1. regression guard: the decision-relevant gates/nodes must NEVER branch on a
-    # FORBIDDEN (LLM-advisory / trust / opaque-selector) key. Scoped to control-flow conditions
-    # only (see _condition_subtrees) so DATA carriage of selectors does not false-positive.
+    # Q-A 불변식1. 회귀 가드: 결정 관련 게이트/노드는 FORBIDDEN(LLM-advisory / trust /
+    # opaque-셀렉터) 키로 절대 분기해서는 안 된다. 제어-흐름 CONDITION 에만 한정(_condition_subtrees
+    # 참고)하여 셀렉터의 DATA 운반이 오탐하지 않게 한다.
     for base in DECISION_MODULES:
         mpath = os.path.join(NODES if base in {"rank_recovery.py", "select_policy.py"} else CORE,
                              base)
@@ -104,7 +102,7 @@ def _check() -> Report:
                       f"{base}: forbidden key '{bad}' steers a control-flow condition "
                       f"(불변식① — decision modules branch on numeric/bool/registry only)")
 
-    # nodes: no direct time.* call, no async def
+    # nodes: 직접 time.* 호출 없음, async def 없음
     for path in py_files(NODES):
         tree = parse(path)
         base = os.path.basename(path)

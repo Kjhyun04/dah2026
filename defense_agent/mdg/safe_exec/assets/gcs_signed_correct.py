@@ -1,35 +1,35 @@
 #!/usr/bin/env python3
-"""gcs_signed_correct.py — SIGNED recovery-correction sender (REFERENCE / SUPERSEDED).
+"""gcs_signed_correct.py — SIGNED 복구-교정 발신기(참조용 / 대체됨).
 
-!!! DOES NOT WORK AS A STANDALONE SENDER — DO NOT DEPLOY (live-verified 2026-07-09) !!!
-Inside gcs_c2, ``gcs.py`` is the SOLE owner of the SITL signing link: it alone binds
-``udpin:127.0.0.1:14550`` and did ``setup_signing(sign_outgoing=True)`` with /sign.key. A SECOND
-process (this sender, exec'd independently) therefore cannot receive telemetry on 14550 nor emit on
-that signed link — the socket is already held by gcs.py, so this sender's heartbeat wait times out
-and its commands never reach the SITL. This file is kept ONLY as the reference implementation of the
-signed set_mode(GUIDED)+return-to-alt sequence (the exact convention gcs.py's trigger handler mirrors).
+!!! 독립 발신기로는 동작하지 않음 — 배포 금지(live-verified 2026-07-09) !!!
+gcs_c2 안에서 ``gcs.py``가 SITL signing link의 유일한 소유자다: 그것만이
+``udpin:127.0.0.1:14550``을 bind하고 /sign.key로 ``setup_signing(sign_outgoing=True)``를 했다. 따라서
+두 번째 프로세스(독립적으로 exec된 이 발신기)는 14550에서 telemetry를 받을 수도, 그 signed link로
+방출할 수도 없다 — 소켓을 이미 gcs.py가 점유하고 있어, 이 발신기의 heartbeat 대기는 timeout되고
+그 명령은 SITL에 결코 도달하지 못한다. 이 파일은 오직 signed set_mode(GUIDED)+return-to-alt
+시퀀스의 참조 구현으로만 유지된다(gcs.py의 trigger 핸들러가 그대로 미러링하는 정확한 관례).
 
-REAL (live-verified) recovery path — gcs.py TRIGGER-FILE polling, see the standard form in
-``assets/gcs_recovery_trigger.README``:
-  1. MDG delegates by WRITING a trigger file inside gcs_c2 (signer_shim._delegate_argv):
+실제(live-verified) 복구 경로 — gcs.py TRIGGER-FILE 폴링, 표준 형태는
+``assets/gcs_recovery_trigger.README`` 참조:
+  1. MDG는 gcs_c2 안에 trigger 파일을 씀으로써 위임한다(signer_shim._delegate_argv):
         docker exec gcs_c2 sh -c 'printf "%s %s" "$1" "$2" > /tmp/mdg_correct' sh <MODE> <ALT>
-  2. The DEPLOYED gcs.py polls /tmp/mdg_correct each loop; when present it reads "<MODE> <ALT>" and
-     issues set_mode(GUIDED)+COMPONENT_ARM_DISARM(arm)+NAV_TAKEOFF(alt) over ITS OWN signing link,
-     then deletes the file. The signature is produced by gcs.py with its own key — MDG stays KEY-FREE.
+  2. 배포된 gcs.py는 매 루프마다 /tmp/mdg_correct를 폴링한다; 존재하면 "<MODE> <ALT>"를 읽고
+     자신의 signing link로 set_mode(GUIDED)+COMPONENT_ARM_DISARM(arm)+NAV_TAKEOFF(alt)를
+     발행한 뒤 파일을 삭제한다. 서명은 gcs.py가 자신의 키로 생성한다 — MDG는 KEY-FREE로 유지된다.
 
-KEY OWNERSHIP (E11 non-proliferation): the MAVLink uplink-signing key lives ONLY inside gcs_c2
-(``/sign.key``, the same key ``/gcs.py`` already uses). MDG never opens, reads, names, or copies it
-— the signature is produced HERE, inside the container that already owns the key. This is why the
-defense_agent codebase stays statically key-free (verify_signer_no_keyopen): the ONLY code that ever
-touches the key is this in-container sender.
+키 소유권(E11 non-proliferation): MAVLink uplink-signing 키는 오직 gcs_c2 안에만 존재한다
+(``/sign.key``, ``/gcs.py``가 이미 쓰는 그 키). MDG는 그것을 절대 열거나, 읽거나, 이름 짓거나, 복사하지 않는다
+— 서명은 키를 이미 소유한 컨테이너 안, 여기서 생성된다. 이것이
+defense_agent 코드베이스가 정적으로 key-free를 유지하는 이유다(verify_signer_no_keyopen): 키를 만지는
+유일한 코드는 이 컨테이너 내부 발신기다.
 
-Behaviour (S2 physical return): open a SIGNED MAVLink2 link to the local SITL bridge
-(``udpout:127.0.0.1:14550`` -> ARIA cipher proxy 14555 -> uav_proxy signature verify -> SITL), then
-  (a) DO_SET_MODE GUIDED  — take command authority back into a mode that accepts guided targets, and
-  (b) return to a <alt> m RELATIVE-altitude hover over the current position
+동작(S2 물리적 복귀): 로컬 SITL 브리지로 SIGNED MAVLink2 link를 연다
+(``udpout:127.0.0.1:14550`` -> ARIA cipher proxy 14555 -> uav_proxy signature verify -> SITL), 그다음
+  (a) DO_SET_MODE GUIDED  — guided target을 받아들이는 모드로 명령 권한을 되찾고,
+  (b) 현재 위치 위로 <alt> m RELATIVE-altitude hover로 복귀
       (SET_POSITION_TARGET_GLOBAL_INT, MAV_FRAME_GLOBAL_RELATIVE_ALT_INT),
-so a command-hijack (e.g. an unauthorized LAND) is physically overridden and the drone climbs back
-to the ~30 m home/hover altitude. Signing uses the SAME convention as /gcs.py
+그리하여 명령 탈취(예: 무단 LAND)를 물리적으로 무효화하고 드론이 다시
+~30 m home/hover 고도로 상승한다. 서명은 /gcs.py와 동일한 관례를 쓴다
 (``setup_signing(bytes.fromhex(<key>), sign_outgoing=True)``).
 """
 from __future__ import annotations
@@ -39,46 +39,46 @@ import time
 
 from pymavlink import mavutil
 
-SIGN_KEYFILE = "/sign.key"          # gcs_c2-local signing key (SAME key /gcs.py uses) — never leaves gcs_c2
-LINK = "udpout:127.0.0.1:14550"     # local signed uplink -> ARIA proxy -> uav_proxy verify -> SITL
+SIGN_KEYFILE = "/sign.key"          # gcs_c2 로컬 signing 키(/gcs.py가 쓰는 그 키) — 절대 gcs_c2를 벗어나지 않음
+LINK = "udpout:127.0.0.1:14550"     # 로컬 signed uplink -> ARIA proxy -> uav_proxy verify -> SITL
 COPTER_GUIDED_CUSTOM_MODE = 4       # ArduCopter GUIDED custom_mode
 
-# --- blocking-time budget (HISTORICAL — this standalone sender is SUPERSEDED; see the header) ------
-# NOTE: this budget applied to the OLD ``docker exec gcs_c2 python3 <sender> …`` model, which does NOT
-# work (the SITL link is owned by gcs.py). It is retained only as reference for the signed sequence;
-# the live path (gcs.py trigger polling) is asynchronous and NOT bounded by _DELEGATE_TIMEOUT_S.
-# (historical) The Backend spawn that ran this sender enforced a
-# HARD deadline (signer_shim._DELEGATE_TIMEOUT_S). If this sender's worst-case blocking exceeds that
-# deadline the process group is SIGKILLed MID-SEQUENCE — and the S2 physical return can be silently
-# truncated (GUIDED set but the 30 m reposition never issued, or issued only once). So every
-# blocking call below is bounded and the WORST CASE must stay well under the spawn deadline:
+# --- blocking-time budget (HISTORICAL — 이 독립 발신기는 대체됨; 헤더 참조) ------
+# NOTE: 이 예산은 구형 ``docker exec gcs_c2 python3 <sender> …`` 모델에 적용됐으며, 그 모델은
+# 동작하지 않는다(SITL link를 gcs.py가 소유). signed 시퀀스의 참조로만 유지된다;
+# live 경로(gcs.py trigger 폴링)는 비동기이며 _DELEGATE_TIMEOUT_S로 제한되지 않는다.
+# (historical) 이 발신기를 실행하던 Backend spawn은
+# HARD deadline(signer_shim._DELEGATE_TIMEOUT_S)을 강제했다. 이 발신기의 최악 블로킹이 그
+# deadline을 초과하면 프로세스 그룹이 시퀀스 도중에 SIGKILL된다 — 그러면 S2 물리적 복귀가 조용히
+# 잘릴 수 있다(GUIDED는 설정됐으나 30 m 재배치가 발행 안 됨, 또는 한 번만 발행). 그래서 아래 모든
+# 블로킹 호출은 제한되며 최악의 경우가 spawn deadline보다 충분히 낮게 유지되어야 한다:
 #     HEARTBEAT_TIMEOUT_S + 2*(POS_TIMEOUT_S + SETTLE_S) = 5 + 2*(2 + 1) = 11s  (<< 30s deadline).
-# Keep this sum and signer_shim._DELEGATE_TIMEOUT_S in lockstep if either is retuned.
-HEARTBEAT_TIMEOUT_S = 5.0           # learn target_system from a heartbeat (was 10s)
-POS_TIMEOUT_S = 2.0                 # best-effort current-position read, per reposition (was 5s)
-SETTLE_S = 1.0                      # let the mode / guided target apply between sends
+# 둘 중 하나라도 재조정되면 이 합과 signer_shim._DELEGATE_TIMEOUT_S를 lockstep으로 유지하라.
+HEARTBEAT_TIMEOUT_S = 5.0           # heartbeat에서 target_system을 학습(이전 10s)
+POS_TIMEOUT_S = 2.0                 # 재배치마다 best-effort 현재 위치 읽기(이전 5s)
+SETTLE_S = 1.0                      # 전송 사이에 mode / guided target이 적용되도록 대기
 
 
 def _load_signing_key() -> bytes:
-    """Read gcs_c2's own signing key (hex text, like /gcs.py). Runs ONLY inside gcs_c2."""
+    """gcs_c2 자신의 signing 키를 읽는다(hex 텍스트, /gcs.py처럼). 오직 gcs_c2 안에서만 실행된다."""
     with open(SIGN_KEYFILE, "r", encoding="utf-8") as fh:
         return bytes.fromhex(fh.read().strip())
 
 
 def _connect_signed() -> "mavutil.mavfile":
     master = mavutil.mavlink_connection(LINK, dialect="ardupilotmega")
-    # MAVLink2 + outgoing signing — identical convention to /gcs.py's setup_signing(sign_outgoing=True).
+    # MAVLink2 + outgoing signing — /gcs.py의 setup_signing(sign_outgoing=True)과 동일한 관례.
     master.setup_signing(_load_signing_key(), sign_outgoing=True)
     return master
 
 
 def _wait_target(master: "mavutil.mavfile", timeout: float = HEARTBEAT_TIMEOUT_S):
-    """Learn the vehicle system/component id from a heartbeat so command targets are addressed.
+    """heartbeat에서 vehicle system/component id를 학습해 명령 target을 지정한다.
 
-    Returns the HEARTBEAT msg (or None). We log LOUDLY whether telemetry actually reached this
-    sender: if no heartbeat arrives, ``target_system`` stays 0 (broadcast) and the correction
-    degrades to a best-effort broadcast — that must be VISIBLE in the spawn stdout (a missing
-    gcs.py-to-client telemetry relay is otherwise silent). The sender still proceeds best-effort."""
+    HEARTBEAT msg(또는 None)를 반환한다. telemetry가 실제로 이 발신기에 도달했는지 크게
+    로깅한다: heartbeat가 오지 않으면 ``target_system``은 0(broadcast)으로 남고 교정은
+    best-effort broadcast로 강등된다 — 그것은 spawn stdout에 반드시 보여야 한다(누락된
+    gcs.py-to-client telemetry relay는 그렇지 않으면 조용하다). 발신기는 그래도 best-effort로 진행한다."""
     hb = master.wait_heartbeat(timeout=timeout)
     if hb is None or getattr(master, "target_system", 0) == 0:
         print(f"gcs_signed_correct: WARNING no HEARTBEAT within {timeout:.0f}s "
@@ -100,7 +100,7 @@ def _set_mode_guided(master: "mavutil.mavfile", custom_mode: int) -> None:
 
 
 def _current_global(master: "mavutil.mavfile", timeout: float = POS_TIMEOUT_S):
-    """Best-effort current lat/lon (1e7 int deg) so the return hover keeps the current position."""
+    """복귀 hover가 현재 위치를 유지하도록 best-effort 현재 lat/lon(1e7 int deg)."""
     msg = master.recv_match(type="GLOBAL_POSITION_INT", blocking=True, timeout=timeout)
     if msg is None:
         print(f"gcs_signed_correct: no GLOBAL_POSITION_INT within {timeout:.0f}s "
@@ -110,15 +110,15 @@ def _current_global(master: "mavutil.mavfile", timeout: float = POS_TIMEOUT_S):
 
 
 def _return_to_alt(master: "mavutil.mavfile", alt_m: float) -> None:
-    """Command a return to ``alt_m`` RELATIVE altitude over the current position (GUIDED hold).
+    """현재 위치 위로 ``alt_m`` RELATIVE 고도로의 복귀를 명령한다(GUIDED hold).
 
-    type_mask enables ONLY the position fields (bits for vel/accel/yaw set to ignore). Frame is
-    RELATIVE_ALT so ``alt_m`` is height above home (~30 m), matching arducopter --home=...,30."""
+    type_mask는 오직 position 필드만 활성화한다(vel/accel/yaw 비트는 ignore로 설정). Frame이
+    RELATIVE_ALT이므로 ``alt_m``은 home 위 높이(~30 m)이며, arducopter --home=...,30과 일치한다."""
     lat, lon = _current_global(master)
-    # 0b0000_111_111_111_000 -> use position (x,y,z), ignore vel/accel/yaw/yaw_rate.
+    # 0b0000_111_111_111_000 -> position(x,y,z) 사용, vel/accel/yaw/yaw_rate 무시.
     type_mask = 0b0000111111111000
     if lat is None or lon is None:
-        # Fallback: no position fix yet — command altitude-only via a takeoff-to-alt in GUIDED.
+        # Fallback: 아직 position fix 없음 — GUIDED에서 takeoff-to-alt로 고도만 명령.
         master.mav.command_long_send(
             master.target_system, master.target_component,
             mavutil.mavlink.MAV_CMD_NAV_TAKEOFF, 0,
@@ -143,17 +143,17 @@ def main(argv: list[str]) -> int:
     master = _connect_signed()
     _wait_target(master)
 
-    # (a) take authority back into GUIDED (only GUIDED is wired here; other modes would map similarly)
+    # (a) GUIDED로 권한을 되찾음(여기선 GUIDED만 배선; 다른 모드도 유사하게 매핑될 것)
     if mode.upper() == "GUIDED":
         _set_mode_guided(master, COPTER_GUIDED_CUSTOM_MODE)
     else:
         _set_mode_guided(master, COPTER_GUIDED_CUSTOM_MODE)
     time.sleep(SETTLE_S)
 
-    # (b) physically return to the ~30 m relative hover altitude over the current position
+    # (b) 현재 위치 위로 ~30 m relative hover 고도로 물리적 복귀
     _return_to_alt(master, alt_m)
     time.sleep(SETTLE_S)
-    # re-issue once for reliability over lossy UDP (both are idempotent guided targets)
+    # lossy UDP에 대한 신뢰성을 위해 한 번 재발행(둘 다 멱등 guided target)
     _return_to_alt(master, alt_m)
 
     print(f"gcs_signed_correct: signed GUIDED + return-to-{alt_m:.0f}m relative issued", flush=True)

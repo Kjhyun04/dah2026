@@ -1,28 +1,28 @@
-"""test_cr01_signed_recovery — Item 2: incident -> signing-recovery legal candidate.
+"""test_cr01_signed_recovery — Item 2: incident -> signing-recovery 적법 후보.
 
-Locks the "command-domain incident -> send_signed_mode becomes a LEGAL recovery" wiring,
-end to end through select_policy + legality + rank_recovery, with ZERO core hardcode
-(tuning lives only in recovery_priors.yaml + the closed _INCIDENT_RECOVERY map). Runs
-offline and fully deterministic (불변식1.).
+"command-도메인 incident -> send_signed_mode 가 적법(LEGAL) recovery 가 됨" 배선을
+select_policy + legality + rank_recovery 를 관통해 end to end 로 고정하며, core 하드코드
+전혀 없음(튜닝은 recovery_priors.yaml + 닫힌 _INCIDENT_RECOVERY 맵에만 존재). 오프라인
+실행이며 완전 결정론적(불변식1.).
 
-Two routes deliver send_signed_mode as a legal candidate; both are locked here:
+두 경로가 send_signed_mode 를 적법 후보로 전달한다; 둘 다 여기서 고정된다:
 
-  A) CR01 (E19 time-window correlation of PFCP_Delete_Attempt + Unauthorized_Command)
-     -> _INCIDENT_RECOVERY["CR01"] = [pfcp_firewall, command_override]. command_override's
-     response_tool is send_signed_mode (recovery_priors). It enters legal_actions ONLY when
-     signing == CONFIRMED_ON AND role_verified[<gcs_proxy>] is True. Under the pure-CR01
-     legal set pfcp_firewall CO-EXISTS (same gcs_proxy chokepoint) and DETERMINISTICALLY
-     out-ranks command_override, so the autonomous chosen action is nsenter_input_drop — the
-     flight uplink is offered but not auto-selected (send_signed_mode stays OPER/operator-go).
+  A) CR01 (PFCP_Delete_Attempt + Unauthorized_Command 의 E19 시간창 상관)
+     -> _INCIDENT_RECOVERY["CR01"] = [pfcp_firewall, command_override]. command_override 의
+     response_tool 은 send_signed_mode(recovery_priors). 오직(ONLY)
+     signing == CONFIRMED_ON 이고 role_verified[<gcs_proxy>] 가 True 일 때 legal_actions 에
+     진입한다. 순수-CR01 적법 집합에서 pfcp_firewall 이 공존하며(CO-EXISTS)(동일 gcs_proxy
+     chokepoint) command_override 를 결정론적으로 능가하므로, 자율 선택 액션은
+     nsenter_input_drop 이다 — 비행 업링크는 제시되나 자동 선택되지 않는다(send_signed_mode 는 OPER/operator-go 유지).
 
   B) command single-signal (Unauthorized_Command / Signature_Verify_Fail) -> signed_guided
-     (send_signed_mode) via the _RTYPE_DOMAIN_GUARD command gate. When the container-isolation
-     peer (backdoor_pause -> web_backend) is NOT verified, signed_guided is the SOLE legal
-     candidate and send_signed_mode is the CHOSEN flight-recovery tool (the S2 scenario).
+     (send_signed_mode), _RTYPE_DOMAIN_GUARD command 게이트를 통해. 컨테이너 격리
+     피어(backdoor_pause -> web_backend)가 미검증일 때, signed_guided 가 유일한(SOLE) 적법
+     후보이며 send_signed_mode 가 선택된(CHOSEN) 비행-recovery 도구다(S2 시나리오).
 
-Fail-safe (MONOTONIC LATCH): signing UNKNOWN or CONFIRMED_OFF, or a missing role_verified
-binding, MUST exclude send_signed_mode from the legal set (never fire an unconfirmed-auth
-flight uplink).
+Fail-safe (MONOTONIC LATCH): signing 이 UNKNOWN 또는 CONFIRMED_OFF, 또는 role_verified
+바인딩 누락 시, send_signed_mode 를 적법 집합에서 반드시 배제해야 한다(미확인 인증
+비행 업링크를 절대 발사하지 않음).
 """
 from __future__ import annotations
 
@@ -65,18 +65,18 @@ def _tools(legal) -> set:
 
 
 # --------------------------------------------------------------------------- #
-# mapping consistency (pure config; no core literal)
+# 매핑 일관성 (순수 config; core 리터럴 없음)
 # --------------------------------------------------------------------------- #
 def test_cr01_maps_to_command_override_signing_recovery():
     assert _INCIDENT_RECOVERY["CR01"] == ["pfcp_firewall", "command_override"]
     priors = loader.recovery_priors().get("recovery_priors", {})
-    # the signing-recovery candidate for CR01 dispatches the flight-uplink tool
+    # CR01 의 signing-recovery 후보는 비행-업링크 도구를 디스패치한다
     assert priors["command_override"]["response_tool"] == "send_signed_mode"
     assert priors["command_override"]["enforce_at"] == "gcs_proxy"
 
 
 # --------------------------------------------------------------------------- #
-# A) CR01 legality — send_signed_mode admitted ONLY under CONFIRMED_ON + role gcs
+# A) CR01 적법성 — send_signed_mode 는 오직 CONFIRMED_ON + role gcs 에서만 허용
 # --------------------------------------------------------------------------- #
 def test_cr01_confirmed_signing_and_role_gcs_admits_send_signed_mode():
     world = _world(signing=SigningObs.CONFIRMED_ON, verified={"gcs_proxy": True})
@@ -87,7 +87,7 @@ def test_cr01_confirmed_signing_and_role_gcs_admits_send_signed_mode():
 
 
 def test_cr01_unknown_signing_latch_excludes_send_signed_mode():
-    # MONOTONIC LATCH fail-safe: no authoritative ON observation -> flight uplink NOT legal.
+    # MONOTONIC LATCH fail-safe: 권위 있는 ON 관측 없음 -> 비행 업링크 비적법.
     world = _world(signing=SigningObs.UNKNOWN, verified={"gcs_proxy": True})
     legal, _ = _drive(_cr01(), world)
     assert "command_override" not in {a.recovery_type for a in legal}
@@ -95,27 +95,27 @@ def test_cr01_unknown_signing_latch_excludes_send_signed_mode():
 
 
 def test_cr01_confirmed_off_excludes_send_signed_mode():
-    # only CONFIRMED_ON is enforced (signing_enforced); a confirmed-OFF posture is NOT legal.
+    # CONFIRMED_ON 만 강제됨(signing_enforced); confirmed-OFF 자세는 비적법.
     world = _world(signing=SigningObs.CONFIRMED_OFF, verified={"gcs_proxy": True})
     legal, _ = _drive(_cr01(), world)
     assert "send_signed_mode" not in _tools(legal)
 
 
 def test_cr01_missing_role_gcs_excludes_send_signed_mode():
-    # role gate: gcs_proxy chokepoint binding absent -> command_override illegal (self-DoS shut).
+    # role 게이트: gcs_proxy chokepoint 바인딩 부재 -> command_override 비적법(self-DoS 차단).
     world = _world(signing=SigningObs.CONFIRMED_ON, verified={})
     legal, _ = _drive(_cr01(), world)
     assert "send_signed_mode" not in _tools(legal)
 
 
 # --------------------------------------------------------------------------- #
-# A) CR01 ranking — DETERMINISTIC total order (pfcp_firewall out-ranks command_override)
+# A) CR01 랭킹 — 결정론적 전순서 (pfcp_firewall 이 command_override 를 능가)
 # --------------------------------------------------------------------------- #
 def test_cr01_rank_is_deterministic_pfcp_out_ranks_command_override():
-    # Both legal under CONFIRMED_ON + gcs. recovery_priors scores pfcp_firewall (succ 0.80, MED)
-    # above command_override (succ 0.90, HIGH) via the composite recovery_score (risk weighting),
-    # with NO core _sort_key boost. Locking this pins the autonomous CR01 selection: the flight
-    # uplink is a legal candidate but is NOT auto-chosen (send_signed_mode stays operator-go).
+    # CONFIRMED_ON + gcs 하에서 둘 다 적법. recovery_priors 는 복합 recovery_score(위험 가중)를
+    # 통해 pfcp_firewall(succ 0.80, MED)을 command_override(succ 0.90, HIGH)보다 높게 점수화하며,
+    # core _sort_key 부스트는 없다. 이를 고정하면 자율 CR01 선택이 고정된다: 비행
+    # 업링크는 적법 후보이나 자동 선택되지 않는다(send_signed_mode 는 operator-go 유지).
     world = _world(signing=SigningObs.CONFIRMED_ON, verified={"gcs_proxy": True})
     legal, out = _drive(_cr01(), world)
     assert {a.recovery_type for a in legal} == {"pfcp_firewall", "command_override"}
@@ -125,12 +125,12 @@ def test_cr01_rank_is_deterministic_pfcp_out_ranks_command_override():
 
 
 # --------------------------------------------------------------------------- #
-# B) command single-signal — send_signed_mode is the CHOSEN flight recovery (S2)
+# B) command single-signal — send_signed_mode 가 선택된 비행 recovery(S2)
 # --------------------------------------------------------------------------- #
 def test_command_hijack_single_signal_chooses_send_signed_mode():
-    # command-domain single-signal (Signature_Verify_Fail) admits signed_guided via the
-    # _RTYPE_DOMAIN_GUARD command gate. gcs_proxy verified, web_backend NOT -> backdoor_pause
-    # filtered -> signed_guided sole legal -> send_signed_mode CHOSEN (the S2 flight recovery).
+    # command-도메인 single-signal(Signature_Verify_Fail)은 _RTYPE_DOMAIN_GUARD command
+    # 게이트를 통해 signed_guided 를 허용. gcs_proxy 검증됨, web_backend 미검증 -> backdoor_pause
+    # 필터됨 -> signed_guided 유일 적법 -> send_signed_mode 선택됨(S2 비행 recovery).
     world = _world(signing=SigningObs.CONFIRMED_ON, verified={"gcs_proxy": True})
     legal, out = _drive(_cmd_single_signal("Signature_Verify_Fail"), world)
     assert [a.recovery_type for a in legal] == ["signed_guided"], [a.recovery_type for a in legal]
@@ -142,8 +142,8 @@ def test_command_hijack_single_signal_chooses_send_signed_mode():
 
 
 def test_command_single_signal_unknown_signing_no_flight_uplink():
-    # LIVE posture fail-safe: UNKNOWN signing -> signed_guided double-gated out; if the isolation
-    # peer is also unverified there is NO legal recovery and NO flight uplink is chosen.
+    # LIVE 자세 fail-safe: UNKNOWN signing -> signed_guided 이중 게이트로 배제; 격리
+    # 피어도 미검증이면 적법 recovery 없음, 비행 업링크 선택 없음.
     world = _world(signing=SigningObs.UNKNOWN, verified={"gcs_proxy": True})
     legal, out = _drive(_cmd_single_signal("Signature_Verify_Fail"), world)
     assert "send_signed_mode" not in _tools(legal)

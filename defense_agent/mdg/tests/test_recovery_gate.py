@@ -1,8 +1,8 @@
-"""test_recovery_gate — P0 panel-1 (M6/E-2): feasibility gate vs recovery_score split.
+"""test_recovery_gate — P0 panel-1 (M6/E-2): feasibility gate 대 recovery_score 분리.
 
-Pins the decision so a future refactor cannot silently re-brick the agent by pointing
-the feasibility gate back at recovery_score (which caps at ~0.14-0.38, making every
-response permanently infeasible). Runnable as ``python tests/test_recovery_gate.py``.
+이 결정을 고정하여, 이후 리팩터가 feasibility gate 를 다시 recovery_score(~0.14-0.38 로
+상한이 걸려 모든 응답을 영구히 infeasible 로 만듦)로 가리켜 에이전트를 조용히
+재차 벽돌화하지 못하게 한다. ``python tests/test_recovery_gate.py`` 로 실행 가능.
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def _feasible_min() -> float:
     return float(rp.get("success_prob_feasible_min", rp.get("feasible_min", 0.70)))
 
 
-# --- the split itself: gate on success_probability, NOT recovery_score ---------
+# --- 분리 자체: recovery_score 아닌 success_probability 로 게이트 ---------
 def test_every_prior_admitted_by_success_prob_gate():
     fmin = _feasible_min()
     for name, prior in D.RECOVERY_PRIORS.items():
@@ -39,9 +39,9 @@ def test_every_prior_admitted_by_success_prob_gate():
 
 
 def test_recovery_score_cannot_be_the_gate():
-    # every recovery_score sits FAR below the 0.70 floor -> gating on it = infeasible-forever
+    # 모든 recovery_score 는 0.70 하한보다 한참 아래 -> 이를 게이트로 쓰면 영구 infeasible
     scores = {n: _score(p) for n, p in D.RECOVERY_PRIORS.items()}
-    assert max(scores.values()) < _feasible_min(), scores       # pins the contradiction
+    assert max(scores.values()) < _feasible_min(), scores       # 모순을 고정
 
 
 def test_recovery_score_is_bounded():
@@ -49,15 +49,15 @@ def test_recovery_score_is_bounded():
         assert 0.0 <= _score(p) <= 1.0
 
 
-# --- config key renamed so gate cannot be re-pointed at recovery_score ---------
+# --- gate 를 recovery_score 로 재지정 못하도록 config 키 개명 ---------
 def test_feasible_min_key_is_success_prob_scoped():
     rp = loader.recovery_priors()
     assert "success_prob_feasible_min" in rp, "renamed gate key missing"
 
 
-# --- node behavior: gate reads success_probability -----------------------------
+# --- 노드 동작: gate 는 success_probability 를 읽음 -----------------------------
 def test_unknown_type_filtered_by_gate():
-    # unknown recovery_type -> success_probability defaults 0.5 < 0.70 -> filtered out
+    # 미지 recovery_type -> success_probability 기본값 0.5 < 0.70 -> 필터링됨
     st = {"legal_actions": [Action(tool_id="x", recovery_type="unknown_type",
                                    risk="MED", reversible=True)],
           "config_version": "test"}

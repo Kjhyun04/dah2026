@@ -1,15 +1,15 @@
-"""mdg.llm — the 2-phase advice LLM package (P3, PA-4/PA-5/PS-3/PS-7).
+"""mdg.llm — 2단계 advice LLM 패키지(P3, PA-4/PA-5/PS-3/PS-7).
 
-Two litellm-backed callables (orient=Sonnet, decide=Opus per models.yaml) that the
-graph injects into the orient/decide nodes as ``llm_orient`` / ``llm_decide``. Both are
-temperature=0, structured (pydantic OrientNote/DecideNote), advice-only (raise-only), and
-edge-invisible. Prompts are Jinja StrictUndefined with an empty-prompt guard and receive
-DERIVED numeric/enum features only (PS-7). Secrets (ANTHROPIC_API_KEY) live only in the
-litellm client's process env — never in State/JSONL/prompts (PS-3).
+graph가 orient/decide node에 ``llm_orient`` / ``llm_decide``로 주입하는, litellm 기반의
+두 callable(models.yaml에 따라 orient=Sonnet, decide=Opus). 둘 다 temperature=0,
+구조화됨(pydantic OrientNote/DecideNote), advice-only(raise-only), 그리고 edge-invisible이다.
+프롬프트는 empty-prompt 가드가 있는 Jinja StrictUndefined이며 DERIVED된 numeric/enum
+피처만 받는다(PS-7). 시크릿(ANTHROPIC_API_KEY)은 litellm 클라이언트의 프로세스 env에만
+존재한다 — State/JSONL/프롬프트에는 결코 담기지 않는다(PS-3).
 
-Graceful degradation: when litellm/jinja2/API key are absent, the factories return None
-and the nodes use their deterministic fallback (G6). This package lives OUTSIDE mdg.core
-so the deterministic core never imports the optional LLM/egress surface.
+우아한 성능 저하(graceful degradation): litellm/jinja2/API key가 없으면 팩토리는 None을
+반환하고 node는 결정론적 fallback을 사용한다(G6). 이 패키지는 mdg.core 바깥에 있으므로
+결정론적 core는 선택적 LLM/egress 표면을 결코 import하지 않는다.
 """
 from __future__ import annotations
 
@@ -25,9 +25,9 @@ __all__ = [
 
 
 def build_llm_deps(models_cfg: dict | None = None) -> dict:
-    """Launcher helper: build the ``{'llm_orient','llm_decide'}`` dep slice that
-    graph.build_graph(deps) consumes. Values are None when the LLM path is unavailable
-    (deterministic fallback, G6) — the graph is fully functional either way."""
+    """Launcher 헬퍼: graph.build_graph(deps)가 소비하는 ``{'llm_orient','llm_decide'}``
+    dep slice를 만든다. LLM 경로를 사용할 수 없으면 값은 None이다(결정론적 fallback, G6) —
+    어느 경우든 graph는 완전히 동작한다."""
     return {
         "llm_orient": make_orient_llm(models_cfg),
         "llm_decide": make_decide_llm(models_cfg),

@@ -1,18 +1,18 @@
-"""Backend.run(ExecRequest) — THE ONLY subprocess path (불변식2., Robo Duck R1~R6).
+"""Backend.run(ExecRequest) — 유일한 subprocess 경로(불변식2., Robo Duck R1~R6).
 
-Graph nodes and collectors never spawn processes; they hand an ExecRequest to
-Backend.run, which is the sole owner of ``subprocess``. Backend performs the spawn
-(secret on stdin, R5) and delegates the R1/R2/R3/R4/R6 teardown discipline to
-``safeexec`` (setsid process group, labelled container-scope reap). A
-PrioritySemaphore(1) gives 5762/nsenter resource singularity.
+Graph node와 collector는 절대 프로세스를 spawn하지 않는다; ExecRequest를
+``subprocess``의 유일한 소유자인 Backend.run에 넘긴다. Backend가 spawn을 수행하고
+(비밀은 stdin으로, R5) R1/R2/R3/R4/R6 teardown 규율을 ``safeexec``에 위임한다
+(setsid 프로세스 그룹, 라벨된 container-scope reap).
+PrioritySemaphore(1)이 5762/nsenter 자원 단일화를 제공한다.
 
-Modes:
-  - ``mock``  : never spawns; returns synthetic output (unit tests / offline).
-  - ``local`` : real subprocess via subprocess.Popen, ONLY when ``allow_live`` is True.
+모드:
+  - ``mock``  : 절대 spawn하지 않음; 합성 출력을 반환(단위 테스트 / 오프라인).
+  - ``local`` : ``allow_live``가 True일 때만, subprocess.Popen을 통한 실제 subprocess.
 
-Live state-change is operator-go RESERVED (운영 제약): ``allow_live`` defaults False,
-so even a ``local`` backend returns a DRY-RUN result until an operator explicitly flips
-it. This is the code-level guard behind the testbed no-actuation constraint.
+Live 상태 변경은 operator-go 유보다(운영 제약): ``allow_live``는 기본 False이므로,
+``local`` backend라도 운영자가 명시적으로 뒤집기 전까지 DRY-RUN 결과를 반환한다.
+이것이 테스트베드 무집행 제약 뒤의 코드 수준 가드다.
 """
 from __future__ import annotations
 
@@ -24,31 +24,31 @@ from typing import Optional
 from . import safeexec
 
 
-# -- read_only trust-boundary allowlist (security-relevant, NOT advisory) ------- #
-#   ``read_only`` gates TWO privileges in Backend.run: the read_only fast-path (a)
-#   spawns even when allow_live=False (observation is permitted freely) and (b) skips
-#   the pool=1 resource-singularity semaphore. A caller-asserted boolean must therefore
-#   be validated against the ACTUAL argv, or a mutating command could smuggle itself past
-#   both guards. tcpdump ``-w <file>`` writes a capture file and ``-z <cmd>``/``-G`` run a
-#   postrotate command — genuine state changes — and nsenter/docker can wrap any binary.
-#   We pin the post-nsenter binary to the known non-mutating observers and reject any
-#   write/exec/rotate flag before granting the fast-path.
+# -- read_only trust-boundary 허용목록 (보안 관련, 권고 아님) ------- #
+#   ``read_only``는 Backend.run에서 두 가지 권한을 통제한다: read_only fast-path는 (a)
+#   allow_live=False일 때도 spawn하며(관측은 자유롭게 허용) (b) pool=1 자원-단일화
+#   세마포어를 건너뛴다. 따라서 호출자가 주장한 boolean은 실제 argv에 대해
+#   검증되어야 하며, 그렇지 않으면 변경 명령이 두 가드를 몰래 통과할 수 있다. tcpdump
+#   ``-w <file>``은 캡처 파일을 쓰고 ``-z <cmd>``/``-G``는 postrotate 명령을 실행한다
+#   — 진짜 상태 변경 — 그리고 nsenter/docker는 임의 바이너리를 감쌀 수 있다.
+#   post-nsenter 바이너리를 알려진 비변경 관측기로 고정하고 fast-path를 허용하기 전에
+#   모든 write/exec/rotate 플래그를 거부한다.
 _READONLY_OBSERVERS = frozenset({"tcpdump", "ss", "docker", "iptables"})
-#   -w/-W/-G/-z: tcpdump file-write, filecount, rotate-seconds, postrotate-exec.
+#   -w/-W/-G/-z: tcpdump 파일쓰기, 파일개수, rotate 초, postrotate 실행.
 _READONLY_BANNED_FLAGS = ("-w", "-W", "-G", "-z")
-#   NOTE (live finding, 2026-07-08): ``ip`` is deliberately NOT here. The recon tun-scan
-#   (``nsenter ... ip -4 addr show <iface>``) is OPERATOR-GO RESERVED by design (resolve.py
-#   docstring + test_p2_recon.test_resolve_tun_scan_is_operator_go_dry_run) to minimise the
-#   netns-entry surface — so UE-pool role_verified requires allow_live. Consequence: the verified
-#   decision path (legality-pass -> DROP plan) is NOT observable under allow_live=False; it manifests
-#   only under the operator-go allow_live window (same gate as actuation). This is the intended
-#   double operator-go gate (recon resolve + actuation).
+#   NOTE (live finding, 2026-07-08): ``ip``는 의도적으로 여기 없다. recon tun-scan
+#   (``nsenter ... ip -4 addr show <iface>``)은 netns-entry 표면을 최소화하기 위해 설계상
+#   OPERATOR-GO 유보다(resolve.py docstring + test_p2_recon.test_resolve_tun_scan_is_operator_go_dry_run)
+#   — 그래서 UE-pool role_verified는 allow_live를 요구한다. 결과: 검증된
+#   결정 경로(legality-pass -> DROP plan)는 allow_live=False에서 관측되지 않는다; 그것은
+#   operator-go allow_live 창(집행과 동일한 게이트)에서만 나타난다. 이것이 의도된
+#   이중 operator-go 게이트(recon resolve + 집행)다.
 
 
 def _strip_nsenter_prefix(argv: list[str]) -> list[str]:
-    """Return the wrapped command after the canonical ``nsenter ... -- <binary> ...``
-    prefix. A bare (non-nsenter) argv is returned unchanged; a malformed nsenter with no
-    ``--`` terminator yields [] (fails the allowlist below rather than mis-reading argv[0])."""
+    """canonical ``nsenter ... -- <binary> ...`` 접두 뒤의 감싼 명령을 반환한다.
+    맨(비-nsenter) argv는 그대로 반환된다; ``--`` 종결자가 없는 잘못된 nsenter는
+    []를 낸다(argv[0]을 잘못 읽는 대신 아래 허용목록을 실패시킴)."""
     if argv and argv[0] == "nsenter":
         if "--" in argv:
             return argv[argv.index("--") + 1:]
@@ -57,10 +57,10 @@ def _strip_nsenter_prefix(argv: list[str]) -> list[str]:
 
 
 def is_read_only_argv(argv: list[str]) -> bool:
-    """True iff ``argv`` is a recognized non-mutating observation form. The post-nsenter
-    binary must be an allowlisted observer, no write/exec/rotate flag may appear, and
-    ``docker`` is narrowed to its read-only ``logs`` subcommand. This is the validation
-    behind the ``read_only`` fast-path; a claim that fails here is treated as NOT read_only."""
+    """``argv``가 인식된 비변경 관측 형태일 때만 True. post-nsenter
+    바이너리는 허용목록의 관측기여야 하고, write/exec/rotate 플래그가 나타나선 안 되며,
+    ``docker``는 read-only ``logs`` 하위 명령으로 좁혀진다. 이것이 ``read_only`` fast-path
+    뒤의 검증이다; 여기서 실패하는 주장은 read_only가 아닌 것으로 취급된다."""
     body = _strip_nsenter_prefix(argv)
     if not body:
         return False
@@ -70,18 +70,18 @@ def is_read_only_argv(argv: list[str]) -> bool:
     for a in rest:
         if any(a == bad or a.startswith(bad) for bad in _READONLY_BANNED_FLAGS):
             return False
-    if binary == "docker":                    # only read-only subcommands: `logs` + `inspect`
-        # resolve.py stage-1 is "inspect, read-only" (container existence + .State.Pid + cellular
-        # IP) — a metadata read, NOT a state change — so recon can resolve pids under allow_live=False
-        # (detection path). Mutating docker verbs (run/rm/exec/pause/stop) stay blocked.
+    if binary == "docker":                    # read-only 하위 명령만: `logs` + `inspect`
+        # resolve.py stage-1은 "inspect, read-only"다(container 존재 + .State.Pid + cellular
+        # IP) — 상태 변경이 아닌 메타데이터 읽기 — 그래서 recon은 allow_live=False에서 pid를 해결할 수 있다
+        # (탐지 경로). 변경성 docker 동사(run/rm/exec/pause/stop)는 차단된 채로 유지된다.
         if not rest or rest[0] not in ("logs", "inspect"):
             return False
-    if binary == "iptables":                  # only read-only listing (-L/-S/-C); no mutation
-        # DAH5762 backdoor SYN-counter read (`iptables -n -v -x -L DAH5762`). Reject EVERY
-        # mutating verb — long form OR any short cluster containing a command letter
-        # (A/I/D/R/F/X/N/P/Z/E, incl. -Z counter-zero) — so this read-only fast-path can never
-        # install/flush/zero a rule; and require at least one listing verb (-L/-S/-C). Handles
-        # both separate (-n -v -x -L) and combined (-nvxL) short-flag forms.
+    if binary == "iptables":                  # read-only 나열만(-L/-S/-C); 변경 없음
+        # DAH5762 backdoor SYN-counter 읽기(`iptables -n -v -x -L DAH5762`). 모든
+        # 변경성 동사를 거부한다 — long form 또는 command 문자를 포함한 short cluster
+        # (A/I/D/R/F/X/N/P/Z/E, -Z counter-zero 포함) — 그래서 이 read-only fast-path는 결코
+        # 규칙을 설치/flush/zero할 수 없다; 그리고 최소 하나의 나열 동사(-L/-S/-C)를 요구한다.
+        # 분리형(-n -v -x -L)과 결합형(-nvxL) short-flag 형태를 모두 처리한다.
         _MUT_LONG = {"--append", "--insert", "--delete", "--replace", "--flush",
                      "--delete-chain", "--new-chain", "--policy", "--zero", "--rename-chain"}
         _MUT_LETTERS, _LIST_LETTERS = set("AIDRFXNPZE"), set("LSC")
@@ -104,13 +104,13 @@ def is_read_only_argv(argv: list[str]) -> bool:
 
 @dataclass
 class ExecRequest:
-    argv: list[str]                          # NO shell string; argv list only
+    argv: list[str]                          # shell 문자열 없음; argv 리스트만
     timeout_s: float = 10.0
-    stdin_secret: Optional[str] = None       # R5: secret via stdin, never argv
-    label: str = safeexec.LABEL              # R3: container-scope reap label (dah_def)
-    revert_cmd: str = ""                     # recorded to ledger before run (G3)
+    stdin_secret: Optional[str] = None       # R5: 비밀은 stdin으로, 절대 argv 아님
+    label: str = safeexec.LABEL              # R3: container-scope reap 라벨(dah_def)
+    revert_cmd: str = ""                     # run 전에 ledger에 기록(G3)
     reversible: bool = True
-    read_only: bool = False                  # observation cmds (tcpdump/ss/logs)
+    read_only: bool = False                  # 관측 명령(tcpdump/ss/logs)
 
 
 @dataclass
@@ -124,7 +124,7 @@ class ExecResult:
 
 
 class PrioritySemaphore:
-    """pool=1 for 5762 ss / nsenter target resource singularity (G4)."""
+    """5762 ss / nsenter 대상 자원 단일화를 위한 pool=1 (G4)."""
     def __init__(self, permits: int = 1):
         self._sem = threading.BoundedSemaphore(permits)
 
@@ -137,10 +137,10 @@ class PrioritySemaphore:
 
 
 class Backend:
-    """Single owner of subprocess. allow_live defaults False (operator-go 유보).
+    """subprocess의 단일 소유자. allow_live는 기본 False(operator-go 유보).
 
-    mode='local' spawns via subprocess.Popen (R1~R6 teardown); mode='mock' returns
-    synthetic output (and honours a scripted stdout table for deterministic tests).
+    mode='local'은 subprocess.Popen으로 spawn한다(R1~R6 teardown); mode='mock'은
+    합성 출력을 반환한다(그리고 결정론적 테스트를 위해 스크립트된 stdout 테이블을 따른다).
     """
 
     def __init__(self, allow_live: bool = False, semaphore: Optional[PrioritySemaphore] = None,
@@ -149,7 +149,7 @@ class Backend:
         self.mode = mode
         self._sem = semaphore or PrioritySemaphore(1)
         self._mock_stdout = mock_stdout
-        self._mock_table = mock_table or {}   # {argv-substring: stdout}
+        self._mock_table = mock_table or {}   # {argv-부분문자열: stdout}
 
     # -- mock -------------------------------------------------------------- #
     def _mock_run(self, req: ExecRequest) -> ExecResult:
@@ -159,24 +159,24 @@ class Backend:
             if key in joined:
                 stdout = val
                 break
-        # mock represents synthetic-but-live observation output: dry_run False so
-        # collectors parse it. The operational no-actuation guard is allow_live in
-        # 'local' mode, not mock.
+        # mock은 합성이지만 live인 관측 출력을 나타낸다: dry_run False이므로
+        # collector가 파싱한다. 운영상 무집행 가드는 'local' 모드의 allow_live이지
+        # mock이 아니다.
         return ExecResult(ok=True, code=0, stdout=stdout, dry_run=False,
                           note=f"MOCK: {joined}")
 
-    # -- the single spawn site (R1~R6) ------------------------------------ #
+    # -- 유일한 spawn 지점 (R1~R6) ------------------------------------ #
     def _spawn(self, req: ExecRequest) -> ExecResult:
-        env = safeexec.child_env(req.label)                 # R3: label the subtree
+        env = safeexec.child_env(req.label)                 # R3: 서브트리에 라벨
         popen_kw = dict(stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE, text=True, env=env)
-        popen_kw.update(safeexec.session_popen_kwargs())    # R2: setsid process group
-        proc = subprocess.Popen(req.argv, **popen_kw)       # the ONLY spawn
+        popen_kw.update(safeexec.session_popen_kwargs())    # R2: setsid 프로세스 그룹
+        proc = subprocess.Popen(req.argv, **popen_kw)       # 유일한 spawn
         try:
             out, err = proc.communicate(input=req.stdin_secret, timeout=req.timeout_s)  # R5
             return ExecResult(ok=(proc.returncode == 0), code=proc.returncode,
                               stdout=out or "", stderr=err or "")
-        except subprocess.TimeoutExpired:                   # R1: hard deadline
+        except subprocess.TimeoutExpired:                   # R1: 하드 데드라인
             safeexec.kill_group(proc)
             try:
                 out, err = proc.communicate(timeout=2.0)
@@ -185,24 +185,24 @@ class Backend:
             return ExecResult(ok=False, code=124, stdout=out or "", stderr=err or "",
                               note="timeout")
         finally:
-            safeexec.reap_proc(proc)                        # R6: always tear down
+            safeexec.reap_proc(proc)                        # R6: 항상 teardown
 
     # -- run --------------------------------------------------------------- #
     def run(self, req: ExecRequest) -> ExecResult:
         if self.mode == "mock":
             return self._mock_run(req)
 
-        # read_only is a caller-asserted flag; validate it against the actual argv before
-        # it is allowed to unlock the fast-path (allow_live bypass + no semaphore). A claim
-        # that does not match a recognized observation form (allowlisted observer binary,
-        # no write/exec/rotate flag, docker->logs only) is downgraded to a normal state-
-        # changing request so it CANNOT skip either guard — closing the unvalidated trust
-        # boundary without breaking any real observer (tcpdump/ss/docker-logs all pass).
+        # read_only는 호출자가 주장한 플래그다; fast-path(allow_live 우회 + 세마포어 없음)를
+        # 열도록 허용하기 전에 실제 argv에 대해 검증한다. 인식된 관측 형태(허용목록 관측기
+        # 바이너리, write/exec/rotate 플래그 없음, docker->logs만)와 일치하지 않는 주장은
+        # 일반 상태 변경 요청으로 강등되어 어느 가드도 건너뛸 수 없다 — 실제 관측기
+        # (tcpdump/ss/docker-logs 모두 통과)를 깨지 않으면서 미검증 신뢰
+        # 경계를 닫는다.
         read_only = bool(req.read_only) and is_read_only_argv(req.argv)
 
-        # read-only observation (tcpdump/ss/docker logs/:9090) is NOT a state change —
-        # RUNBOOK §2 permits it freely. Only state-changing actuation (read_only=False)
-        # stays DRY until an operator flips allow_live (operator-go 유보).
+        # read-only 관측(tcpdump/ss/docker logs/:9090)은 상태 변경이 아니다 —
+        # RUNBOOK §2가 자유롭게 허용한다. 상태 변경 집행(read_only=False)만
+        # 운영자가 allow_live를 뒤집기 전까지 DRY로 유지된다(operator-go 유보).
         if not self.allow_live and not read_only:
             return ExecResult(
                 ok=True, code=0, dry_run=True,
@@ -225,22 +225,21 @@ class Backend:
             return self._spawn(req)
 
     def teardown(self, label: str = safeexec.LABEL) -> list[int]:
-        """R4/R6: reap any leftover labelled process in this container.
+        """R4/R6: 이 container에 남은 라벨된 프로세스를 reap한다.
 
-        Gated ONLY on mode=='mock' (mock never spawns, so nothing to reap). It is
-        deliberately NOT gated on allow_live: the default operator-go 유보 backend
-        (allow_live=False) still REAL-spawns read_only observers (tcpdump/ss/docker
-        logs take the read_only fast-path in run() and hit _spawn even when
-        allow_live is False), so a crash can leave labelled orphans in exactly that
-        mode. Gating reap on allow_live would disable crash-orphan recovery for the
-        primary read-only observation path (감사 P1).
+        오직 mode=='mock'에서만 게이트된다(mock은 절대 spawn하지 않으므로 reap할 것 없음).
+        의도적으로 allow_live에는 게이트되지 않는다: 기본 operator-go 유보 backend
+        (allow_live=False)도 read_only 관측기를 실제로 spawn한다(tcpdump/ss/docker
+        logs는 run()에서 read_only fast-path를 타고 allow_live가 False여도
+        _spawn에 도달), 그래서 크래시가 바로 그 모드에서 라벨된 고아를 남길 수 있다.
+        reap를 allow_live에 게이트하면 주된 read-only 관측 경로의 크래시-고아 복구가
+        비활성화된다(감사 P1).
 
-        This is not a protected-asset state change: reap_labelled calls iter_labelled_pids and
-        scans ONLY this container's /proc for our own DAH_DEF_LABEL=dah_def marker and
-        os.kill(pid, SIGKILL)s each such pid individually (single-pid semantics, per the
-        Python os.kill contract). It can therefore only tear down our own labelled
-        subtree — never a testbed/host asset — so it is safe under the no-actuation
-        operating constraint.
+        이것은 보호 자산 상태 변경이 아니다: reap_labelled는 iter_labelled_pids를 호출하고
+        오직 이 container의 /proc만 스캔해 우리 자신의 DAH_DEF_LABEL=dah_def 마커를 찾아
+        각 pid를 개별적으로 os.kill(pid, SIGKILL)한다(single-pid 시맨틱, Python os.kill
+        계약에 따름). 따라서 오직 우리 자신의 라벨된 서브트리만 teardown할 수 있고 —
+        테스트베드/호스트 자산은 절대 아니다 — 그래서 무집행 운영 제약 하에서 안전하다.
         """
         if self.mode == "mock":
             return []

@@ -1,16 +1,16 @@
-"""verify_grep0 — Verifier separation (PA-2 · DESIGN §부록A).
+"""verify_grep0 — Verifier 분리 (PA-2 · DESIGN §부록A).
 
-Enforces (static):
-  - no mdg.core.* module imports mdg.verifier.* (core ↛ verifier)
-  - 'verifier_truth' channel/symbol absent from state.py (and all of core)
-  - 'Truth' type not referenced in core (core cannot import a verdict store)
-  - no core module imports docker sdk / socket path / proxy URL (PS-1 overlap)
-  - NO hardcoded target literals in core CODE (GATE2 targets-0, finding P2-3/A-1):
-    IPv4 literals, INPUT_SPEC container/role name tokens, and INPUT_SPEC port ints
-    are forbidden as code-level constants; allowed ONLY in comments/docstrings. The
-    forbidden set is sourced from config.INPUT_SPEC (loader), not a 2nd hardcoded copy,
-    so the guard tracks the declared topology. This is what would have caught the
-    select_policy.py enforce_at container-literal regression.
+강제(정적):
+  - 어떤 mdg.core.* 모듈도 mdg.verifier.* 를 import 하지 않음 (core ↛ verifier)
+  - 'verifier_truth' 채널/심볼이 state.py (및 core 전체)에 부재
+  - 'Truth' 타입이 core 에서 참조되지 않음 (core 는 판정 저장소를 import 불가)
+  - 어떤 core 모듈도 docker sdk / socket 경로 / proxy URL 을 import 하지 않음 (PS-1 중첩)
+  - core CODE 에 하드코딩된 타겟 리터럴 금지 (GATE2 targets-0, finding P2-3/A-1):
+    IPv4 리터럴, INPUT_SPEC 컨테이너/역할 이름 토큰, INPUT_SPEC 포트 int 는
+    코드 레벨 상수로 금지되며, 주석/독스트링에서만 허용된다. 금지 집합은
+    config.INPUT_SPEC (loader) 에서 소싱하며 두 번째 하드코딩 복사본이 아니므로,
+    가드가 선언된 토폴로지를 추적한다. 이것이 바로
+    select_policy.py enforce_at 컨테이너-리터럴 회귀를 잡아냈을 장치다.
 """
 from __future__ import annotations
 
@@ -47,16 +47,16 @@ def _imports(tree: ast.Module) -> list[str]:
 FORBIDDEN_IMPORT_SUBSTR = ["verifier", "docker", "socket"]
 FORBIDDEN_LITERALS = ["/var/run/docker.sock", "docker-socket-proxy", "verifier_truth"]
 
-# IPv4 dotted-quad (word-bounded so a regex-pattern string like r"\d{1,3}\.\d{1,3}" — which has no
-# literal quad — does not false-positive; only actual a.b.c.d literals match).
+# IPv4 dotted-quad (word-bounded 이므로 리터럴 quad 가 없는 r"\d{1,3}\.\d{1,3}" 같은 regex-패턴
+# 문자열은 오탐하지 않고, 실제 a.b.c.d 리터럴만 매칭한다).
 _IPV4_RE = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b")
 
 
 def _forbidden_target_literals() -> tuple[dict[str, re.Pattern], set[int]]:
-    """Topology tokens that must NEVER appear as CODE-LEVEL literals in core — sourced from
-    config.INPUT_SPEC (NOT a second hardcoded copy). Returns (name-token -> word-bounded regex,
-    forbidden port ints). Container/role names (incl. log-tail containers) + declared ports and
-    the :port on nf metric endpoints."""
+    """core 에서 CODE 레벨 리터럴로 절대 나타나서는 안 되는 토폴로지 토큰 — config.INPUT_SPEC
+    에서 소싱(두 번째 하드코딩 복사본 아님). (이름토큰 -> word-bounded regex, 금지 포트 int) 를
+    반환. 컨테이너/역할 이름(log-tail 컨테이너 포함) + 선언된 포트 및 nf 메트릭 엔드포인트의
+    :port."""
     spec = loader.input_spec()
     tokens: set[str] = set()
     for r in spec.get("roles", []) or []:
@@ -81,9 +81,9 @@ def _forbidden_target_literals() -> tuple[dict[str, re.Pattern], set[int]]:
 
 
 def _docstring_const_ids(tree: ast.Module) -> set[int]:
-    """id() of every Constant node used as a module/class/function docstring — topology tokens are
-    allowed there (prose), so those nodes are exempt from the literal scan. Comments are not in the
-    AST at all, so they are exempt implicitly."""
+    """모듈/클래스/함수 독스트링으로 쓰인 모든 Constant 노드의 id() — 토폴로지 토큰은 거기(서술)
+    에서 허용되므로 해당 노드는 리터럴 스캔에서 면제된다. 주석은 AST 에 아예 없으므로 암묵적으로
+    면제된다."""
     ids: set[int] = set()
     for node in ast.walk(tree):
         body = getattr(node, "body", None)
@@ -95,8 +95,8 @@ def _docstring_const_ids(tree: ast.Module) -> set[int]:
 
 
 def _scan_hardcoded_targets(rep: Report) -> None:
-    """Fail-closed AST scan: any IPv4 / container-role token / declared-port literal in core CODE
-    (outside comments & docstrings) is a GATE2 targets-0 violation (finding P2-3/A-1)."""
+    """Fail-closed AST 스캔: core CODE(주석·독스트링 외부)의 IPv4 / 컨테이너-역할 토큰 /
+    선언-포트 리터럴은 모두 GATE2 targets-0 위반(finding P2-3/A-1)이다."""
     token_res, ports = _forbidden_target_literals()
     for path in _core_files():
         tree = parse(path)
@@ -132,22 +132,22 @@ def _check() -> Report:
                       f"{base}: core imports verifier module '{mod}' (grep0 violation)")
             rep.check(not (mod == "docker" or mod.startswith("docker.")),
                       f"{base}: core imports docker sdk '{mod}' (PS-1)")
-        # literal scans
+        # 리터럴 스캔
         rep.check("verifier_truth" not in src,
                   f"{base}: 'verifier_truth' symbol present (PA-2 requires absence)")
         for lit in ("/var/run/docker.sock", "docker-socket-proxy"):
             rep.check(lit not in src, f"{base}: forbidden sock/proxy literal '{lit}' (PS-1)")
 
-    # Truth type not referenced in core
+    # Truth 타입은 core 에서 참조되지 않음
     for path in _core_files():
         src = read(path)
         base = os.path.relpath(path, MDG_ROOT)
-        # allow the word inside comments about absence; check for symbol usage patterns
+        # 부재에 관한 주석 안의 단어는 허용; 심볼 사용 패턴을 검사
         rep.check("import Truth" not in src and "Truth(" not in src and ": Truth" not in src
                   and "list[Truth]" not in src,
                   f"{base}: references Truth type (core must not import verdict store)")
 
-    # GATE2 targets-0: no hardcoded IPv4/container/port literals in core CODE (finding P2-3/A-1).
+    # GATE2 targets-0: core CODE 에 하드코딩된 IPv4/컨테이너/포트 리터럴 없음 (finding P2-3/A-1).
     _scan_hardcoded_targets(rep)
     return rep
 

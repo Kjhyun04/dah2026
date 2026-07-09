@@ -1,13 +1,13 @@
-"""ORIENT phase-LLM (LLM1, PA-5/PS-7) — litellm callable injected into the orient node.
+"""ORIENT 페이즈-LLM (LLM1, PA-5/PS-7) — orient 노드에 주입되는 litellm callable.
 
-make_orient_llm() returns a callable ``(features:dict) -> OrientNote`` or ``None``. None
-means the advice path is unavailable (no litellm / no jinja2 / no API key) — the graph
-binds ``llm_orient=None`` and the orient node uses its deterministic fallback (G6). The
-callable itself only ever RAISES on error (the node catches + falls back); it never
-returns a downgraded note.
+make_orient_llm() 는 callable ``(features:dict) -> OrientNote`` 또는 ``None`` 을 반환한다. None 은
+조언 경로가 불가함을 뜻한다(litellm 없음 / jinja2 없음 / API 키 없음) — 그래프는
+``llm_orient=None`` 을 바인딩하고 orient 노드는 결정론 폴백을 쓴다(G6). 이
+callable 자체는 에러 시 raise 만 한다(노드가 잡아 폴백); 결코
+격하된 노트를 반환하지 않는다.
 
-Authority (E12): rationale + novelty/ambiguity + severity_bump in {0,1} (raise-only).
-The note is edge-invisible; apply_advice merges it monotonically (band up only).
+권한(E12): rationale + novelty/ambiguity + {0,1} 범위의 severity_bump(raise-only).
+노트는 edge-invisible; apply_advice 가 이를 단조 병합한다(밴드 상향만).
 """
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ _SYSTEM = (
 
 
 def make_orient_llm(models_cfg: dict | None = None):
-    """Build the orient LLM callable, or None when unavailable (deterministic fallback)."""
+    """orient LLM callable 을 만들거나, 불가 시 None(결정론 폴백)."""
     cfg = models_cfg or loader.models()
     # has_api_key 는 models.yaml 최상위 api_key_env(기본 ANTHROPIC_API_KEY)가 가리키는 env 를
     # 확인한다 — provider(anthropic 직결 vs openrouter)를 하드코딩하지 않기 위함.
@@ -55,8 +55,8 @@ def make_orient_llm(models_cfg: dict | None = None):
     api_key = resolve_api_key(cfg)                            # provider-agnostic 키 명시 주입
 
     def _call(features: dict) -> OrientNote:
-        clean = sanitize(features, ORIENT_FEATURES)          # PS-7 derived-only gate
-        user = render("orient.jinja", clean)                 # StrictUndefined + empty guard
+        clean = sanitize(features, ORIENT_FEATURES)          # PS-7 파생값 전용 게이트
+        user = render("orient.jinja", clean)                 # StrictUndefined + 공백 가드
         return complete_structured(role, _SYSTEM, user, OrientNote, timeout, api_key=api_key)
 
     return _call

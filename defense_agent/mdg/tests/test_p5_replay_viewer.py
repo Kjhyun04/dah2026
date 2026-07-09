@@ -1,13 +1,13 @@
-"""test_p5_replay_viewer — P5 Verifier + Viewer + replay self-verify (runnable standalone).
+"""test_p5_replay_viewer — P5 Verifier + Viewer + replay self-verify (독립 실행 가능).
 
-Exercises the four locked P5 properties without langgraph/fastapi:
-  - record.py: byte-identical canonical lines + secret scrub (PS-3)
-  - play.py: tick-timeline reconstruction (both schemas)
-  - verifier.py: independent cross-root truth + telemetry-silence + agent≠truth divergence,
-    AND grep0 (the Verifier module imports NO mdg.core.*)
-  - viewer/app.py: pure 3-panel builder + fail-closed secret scan + loopback-only bind (PS-8)
+langgraph/fastapi 없이 잠긴 네 개 P5 속성을 검증한다:
+  - record.py: byte-identical 정규 라인 + secret scrub (PS-3)
+  - play.py: tick-timeline 재구성 (양 스키마)
+  - verifier.py: 독립 cross-root 진실 + telemetry-silence + agent≠truth 발산,
+    그리고 grep0 (Verifier 모듈은 mdg.core.* 를 전혀 import 하지 않음)
+  - viewer/app.py: 순수 3-panel 빌더 + fail-closed secret scan + loopback 전용 bind (PS-8)
 
-Run: python mdg/tests/test_p5_replay_viewer.py
+실행: python mdg/tests/test_p5_replay_viewer.py
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ _MDG = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 class _StubGraph:
-    """Minimal graph exposing .stream(inp, cfg, stream_mode='updates') for record tests."""
+    """record 테스트용 .stream(inp, cfg, stream_mode='updates') 만 노출하는 최소 graph."""
     def __init__(self, updates):
         self._updates = updates
 
@@ -40,8 +40,8 @@ class _StubGraph:
 
 
 def _synthetic_updates():
-    """3 ticks: healthy -> cross-root-inconsistent(silent,streak1) -> telemetry-silence(streak2).
-    Agent decides 'Continue' every tick (nominal) so ticks 1&2 are agent≠truth divergences."""
+    """3 tick: 정상 -> cross-root-inconsistent(silent,streak1) -> telemetry-silence(streak2).
+    에이전트는 매 tick 'Continue' 결정 (nominal)하므로 tick 1&2 는 agent≠truth 발산."""
     hb = {"metric": "Link_Heartbeat", "channel": "plaintext_mavlink_tap",
           "domain": "communication", "band": "normal", "value": 3,
           "verified": True, "tamper": False, "source_id": "air_telemetry_tap"}
@@ -60,7 +60,7 @@ def _record_to(path: str) -> None:
     g = _StubGraph(_synthetic_updates())
     seq = 0
     cfg = {"configurable": {"thread_id": "t"}}
-    # record all updates as ONE logical run (append across the stub's single stream)
+    # 모든 update 를 하나의 논리적 run 으로 기록 (stub 의 단일 stream 에 걸쳐 append)
     record.record_stream(g, None, cfg, path, seq_start=seq)
 
 
@@ -71,17 +71,17 @@ def test_record_byte_identical():
         _record_to(b)
         with open(a, "rb") as fa, open(b, "rb") as fb:
             assert fa.read() == fb.read(), "recording is not byte-identical across runs"
-        # every line is valid JSON with the canonical schema
+        # 모든 라인은 정규 스키마의 유효한 JSON
         for ln in open(a, encoding="utf-8"):
             obj = json.loads(ln)
             assert set(obj) == {"seq", "node", "patch"}, obj
 
 
-# Standalone program that drives the PRODUCTION driver (run_driver -> _tick) end-to-end
-# against a deterministic stub graph and writes run.jsonl to argv[1]. Run in a subprocess so
-# we can vary PYTHONHASHSEED — the top-level projected-key order comes from iterating the
-# _RECORD_ALLOW *set* (to_record), which is hash-seed dependent across processes. The
-# canonical recorder (sort_keys) must make run.jsonl byte-identical regardless (GATE2).
+# PRODUCTION 드라이버 (run_driver -> _tick)를 결정론적 stub graph 에 대해 end-to-end 구동하고
+# run.jsonl 을 argv[1] 에 쓰는 독립 프로그램. subprocess 로 실행하여 PYTHONHASHSEED 를
+# 변경할 수 있음 — 최상위 projected-key 순서는 _RECORD_ALLOW *set* (to_record) 순회에서 오며,
+# 이는 프로세스마다 hash-seed 에 의존. 정규 recorder (sort_keys)가 그와 무관하게 run.jsonl 을
+# byte-identical 로 만들어야 함 (GATE2).
 _DRIVER_PROG = textwrap.dedent(
     """
     import sys
@@ -113,9 +113,9 @@ _DRIVER_PROG = textwrap.dedent(
 
 
 def test_driver_production_path_byte_identical():
-    """GATE2 on the PRODUCTION path: run_driver/_tick delegates to the canonical recorder, so
-    identical deterministic input yields byte-identical run.jsonl even across processes with
-    different hash seeds (the old forked json.dumps without sort_keys failed this)."""
+    """PRODUCTION 경로의 GATE2: run_driver/_tick 이 정규 recorder 에 위임하므로,
+    동일한 결정론적 입력은 서로 다른 hash seed 프로세스 간에도 byte-identical run.jsonl 을
+    산출 (sort_keys 없이 갈라진 옛 json.dumps 는 이를 실패했음)."""
     parent = os.path.dirname(_MDG)
     with tempfile.TemporaryDirectory() as d:
         prog = os.path.join(d, "drv.py")
@@ -132,16 +132,16 @@ def test_driver_production_path_byte_identical():
                 outs.append(f.read())
         assert outs[0] and outs[1], "driver produced empty run.jsonl"
         assert outs[0] == outs[1], "production run.jsonl not byte-identical across hash seeds"
-        # emitted schema is canonical {seq,node,patch} (not legacy {node:patch})
+        # 방출 스키마는 정규 {seq,node,patch} (레거시 {node:patch} 아님)
         first = json.loads(outs[0].splitlines()[0])
         assert set(first) == {"seq", "node", "patch"}, first
-        # seq is monotonic from 0 across the whole run (carried across ticks)
+        # seq 는 run 전체에서 0 부터 단조 (tick 간 이어짐)
         seqs = [json.loads(ln)["seq"] for ln in outs[0].splitlines()]
         assert seqs == list(range(len(seqs))), seqs
 
 
 class _FakeSaver:
-    """InMemorySaver-shaped stub: records delete_thread(thread_id) calls (P3 pruning)."""
+    """InMemorySaver 형태 stub: delete_thread(thread_id) 호출을 기록 (P3 pruning)."""
     def __init__(self):
         self.deleted = []
 
@@ -150,7 +150,7 @@ class _FakeSaver:
 
 
 class _GraphWithSaver:
-    """Deterministic multi-tick stub carrying a .checkpointer (like a compiled Pregel)."""
+    """(.checkpointer 를 지닌) 결정론적 multi-tick stub (컴파일된 Pregel 처럼)."""
     def __init__(self, saver, goal_at=3):
         self.n = 0
         self.checkpointer = saver
@@ -170,39 +170,39 @@ class _GraphWithSaver:
 
 
 def test_driver_prunes_prior_tick_thread_p3():
-    """P3: run_driver deletes each superseded per-tick thread so the InMemorySaver stays
-    O(1) instead of O(ticks). Runs to goal at tick 3 (threads run-t0..run-t2): the two
-    prior threads (t0, t1) are pruned; the final residual thread (t2) is left (bounded)."""
+    """P3: run_driver 는 대체된 per-tick thread 를 각각 삭제하여 InMemorySaver 가
+    O(ticks) 대신 O(1) 로 유지되게 함. tick 3 에서 goal 도달 (thread run-t0..run-t2): 이전
+    두 thread (t0, t1)는 pruning; 최종 잔여 thread (t2)는 남음 (경계됨)."""
     from mdg.core.driver import run_driver
     saver = _FakeSaver()
     final = run_driver(_GraphWithSaver(saver, goal_at=3), "run",
                        max_iters=10, max_pivots=10, k_dry=10)
     assert final["tick_i"] == 3 and final["goal_reached"] is True
-    # exactly the two superseded threads deleted, in order, never the current/last one
+    # 대체된 두 thread 만 순서대로 삭제, 현재/마지막 것은 절대 아님
     assert saver.deleted == ["run-t0", "run-t1"], saver.deleted
 
 
 def test_driver_prune_fail_safe_no_delete_thread():
-    """Fail-safe: on a checkpointer WITHOUT delete_thread (langgraph-checkpoint < 2.0.25) or
-    no checkpointer at all, the loop must run correctly and never crash (just unpruned)."""
+    """Fail-safe: delete_thread 없는 checkpointer (langgraph-checkpoint < 2.0.25) 또는
+    checkpointer 가 아예 없어도, 루프는 올바르게 실행되며 절대 crash 안 함 (단지 unpruned)."""
     from mdg.core.driver import run_driver
 
-    class _NoDelete:            # saver lacking delete_thread (older checkpoint build)
+    class _NoDelete:            # delete_thread 없는 saver (구버전 checkpoint 빌드)
         pass
     g = _GraphWithSaver(_NoDelete(), goal_at=2)
     assert run_driver(g, "run", max_iters=10, max_pivots=10, k_dry=10)["tick_i"] == 2
-    g2 = _GraphWithSaver(None, goal_at=2)   # checkpointer is None (compiled w/o one)
+    g2 = _GraphWithSaver(None, goal_at=2)   # checkpointer 가 None (없이 컴파일)
     assert run_driver(g2, "run", max_iters=10, max_pivots=10, k_dry=10)["tick_i"] == 2
 
 
 def test_record_secret_scrub():
-    # a patch carrying a canary in an ALLOWED string field must be scrubbed at record time
-    canary_key = "sk-ant-" + "abcd1234efgh"  # built at runtime so no source literal trips verify_keys
+    # ALLOWED 문자열 필드에 canary 를 담은 patch 는 record 시점에 scrub 되어야 함
+    canary_key = "sk-ant-" + "abcd1234efgh"  # 런타임 생성하여 소스 리터럴이 verify_keys 를 건드리지 않게 함
     line = record.canonical_line(0, "sense", {"config_version": "api_key=MDG_CANARY_LLM " + canary_key})
     assert "MDG_CANARY_LLM" not in line and canary_key not in line
     assert "[REDACTED]" in line
-    json.loads(line)  # still valid JSON
-    # an UNDECLARED key is dropped by to_record projection (default-deny)
+    json.loads(line)  # 여전히 유효한 JSON
+    # UNDECLARED 키는 to_record projection 이 드롭 (default-deny)
     line2 = record.canonical_line(0, "sense", {"secret_smuggled": "MDG_CANARY_OP"})
     assert "MDG_CANARY_OP" not in line2 and "secret_smuggled" not in line2
 
@@ -215,7 +215,7 @@ def test_play_reconstruct_both_schemas():
         assert len(ticks) == 3, f"expected 3 ticks, got {len(ticks)}"
         assert ticks[0].last_decision()["decision"] == "Continue"
         assert len(ticks[0].evidence) == 1
-        # legacy {node: patch} schema tolerated
+        # 레거시 {node: patch} 스키마 허용
         legacy = os.path.join(d, "legacy.jsonl")
         with open(legacy, "w", encoding="utf-8") as fh:
             fh.write(json.dumps({"sense": {"evidence": [], "tick_i": 1}}) + "\n")
@@ -233,9 +233,9 @@ def test_verifier_truth_and_divergence():
         assert verdicts[0].verdict == V.LINK_HEALTHY, verdicts[0]
         assert verdicts[1].verdict == V.CROSS_ROOT_INCONSISTENT, verdicts[1]
         assert verdicts[2].verdict == V.TELEMETRY_SILENCE, verdicts[2]
-        # cross-root ∧: tick0 both roots up -> consistent True
+        # cross-root ∧: tick0 양 root up -> consistent True
         assert verdicts[0].cross_root_consistent is True
-        # agent≠truth on ticks 1 and 2 (agent 'Continue' vs silence/inconsistent)
+        # tick 1, 2 에서 agent≠truth (agent 'Continue' vs silence/inconsistent)
         assert verdicts[0].agent_truth_divergence is False
         assert verdicts[1].agent_truth_divergence is True
         assert verdicts[2].agent_truth_divergence is True
@@ -244,33 +244,33 @@ def test_verifier_truth_and_divergence():
 
 
 def test_gcs_proxy_alive_p5q3_layering():
-    """P5-Q3: role_verified primary; behaviorally_verified is a POSITIVE-only upgrade
-    (never a downgrade); .get guard degrades legacy worldstate w/o the key."""
+    """P5-Q3: role_verified 우선; behaviorally_verified 는 POSITIVE 전용 업그레이드
+    (절대 다운그레이드 아님); .get 가드는 키 없는 레거시 worldstate 를 degrade."""
     ga = V._gcs_proxy_alive
     hb = {"metric": "Link_Heartbeat", "channel": "plaintext_mavlink_tap",
           "domain": "communication", "tamper": False, "source_id": "air_telemetry_tap"}
-    # 1. role_verified True -> True (primary, short-circuit)
+    # 1. role_verified True -> True (우선, short-circuit)
     assert ga({"role_verified": {"gcs_proxy": True}}, []) is True
-    # 2. behaviorally_verified True upgrades a present-but-False role_verified -> True
+    # 2. behaviorally_verified True 는 존재하나 False 인 role_verified 를 업그레이드 -> True
     assert ga({"role_verified": {"gcs_proxy": False},
                "behaviorally_verified": {"gcs_proxy": True}}, []) is True
-    # 2b. behaviorally_verified True upgrades even when role_verified absent -> True
+    # 2b. behaviorally_verified True 는 role_verified 부재 시에도 업그레이드 -> True
     assert ga({"behaviorally_verified": {"gcs_proxy": True}}, []) is True
-    # 3. behaviorally_verified False is NEVER a downgrade: present-but-False role stays False,
-    #    and a False anchor alone (no role key) stays unknown (None), never forced False
+    # 3. behaviorally_verified False 는 절대 다운그레이드 아님: 존재하나 False 인 role 은 False 유지,
+    #    그리고 False anchor 단독 (role 키 없음)은 unknown (None) 유지, 절대 강제 False 아님
     assert ga({"role_verified": {"gcs_proxy": False},
                "behaviorally_verified": {"gcs_proxy": False}}, []) is False
     assert ga({"behaviorally_verified": {"gcs_proxy": False}}, []) is None
-    # 4. legacy worldstate without the behaviorally_verified key degrades to role_verified/None
+    # 4. behaviorally_verified 키 없는 레거시 worldstate 는 role_verified/None 로 degrade
     assert ga({"role_verified": {"gcs_proxy": False}}, []) is False
     assert ga({}, []) is None
-    # positive tap evidence still overrides a stale present-but-False inspect
+    # positive tap evidence 는 여전히 낡은 존재-하나-False inspect 를 override
     assert ga({"role_verified": {"gcs_proxy": False}},
               [dict(hb, source_id="air_command_tap", domain="command")]) is True
 
 
 def test_verifier_grep0_no_core_import():
-    """PA-2 grep0: the Verifier module imports NO mdg.core.* (independent trust root)."""
+    """PA-2 grep0: Verifier 모듈은 mdg.core.* 를 전혀 import 하지 않음 (독립 trust root)."""
     src = open(os.path.join(_MDG, "verifier", "verifier.py"), encoding="utf-8").read()
     tree = ast.parse(src)
     mods = []
@@ -288,17 +288,17 @@ def test_viewer_panels_and_failclosed():
         p = os.path.join(d, "run.jsonl")
         _record_to(p)
         panels = viewer.load_panels(p)
-        # alarming banner text removed (2026-07); agent≠truth semantics survive as header meta
+        # 경보성 banner 텍스트 제거됨 (2026-07); agent≠truth 의미는 header meta 로 잔존
         assert "text" not in panels["banner"]
         assert "mdg.verifier" in panels["banner"]["trust_root"]
         assert panels["banner"]["divergences"] == 2
         assert panels["record_time_redact"] is True and panels["read_only"] is True
         assert len(panels["panels"]["action"]) == 3
         assert len(panels["panels"]["verification"]) == 3
-        # communication panel carries telemetry rows
+        # communication 패널은 telemetry 행을 담음
         comm = panels["panels"]["communication"]
         assert any(row["telemetry"] for row in comm)
-        # fail-closed: a tainted file is refused, NOT redacted at display time (PS-3)
+        # fail-closed: 오염된 파일은 거부, 표시 시점에 redact 안 함 (PS-3)
         tainted = os.path.join(d, "tainted.jsonl")
         with open(tainted, "w", encoding="utf-8") as fh:
             fh.write(json.dumps({"seq": 0, "node": "sense",
@@ -353,9 +353,9 @@ def _write_lines(path, lines):
 
 
 def test_recovery_panel_lifecycle_and_flight():
-    """Phase 7: load_panels emits a `recovery` panel — per-incident lifecycle
-    (탐지 -> 대응 -> 집행 -> 확인 -> 회복) from ledger/worldstate.applied/view_band + a rel_alt/flight_mode
-    flight series. S2-shaped run: attack(Red, alt 12) -> operator-auto enforce -> confirm/recover
+    """Phase 7: load_panels 는 `recovery` 패널을 방출 — 사건별 lifecycle
+    (탐지 -> 대응 -> 집행 -> 확인 -> 회복)을 ledger/worldstate.applied/view_band + rel_alt/flight_mode
+    flight 시리즈로부터. S2 형태 run: attack(Red, alt 12) -> operator-auto enforce -> confirm/recover
     (Green, alt 30)."""
     with tempfile.TemporaryDirectory() as d:
         p = os.path.join(d, "run.jsonl")
@@ -367,18 +367,18 @@ def test_recovery_panel_lifecycle_and_flight():
                   "revert_cmd": "mode LAND", "operator_gate": False,
                   "operator_auto_confirmed": True, "provenance_relaxed": True}
         _write_lines(p, [
-            # tick 0 — attack visible (Red), altitude dropped to 12m under LAND injection,
-            # operator-auto OPER tool executes (ledger intent + applied[rule] unconfirmed).
-            # The incident member is the REAL command-hijack signature (Unauthorized_Command),
-            # which is a STANDING_SIGNAL: view_band strips it to Green, so the recovery card MUST
-            # source its band from the engine impact_band / incident presence (not view_band) —
-            # else the flight-hijack scenario renders as 밴드 Green-to-Green (no attack). Regression
-            # for the Phase 7 headline S2 deliverable.
+            # tick 0 — attack 가시 (Red), LAND injection 하에서 고도가 12m 로 떨어짐,
+            # operator-auto OPER 도구 실행 (ledger intent + applied[rule] unconfirmed).
+            # incident member 는 실제 command-hijack 시그니처 (Unauthorized_Command)로,
+            # 이는 STANDING_SIGNAL: view_band 가 이를 Green 으로 벗김, 따라서 recovery 카드는 반드시
+            # 밴드를 engine impact_band / incident 존재로부터 소싱해야 함 (view_band 아님) —
+            # 아니면 flight-hijack 시나리오가 밴드 Green-to-Green (공격 없음)으로 렌더됨. Phase 7
+            # 핵심 S2 산출물에 대한 회귀.
             ("sense", {"tick_i": 1, "evidence": [_tele("rel_alt", 12), _tele("flight_mode", "LAND")],
                        "incidents": [{"members": ["Unauthorized_Command"]}]}),
             ("decide", {"decisions": [{"decision": "Graceful Degradation", "enforcement": "auto"}]}),
             ("act", {"ledger": [intent], "worldstate": applied_unconf}),
-            # tick 1 — recovered: no incident (Green), alt back to 30m, effect_confirm sets confirmed
+            # tick 1 — 복구됨: incident 없음 (Green), alt 30m 복귀, effect_confirm 이 confirmed 설정
             ("sense", {"tick_i": 2, "evidence": [_tele("rel_alt", 30), _tele("flight_mode", "GUIDED")]}),
             ("decide", {"decisions": [{"decision": "Continue", "enforcement": "auto"}]}),
             ("effect_confirm", {"worldstate": applied_conf}),
@@ -386,11 +386,11 @@ def test_recovery_panel_lifecycle_and_flight():
         panels = viewer.load_panels(p)
         assert "recovery" in panels
         rec = panels["recovery"]
-        # flight series carries rel_alt/flight_mode per tick
+        # flight 시리즈는 tick 별 rel_alt/flight_mode 를 담음
         alts = [f["rel_alt"] for f in rec["flight"] if f["rel_alt"] is not None]
         assert 12.0 in alts and 30.0 in alts, rec["flight"]
         assert any(f["flight_mode"] == "GUIDED" for f in rec["flight"])
-        # exactly one recovery event, fully realized lifecycle
+        # 정확히 하나의 recovery 이벤트, 완전히 실현된 lifecycle
         assert len(rec["events"]) == 1, rec["events"]
         e = rec["events"][0]
         assert e["tool"] == "send_signed_mode" and e["rule"] == "signed_guided"
@@ -399,26 +399,26 @@ def test_recovery_panel_lifecycle_and_flight():
         assert e["revert_cmd"] == "mode LAND"
         done = {s["label"]: s["done"] for s in e["steps"]}
         assert all(done[k] for k in ("탐지", "대응", "집행", "확인", "회복")), done
-        # the 집행 step carries the sandbox auto flag; band + altitude recover
+        # 집행 step 은 sandbox auto 플래그를 담음; 밴드 + 고도 회복
         enf = next(s for s in e["steps"] if s["label"] == "집행")
         assert enf["auto"] is True
-        # the recovery card MUST show 탐지-to-회복 as a band transition even though the attack
-        # signature is a STANDING signal that view_band strips to Green (the real defect).
+        # recovery 카드는 공격 시그니처가 view_band 로 Green 처리되는 STANDING 시그널임에도 불구하고
+        # 반드시 탐지-to-회복 을 밴드 전이로 보여줘야 함 (실제 결함).
         assert e["band_before"] == "Red" and e["band_after"] == "Green"
         assert e["alt_before"] == 12.0 and e["alt_after"] == 30.0
-        # proof the fix is load-bearing: for THIS run the log's view_band is Green on the attack
-        # tick (standing signal filtered) — so the recovery band cannot be sourced from view_band.
+        # 수정이 핵심임의 증명: THIS run 에서 로그의 view_band 는 attack tick 에서 Green
+        # (standing 시그널 필터됨) — 따라서 recovery 밴드는 view_band 에서 소싱될 수 없음.
         act0 = panels["panels"]["action"][0]
         assert "Unauthorized_Command" in act0["signals"]
-        assert act0["view_band"] == "Green"        # view_band hides the standing-metric attack
-        assert act0["attack_signals"] == []        # (whereas the recovery band above shows Red)
+        assert act0["view_band"] == "Green"        # view_band 는 standing-metric attack 을 숨김
+        assert act0["attack_signals"] == []        # (반면 위 recovery 밴드는 Red 표시)
 
 
 def test_recovery_panel_signed_mechanism_annotations():
-    """Item C: the send_signed_mode (S2 물리 복귀) recovery event renders its mechanism —
-    대응(operator-select) -> 집행(gcs_c2 위임) -> 확인(rel_alt 30m) — as per-step notes, and the
-    event is flagged ``signed`` so the card shows the S2 physical-return context. The base labels
-    (탐지/대응/집행/확인/회복) are unchanged (presentation-only enrichment)."""
+    """Item C: send_signed_mode (S2 물리 복귀) recovery 이벤트는 그 메커니즘을 렌더 —
+    대응(operator-select) -> 집행(gcs_c2 위임) -> 확인(rel_alt 30m) — per-step 노트로, 그리고
+    이벤트는 ``signed`` 로 플래그되어 카드가 S2 물리 복귀 맥락을 보여줌. 기본 라벨
+    (탐지/대응/집행/확인/회복)은 불변 (표현 전용 보강)."""
     with tempfile.TemporaryDirectory() as d:
         p = os.path.join(d, "run.jsonl")
         applied_unconf = {"applied": {"signed_guided": {
@@ -442,42 +442,42 @@ def test_recovery_panel_signed_mechanism_annotations():
         assert note["대응"] == "operator-select"
         assert note["집행"] == "gcs_c2 위임"
         assert note["확인"] == "rel_alt 30m"
-        # 탐지/회복 steps carry NO mechanism note (only respond/enforce/confirm annotated)
+        # 탐지/회복 step 은 메커니즘 노트 없음 (respond/enforce/confirm 만 주석)
         assert note["탐지"] is None and note["회복"] is None
-        # containment recoveries stay un-annotated / signed=False
+        # containment 복구는 주석 없음 / signed=False 유지
         assert viewer._is_signed_recovery("nsenter_input_drop", "backdoor_drop") is False
         assert viewer._is_signed_recovery("send_signed_mode", "signed_guided") is True
 
 
 def test_recovery_band_prefers_engine_impact_over_view_band():
-    """Unit: `_recovery_band` uses the engine's authoritative per-tick impact_band (Green/Yellow/Red)
-    when present, and falls back to incident-presence (`_detect_band`, standing signals INCLUDED)
-    when it is absent — never the standing-filtered view_band."""
-    # engine impact_band present -> used verbatim (even if view_band would disagree)
+    """단위: `_recovery_band` 는 존재 시 엔진의 권위 있는 per-tick impact_band (Green/Yellow/Red)를
+    사용하고, 부재 시 incident 존재 (`_detect_band`, standing 시그널 포함)로 폴백 —
+    standing 필터된 view_band 는 절대 아님."""
+    # engine impact_band 존재 -> 그대로 사용 (view_band 가 불일치하더라도)
     assert viewer._recovery_band({"impact_band": "Red", "signals": []}) == "Red"
     assert viewer._recovery_band({"impact_band": "Green", "signals": ["Unauthorized_Command"]}) == "Green"
-    # impact_band absent/invalid -> fall back to detection band that INCLUDES standing signals
+    # impact_band 부재/무효 -> standing 시그널을 포함하는 detection 밴드로 폴백
     assert viewer._recovery_band({"impact_band": None, "signals": ["Unauthorized_Command"]}) == "Red"
     assert viewer._recovery_band({"signals": ["Port_5762_State"]}) == "Red"
     assert viewer._recovery_band({"signals": ["Recon"]}) == "Yellow"
     assert viewer._recovery_band({"signals": []}) == "Green"
-    # _detect_band (recovery) does NOT strip standing signals the way _classify_view (log) does
+    # _detect_band (recovery)는 _classify_view (log)처럼 standing 시그널을 벗기지 않음
     assert viewer._detect_band(["Unauthorized_Command"]) == "Red"
     assert viewer._classify_view(["Unauthorized_Command"]) == ([], "Green")
 
 
 def test_recovery_panel_empty_when_no_ledger():
-    """No enforcement in the run -> recovery.events empty (viewer shows a wait card, not a crash)."""
+    """run 에 enforcement 없음 -> recovery.events 비어있음 (viewer 는 crash 아닌 대기 카드 표시)."""
     with tempfile.TemporaryDirectory() as d:
         p = os.path.join(d, "run.jsonl")
-        _record_to(p)                       # synthetic run has no ledger / applied / rel_alt
+        _record_to(p)                       # synthetic run 은 ledger / applied / rel_alt 없음
         rec = viewer.load_panels(p)["recovery"]
         assert rec["events"] == [] and rec["flight"] == []
         assert rec["flight_target"] == 30.0
 
 
 def test_viewer_bind_loopback_only():
-    """PS-8: serve() refuses 0.0.0.0 / public binds (attacker UE must not reach mgmt plane)."""
+    """PS-8: serve() 는 0.0.0.0 / public bind 거부 (attacker UE 가 mgmt plane 에 도달해선 안 됨)."""
     for bad in ("0.0.0.0", "::", "", "8.8.8.8", "203.0.113.5"):
         try:
             viewer.serve("x.jsonl", host=bad, port=1)

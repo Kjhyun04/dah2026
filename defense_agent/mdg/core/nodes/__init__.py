@@ -1,6 +1,6 @@
-"""In-graph node roster (11): sense, correlate, compute_trust, compute_impact,
+"""그래프 내(in-graph) node 명단(11): sense, correlate, compute_trust, compute_impact,
 orient, select_policy, rank_recovery, decide, act, effect_confirm, escalate.
-(recon is boot-only, out of graph.)"""
+(recon 은 boot 전용, 그래프 밖.)"""
 from .act import act
 from .compute_impact import compute_impact
 from .compute_trust import compute_trust

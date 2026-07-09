@@ -1,9 +1,9 @@
-"""test_record_contract — P0 panel-2 (PS-3): to_record projection + redact scrub.
+"""test_record_contract — P0 panel-2 (PS-3): to_record 프로젝션 + redact 스크럽.
 
-Pins the leak-0 contract: (a) the allow-list is a subset of declared channels (no phantom
-keys), (b) no secret-looking field name is in the allow-list, (c) undeclared keys are
-dropped by projection, (d) the driver's final scrub closes the json.dumps(default=str)
-bypass. Runnable as ``python tests/test_record_contract.py``.
+leak-0 계약을 고정: (a) allow-list 는 선언된 채널의 부분집합(팬텀 키 없음),
+(b) secret 처럼 보이는 필드명은 allow-list 에 없음, (c) 미선언 키는 프로젝션으로
+제거됨, (d) 드라이버의 최종 스크럽이 json.dumps(default=str) 우회를
+닫음. ``python tests/test_record_contract.py`` 로 실행 가능.
 """
 from __future__ import annotations
 
@@ -19,8 +19,8 @@ from mdg.core.state import MDGState, _RECORD_ALLOW, to_record  # noqa: E402
 _SECRET_NAME_TOKENS = ("api_key", "apikey", "token", "hmac", "sign_key", "signkey",
                        "secret", "operator", "canary")
 
-# Build secret-shaped canaries at runtime (split literals) so verify_keys' source scan
-# does not flag this test file as containing real key material.
+# secret 형태 카나리를 런타임에 생성(리터럴 분할)하여 verify_keys 의 소스 스캔이
+# 이 테스트 파일을 실제 키 자료 포함으로 오판하지 않도록 한다.
 _SK = "sk-" + "ant-"
 _CANARY_A = _SK + "abcdefgh12345678"
 _CANARY_B = _SK + "deadbeefcafe0001"
@@ -54,21 +54,21 @@ def test_redact_scrubs_string_leaves():
 
 
 class _Sneaky:
-    """Non-serializable object whose __str__ leaks a secret; _json_safe would miss it and
-    json.dumps(default=str) would synthesize its __str__ AFTER redact ran."""
+    """__str__ 가 secret 을 누출하는 비직렬화 객체; _json_safe 는 이를 놓치고
+    json.dumps(default=str) 가 redact 실행 후 __str__ 를 합성한다."""
     def __str__(self) -> str:
         return _CANARY_B
 
 
 def test_final_scrub_closes_default_str_bypass():
-    # simulate the driver serialization path: redact -> json.dumps(default=str) -> _scrub_str
-    safe = driver.redact({"leak": _Sneaky()})  # redact leaves the object untouched (not str)
+    # 드라이버 직렬화 경로 시뮬레이션: redact -> json.dumps(default=str) -> _scrub_str
+    safe = driver.redact({"leak": _Sneaky()})  # redact 는 객체를 건드리지 않고 남김(str 아님)
     raw = json.dumps(safe, ensure_ascii=False, default=str)
-    assert _CANARY_B in raw                          # bypass exists before final scrub
+    assert _CANARY_B in raw                          # 최종 스크럽 전에는 우회 존재
     line = driver._scrub_str(raw)
-    assert _CANARY_B not in line                      # closed by the final scrub pass
+    assert _CANARY_B not in line                      # 최종 스크럽 패스로 닫힘
     assert "[REDACTED]" in line
-    json.loads(line)                                  # still valid JSON
+    json.loads(line)                                  # 여전히 유효한 JSON
 
 
 def _run_all() -> int:

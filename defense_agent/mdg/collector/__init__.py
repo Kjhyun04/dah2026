@@ -1,15 +1,15 @@
-"""Collector — out-of-graph long-lived daemons; keyring owner (PS-2/PS-5).
+"""Collector — 그래프 밖 장수 데몬; keyring 소유자 (PS-2/PS-5).
 
-Seven collectors (P1 observation engine):
-  AirCommandTap          air-side netns sidecar — gcs_proxy eth0 UDP:14556 (command)
-  AirTelemetryTap        air-side netns sidecar — 14560 + uav_ue lo:14550 cross-tap
-  NetworkMetricCollector network — NF :9090 Prometheus polling (httpx)
+수집기 7종 (P1 관측 엔진):
+  AirCommandTap          air 측 netns 사이드카 — gcs_proxy eth0 UDP:14556 (command)
+  AirTelemetryTap        air 측 netns 사이드카 — 14560 + uav_ue lo:14550 cross-tap
+  NetworkMetricCollector network — NF :9090 Prometheus 폴링 (httpx)
   WebProbeCollector      web — 5762 ss-only, pool=1
   MongoLogCollector      mongo — docker logs stdout JSON
-  MissionConfigCollector mission — config-derived context
+  MissionConfigCollector mission — config 파생 컨텍스트
   SignLogCollector       command — uav_proxy docker logs §9-B signing drop-line (P3-Q2)
 
-``build_collectors`` wires the standard set against one output queue + keyring.
+``build_collectors``는 표준 세트를 하나의 출력 큐 + keyring에 배선한다.
 """
 from __future__ import annotations
 
@@ -38,10 +38,10 @@ __all__ = [
 
 
 def build_source_domains(collectors: list) -> dict[str, str]:
-    """{source_id -> domain} for the P3-Q5 liveness attribution (watchdog sensor_loss ->
-    dead domain -> compute_trust present-set exclusion). Built from the collector roster's
-    own ``.source_id``/``.domain`` (the watchdog emits ``value=source_id``); collectors
-    without a domain are omitted (netns-agnostic infra collectors)."""
+    """P3-Q5 liveness 귀속용 {source_id -> domain} (watchdog sensor_loss -> 죽은 도메인 ->
+    compute_trust present-set 제외). collector 로스터 자체의 ``.source_id``/``.domain``에서
+    구성한다(watchdog는 ``value=source_id``를 방출); 도메인 없는 collector는 생략된다
+    (netns-무관 인프라 collector)."""
     out: dict[str, str] = {}
     for c in collectors:
         dom = getattr(c, "domain", None)
@@ -55,14 +55,14 @@ def build_collectors(out_queue: "_queue.Queue", keyring: Keyring, kid: str, *,
                      backend=None, clock=None,
                      netns_prefix_map: Optional[dict[str, list[str]]] = None,
                      ) -> list[BaseCollector]:
-    """Instantiate the standard 7-collector set sharing one queue + keyring/kid.
-    Each collector signs its envelopes with ``kid``; ``sense`` verifies at drain.
+    """하나의 queue + keyring/kid를 공유하는 표준 7-collector 세트를 인스턴스화한다.
+    각 collector는 봉투를 ``kid``로 서명한다; ``sense``가 drain에서 검증한다.
 
-    ``netns_prefix_map`` (container -> nsenter prefix) is the recon->collector bridge
-    (P1-netns): recon_boot resolves host PIDs via the sock-proxy inspect and the launcher
-    turns them into ``nsenter --target <pid> --net --`` prefixes here. A container absent
-    from the map (``.get`` -> None) leaves its netns collector inert — no ip-netns-exec
-    invention, no mis-targeted live tap. NetworkMetric/Mongo/Mission are netns-agnostic.
+    ``netns_prefix_map``(container -> nsenter prefix)는 recon->collector 브리지다
+    (P1-netns): recon_boot이 sock-proxy inspect로 호스트 PID를 해소하고 런처가 이를 여기서
+    ``nsenter --target <pid> --net --`` prefix로 변환한다. 맵에 없는 컨테이너
+    (``.get`` -> None)는 자신의 netns collector를 inert로 둔다 — ip-netns-exec를 지어내지
+    않고, 오조준 라이브 탭도 없다. NetworkMetric/Mongo/Mission은 netns-무관이다.
     """
     m = netns_prefix_map or {}
     common = dict(backend=backend, clock=clock)
@@ -86,10 +86,10 @@ def build_collectors(out_queue: "_queue.Queue", keyring: Keyring, kid: str, *,
         WebProbeCollector(out_queue, keyring, kid, netns_prefix=m.get("uav_ue"), **common),
         MongoLogCollector(out_queue, keyring, kid, **common),
         MissionConfigCollector(out_queue, keyring, kid, **common),
-        # §9-B uplink-signing posture: uav_proxy drop-line tail (P3-Q2). netns-agnostic
-        # (docker logs, like Mongo). Its ``Signing_Drop`` evidence latches world.signing ->
-        # CONFIRMED_ON in sense (MONOTONIC). domain='command' -> registered in the source-
-        # domain map (build_source_domains) for watchdog liveness attribution.
+        # §9-B uplink-signing posture: uav_proxy drop-line tail (P3-Q2). netns-무관
+        # (docker logs, Mongo와 동일). 그 ``Signing_Drop`` 근거가 sense에서 world.signing ->
+        # CONFIRMED_ON으로 latch한다(MONOTONIC). domain='command' -> watchdog liveness 귀속을
+        # 위해 source-domain 맵(build_source_domains)에 등록된다.
         SignLogCollector(out_queue, keyring, kid, **common),
     ]
 
@@ -100,11 +100,11 @@ def build_epc_collectors(out_queue: "_queue.Queue", keyring: Keyring, kid: str, 
                          smf_container: str = "epc_smf",
                          mme_container: str = "epc_mme",
                          ) -> tuple[list[BaseCollector], SmfSessionTable]:
-    """Opt-in EPC log-tail collectors (P4-1/P4-5). Returns the collector list PLUS the shared
-    SmfSessionTable so ``correlate`` (P4-4 join) and target ``resolve`` (C-3 pause reverse
-    map) read the same live IMSI<->tun-IP bindings. Not part of the default 6-set; wired
-    explicitly by the runtime launcher once the read-only logs path is operator-approved.
-    Includes the SMF session-table tail (P4-1) and the MME attach/IMSI tail (P4-5).
+    """옵트인 EPC log-tail collector (P4-1/P4-5). collector 리스트에 더해 공유
+    SmfSessionTable을 반환하므로 ``correlate``(P4-4 join)와 타깃 ``resolve``(C-3 pause 역맵)가
+    동일한 라이브 IMSI<->tun-IP 바인딩을 읽는다. 기본 6-세트에 속하지 않으며; read-only 로그
+    경로가 operator 승인되면 런타임 런처가 명시적으로 배선한다.
+    SMF session-table tail(P4-1)과 MME attach/IMSI tail(P4-5)을 포함한다.
     """
     table = session_table or SmfSessionTable()
     common = dict(backend=backend, clock=clock)

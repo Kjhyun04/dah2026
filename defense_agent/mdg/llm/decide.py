@@ -1,11 +1,11 @@
-"""DECIDE phase-LLM (LLM2, PA-4/PA-5) — litellm callable injected into the decide node.
+"""DECIDE 페이즈-LLM (LLM2, PA-4/PA-5) — decide 노드에 주입되는 litellm callable.
 
-make_decide_llm() returns a callable ``(features:dict) -> DecideNote`` or ``None`` (advice
-path unavailable -> deterministic fallback, G6). The callable only RAISES on error.
+make_decide_llm() 는 callable ``(features:dict) -> DecideNote`` 또는 ``None`` 을 반환한다(조언
+경로 불가 -> 결정론 폴백, G6). 이 callable 은 에러 시 raise 만 한다.
 
-Authority (E12/PA-4): rationale + escalate_recommended + caveats. It NEVER sets
-chosen_action/risk/reversible (those are rank_recovery's, deterministic) and the
-decide-edge reads only those numeric/bool fields — the note is edge-invisible.
+권한(E12/PA-4): rationale + escalate_recommended + caveats. chosen_action/risk/reversible 은
+절대 설정하지 않으며(그것들은 rank_recovery 의 것, 결정론적) decide-edge 는 그 수치/bool
+필드만 읽는다 — 노트는 edge-invisible.
 """
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ _SYSTEM = (
 
 
 def make_decide_llm(models_cfg: dict | None = None):
-    """Build the decide LLM callable, or None when unavailable (deterministic fallback)."""
+    """decide LLM callable 을 만들거나, 불가 시 None(결정론 폴백)."""
     cfg = models_cfg or loader.models()
     # has_api_key 는 models.yaml 최상위 api_key_env(기본 ANTHROPIC_API_KEY)가 가리키는 env 를
     # 확인한다 — provider(anthropic 직결 vs openrouter)를 하드코딩하지 않기 위함.
@@ -53,8 +53,8 @@ def make_decide_llm(models_cfg: dict | None = None):
     api_key = resolve_api_key(cfg)                            # provider-agnostic 키 명시 주입
 
     def _call(features: dict) -> DecideNote:
-        clean = sanitize(features, DECIDE_FEATURES)          # PS-7 derived-only gate
-        user = render("decide.jinja", clean)                 # StrictUndefined + empty guard
+        clean = sanitize(features, DECIDE_FEATURES)          # PS-7 파생값 전용 게이트
+        user = render("decide.jinja", clean)                 # StrictUndefined + 공백 가드
         return complete_structured(role, _SYSTEM, user, DecideNote, timeout, api_key=api_key)
 
     return _call
