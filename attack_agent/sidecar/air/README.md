@@ -1,4 +1,4 @@
-﻿# sidecar/air — `dahv2/air` 툴링 사이드카 (A/D 계층)
+﻿# sidecar/air — `dahv2/air-tools` 툴링 사이드카 (A/D 계층 · `./dah.sh build-tools`)
 
 > 오프라인 골격 · 테스트베드 무접속 · 실제 `docker build`/scp/배포는 **통제단계**에서 수행.
 > 근거: doc13(연결·vantage 실행모델) · doc14(타깃식별) · doc18(구현결정) · doc19(누수-안전 R1~R6).
@@ -17,7 +17,7 @@
 ## 2. 실행 모델 (netns 공유 + `docker exec`, 누수 0)
 
 ```
-[agent 컨테이너] --/var/run/docker.sock--> docker exec --> [dahv2/air 사이드카] --(baked script)-->
+[agent 컨테이너] --/var/run/docker.sock--> docker exec --> [dahv2/air-tools 사이드카] --(baked script)-->
 ```
 
 - **금지(하드):** `docker run --rm` 단명 사이드카 · ENTRYPOINT 자동 공격실행 · SSH.
@@ -33,7 +33,7 @@
 | 불변식 | 이미지 제공 | 실행기(host) 책임 |
 |--------|-------------|-------------------|
 | **R1** in-container timeout + JOB 마커 kill | `coreutils`(timeout) · `util-linux`(setsid) · `procps`(pkill) | `docker exec $SC sh -c "exec -a $JOB setsid timeout -s TERM -k 5 $T <script> > /tmp/out.$JOB 2>&1"` · 회수=`pkill -KILL -f $JOB`(마커, 넓은 grep 금지) |
-| **R2** 라벨 + teardown + reap | 이미지 라벨 `org.dah.image=dahv2/air` | 컨테이너 라벨 `dahv2.owner=agent`,`dahv2.run_id=$RUN` 을 `docker create/run --label` 로 부여 · 부팅 reap(우리 라벨만) |
+| **R2** 라벨 + teardown + reap | 이미지 라벨 `org.dah.image=dahv2/air-tools` | 컨테이너 라벨 `dahv2.owner=agent`,`dahv2.run_id=$RUN` 을 `docker create/run --label` 로 부여 · 부팅 reap(우리 라벨만) |
 | **R3** preflight | vendor `aria_gcm.py` COPY · openssl aria-256-gcm **build-time 확인** · pymavlink 핀(ARG) | init 이 사이드카 안에서 aria-256-gcm 확인 + placeholder sentinel 부재 확인 + pymavlink 버전 정합 + golden-frame 1회 |
 | **R5** reaper 백스톱 | `iproute2`(ss) · `procps`(pkill) | 10s 마다 5762 established>1 이면 `pkill -KILL -f job_` · 5762 단일 TCP(세마포어=1) |
 | **R6** 비밀 stdin | 스크립트가 `--<name>-stdin` 로 stdin 수신(비밀 baked 금지) | vault→`printf %s "$SECRET" | docker exec -i $SC <script> --<name>-stdin` |
@@ -60,11 +60,13 @@
 # 통제단계에서 vendor/aria_gcm.py 와 exec/ 를 scp 로 채운 뒤:
 docker build \
   --build-arg PYMAVLINK_VERSION="$(python3 -c 'import pymavlink,importlib.metadata as m; print(m.version("pymavlink"))')" \
-  -t dahv2/air ./sidecar/air
+  -t dahv2/air-tools ./sidecar/air
 ```
+> ★ 편의: `./dah.sh build-tools` 가 위 빌드(host pymavlink 버전 핀)를 대신 수행한다.
+> ★ 태그는 `dahv2/air-tools` — 테스트베드 SITL 이미지 `dahv2/air`(arducopter 포함)와 **태그 충돌 회피**.
 
 - `PYMAVLINK_VERSION` 은 **host 주입기와 동일 버전**으로 맞춘다(R3 ③).
-- `config.tools.image.air = dahv2/air`(configs/config.example.yaml) 가 이 태그를 가리킨다.
+- `config.tools.image.air = dahv2/air-tools`(configs/config.*.yaml) 가 이 태그를 가리킨다.
 - init 은 라벨/이름이 이미 있으면 build/기동을 스킵(doc18 C6, "config만 채우면 실행").
 
 ## 6. 정직성 노트

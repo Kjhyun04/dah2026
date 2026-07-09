@@ -1,6 +1,6 @@
 ﻿# exec/ — baked 공격 스크립트 트리 (VENDOR SLOT · 통제단계 채움)
 
-이 디렉터리는 `dahv2/air` 사이드카에 baked 되는 스크립트 트리의 **자리표시자**다.
+이 디렉터리는 `dahv2/air-tools` 사이드카에 baked 되는 스크립트 트리의 **자리표시자**다.
 이 워크플로우(오프라인·테스트베드 무접속)에서는 실제 스크립트를 생성하지 않는다.
 
 `core/modules/registry.py` 의 `exec_binding.script` 경로(=exec_binding 정본, doc18 C5)가

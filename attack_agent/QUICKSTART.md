@@ -23,9 +23,10 @@ cd ~/attack_agent
 # 웹 대시보드 볼 때만: ssh -i ...<KEY>.pem -L 8080:127.0.0.1:8080 ubuntu@<TESTBED_IP>
 ```
 
-비밀값 2개만 있으면 됩니다 (그 외 기본값은 dah.sh 가 자동 주입):
-- `OPENROUTER_API_KEY` — `.env.openrouter`에 있음 (LLM)
-- `ARIA_KEY` — `~/testbed/.env-aria`에서 자동 로드 (감독 복호)
+.env 에 키+모델 slug 만 채우면 됩니다 (그 외 기본값은 dah.sh 가 자동 주입):
+- `LLM_MODEL` + `LLM_API_KEY` — 아무 플랫폼(OpenRouter/Anthropic/OpenAI/Gemini). 예) `LLM_MODEL=openrouter/anthropic/claude-sonnet-4`. 관례키 재사용 시 `LLM_API_KEY_ENV=OPENROUTER_API_KEY`
+- `ARIA_KEY` — `testbed/.env-aria`에서 자동 로드 (감독 복호)
+- ★ 캠페인 전 1회 `./dah.sh build-tools` (툴링 사이드카 이미지 dahv2/air-tools 빌드)
 
 ## 2. 런처 한 방 (`./dah.sh <명령>`)
 
@@ -45,7 +46,7 @@ cd ~/attack_agent
 | 종류 | 실제 쓰는 것 | 변형(참고) |
 |---|---|---|
 | config | **`configs/config.live.yaml`** (라이브·서버) | `configs/config.testbed.yaml`(오프라인 베이스), `configs/config.example.yaml`(빈 템플릿) |
-| goal | **`goals/goal.p4.yaml`** (서명우회=헤드라인) | `goals/goal.land.yaml`(착륙), `goals/goal.testbed.yaml`(정찰), `goals/goal.example.yaml`(템플릿) |
+| goal | **`goals/goal.land.yaml`** (캠페인 기본 · 5762 백도어 LAND) | `goals/goal.p4.yaml`(서명우회 mode=5), `goals/goal.testbed.yaml`(정찰), `goals/goal.example.yaml`(템플릿). `GOAL=` 오버라이드 |
 | models | **`configs/models.yaml`** (모델 라우팅·1개면 충분) | — |
 
 > config는 `테스트베드 접속·vantage·타깃 이름`, goal은 `공격 목표·방어 시드·계층 scope`만 담습니다. 하드코딩 0 — 값은 전부 여기서 주입.

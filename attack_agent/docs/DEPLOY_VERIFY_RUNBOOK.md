@@ -74,7 +74,8 @@ pip install -e .
 필수 환경변수(export):
 
 ```bash
-export OPENROUTER_API_KEY="..."
+export LLM_MODEL="openrouter/anthropic/claude-sonnet-4"   # 아무 플랫폼 slug (openai/gpt-4o 등)
+export LLM_API_KEY="..."                                  # provider 무관 키값(관례키 재사용 시 LLM_API_KEY_ENV 지정)
 export ARIA_KEY="..."
 ```
 
@@ -83,7 +84,7 @@ export ARIA_KEY="..."
 ```bash
 python - <<'PY'
 import os
-print("OPENROUTER_API_KEY:", bool(os.getenv("OPENROUTER_API_KEY")))
+print("LLM_API_KEY:", bool(os.getenv("LLM_API_KEY") or os.getenv("OPENROUTER_API_KEY")))
 print("ARIA_KEY:", bool(os.getenv("ARIA_KEY")))
 PY
 ```

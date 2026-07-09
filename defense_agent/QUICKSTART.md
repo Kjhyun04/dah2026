@@ -30,7 +30,7 @@ cp .env.example .env       # live/status 쓸 때만 값 채움(오프라인 실�
 
 `.env` 핵심(전부 커밋 금지, .env.example 만 커밋):
 - `TESTBED_HOST` / `TESTBED_USER` / `SSH_KEY` — live/status 접속 (오프라인엔 불필요)
-- `ANTHROPIC_API_KEY` — LLM advisory (**비워도 됨**, 코어는 결정론)
+- `MDG_LLM_API_KEY` + `MDG_ORIENT_MODEL`/`MDG_DECIDE_MODEL` — LLM advisory, 키+모델 slug 만으로 아무 플랫폼 (**비워도 됨**, 코어는 결정론)
 - `MDG_ALLOW_LIVE` — operator-go. **0/미설정=전부 DRY**, `1`=단일 가역 DROP 창 개방
 
 ## 2. 런처 한 방 (`./dah.sh <명령>`)

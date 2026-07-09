@@ -209,14 +209,15 @@ reward 는 배포 환경서도 계산 가능한 공격자 신호만 사용한다
 | 테스트베드 서버 | Ubuntu, Python **3.12+**, Docker(무-sudo 권장), `sudo nsenter`(감독용) |
 | 실행 위치 | **온-호스트 LocalBackend** — 에이전트를 테스트베드 서버에서 실행(로컬 SSH 백엔드 아님) |
 | Python 패키지 | `pip install -e .`(litellm·pymavlink·fastapi·uvicorn·pydantic·PyYAML — `pyproject.toml`) |
-| 컨테이너 | 테스트베드 컨테이너 다수(19~20) Up + `dahv2/air` 이미지(정찰/주입 사이드카) |
+| 컨테이너 | 테스트베드 컨테이너 다수(19~20) Up + `dahv2/air-tools` 툴링 사이드카 이미지(정찰/주입 baked 스크립트 — `./dah.sh build-tools` 로 빌드) |
 | 네트워크 | 대시보드 `127.0.0.1:8080`(SSH 터널), 뷰어 `127.0.0.1:8090` |
 
-**환경변수(비밀 2개 + 자동 기본값):**
-| 변수 | 용도 | 출처 |
+**환경변수(.env — 키+모델 slug 만 채우면 아무 플랫폼 동작):**
+| 변수 | 용도 | 비고 |
 |---|---|---|
-| `OPENROUTER_API_KEY` | live LLM(litellm) | `.env.openrouter`(런처 자동 로드) |
-| `ARIA_KEY` | 감독 14555 복호 | `~/testbed/.env-aria`(런처 자동 해석) |
+| `LLM_MODEL` | live LLM 모델 slug | 예) `openrouter/anthropic/claude-sonnet-4` · `openai/gpt-4o` · `anthropic/claude-sonnet-4-5` · `gemini/gemini-2.0-flash`. 미설정 시 friendly名 기본 |
+| `LLM_API_KEY` | live LLM 키(값) | provider 무관 — litellm 에 명시 주입. 관례키 재사용 시 `LLM_API_KEY_ENV=OPENROUTER_API_KEY` 등으로 이름 지정 |
+| `ARIA_KEY` | 감독 14555 복호 | `testbed/.env-aria`(런처 자동 해석) |
 | 그 외 기본값 | 캐시억제 등 | dah.sh 내장 |
 
 > 배포 의존값(테스트베드 IP·SSH키)·비밀은 **`.env`** 에 모은다(`.env.example` 복사→값 채움, `.env`=gitignore).
@@ -244,7 +245,7 @@ ssh -i "C:\Users\user\.ssh\<KEY>.pem" -L 8080:127.0.0.1:8080 ubuntu@<TESTBED_IP>
 ```bash
 python - <<'PY'
 import os
-print("OPENROUTER_API_KEY:", bool(os.getenv("OPENROUTER_API_KEY")))
+print("LLM_API_KEY:", bool(os.getenv("LLM_API_KEY") or os.getenv("OPENROUTER_API_KEY")))
 print("ARIA_KEY:", bool(os.getenv("ARIA_KEY")))
 PY
 ```
@@ -259,8 +260,9 @@ PY
 ```bash
 cd ~/attack_agent
 ./dah.sh verify      # ① 11개 무결성 게이트 (ALL PASS 확인)
+./dah.sh build-tools # ★ 캠페인 전 1회: 툴링 사이드카 이미지 dahv2/air-tools 빌드(recon/주입 baked 스크립트)
 ./dah.sh recon       # ② 정찰 (오프라인 mock 기본; 테스트베드 실측은 --backend local)
-./dah.sh campaign    # ③ 라이브 캠페인 + 감독 (헤드라인)  [OPENROUTER_API_KEY 필요]
+./dah.sh campaign    # ③ 라이브 캠페인 + 감독 (기본 goal.land)  [LLM_MODEL + LLM_API_KEY 필요]
 ./dah.sh land        # ④ 착륙 시각화 데모 (대시보드 고도↓)  [명시 승인 하]
 ./dah.sh viewer      # ⑤ 뷰어 3패널 (127.0.0.1:8090)
 ./dah.sh status      # ⑥ 컨테이너 + 드론 상태
@@ -358,7 +360,7 @@ vendor/exec 채움 계약만 담으며, 워크플로우는 **완전 오프라인
 
 | 이미지 | 디렉터리 | 계층 | vantage(sidecar) | 도구 | config 키 |
 |--------|----------|------|------------------|------|-----------|
-| `dahv2/air` | `air/` | A · D | `tools_ue`(`--network container:attacker_ue`) · `tools_sgi`(net_sgi) | pymavlink + OpenSSL(ARIA, vendored) | `tools.image.air`(필수) |
+| `dahv2/air-tools` | `air/` | A · D | `tools_ue`(`--network container:attacker_ue`) · `tools_sgi`(net_sgi) | pymavlink + OpenSSL(ARIA, vendored) | `tools.image.air`(필수) — `./dah.sh build-tools`. 테스트베드 SITL `dahv2/air` 와 태그 구분 |
 | `dahv2/pfcp-poc` | `pfcp/` | B | `tools_core`(net_core, pivot 후) | scapy | `tools.image.pfcp`(옵션) |
 
 **공통 계약:**
@@ -412,7 +414,7 @@ python -m viewer.server \
 | 종류 | 실제 사용 | 변형(참고) |
 |---|---|---|
 | config | **`configs/config.live.yaml`**(라이브) | `configs/config.testbed.yaml`(오프라인 베이스), `configs/config.example.yaml`(템플릿) |
-| goal | **`goals/goal.p4.yaml`**(서명우회=헤드라인) | `goals/goal.land.yaml`(착륙), `goals/goal.testbed.yaml`(정찰), `goals/goal.example.yaml`(템플릿) |
+| goal | **`goals/goal.land.yaml`**(캠페인 기본 · 5762 백도어 LAND — 방어 탐지 성립) | `goals/goal.p4.yaml`(서명우회 mode=5), `goals/goal.testbed.yaml`(정찰), `goals/goal.example.yaml`(템플릿). `GOAL=` 로 오버라이드 |
 | models | **`configs/models.yaml`**(역할→모델 라우팅) | — |
 
 config = 접속·vantage·타깃 이름, goal = 공격 목표·방어 시드·계층 scope. **하드코딩 0** — 값은 전부 파일로 주입.

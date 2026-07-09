@@ -28,7 +28,7 @@ split-core) 전용 **Mission-centric Defense Gateway(MDG)** 방어 AI 에이전�
 | `TESTBED_HOST` | live·status 만 | `<TESTBED-IP>` | 테스트베드 서버 IP/호스트 |
 | `TESTBED_USER` | live·status 만 | `ubuntu` | SSH 사용자(기본 ubuntu) |
 | `SSH_KEY` | live·status 만 | `~/.ssh/<KEY>.pem` | SSH 개인키 경로 (**커밋 금지**) |
-| `ANTHROPIC_API_KEY` | 선택(전 명령) | `<API-KEY>` | LLM(orient/decide) **advisory**. 비우면 코어는 결정론 동작 |
+| `MDG_LLM_API_KEY` + `MDG_ORIENT_MODEL` + `MDG_DECIDE_MODEL` | 선택(전 명령) | 키값 + slug | LLM(orient/decide) **advisory** — 키+모델 slug 만으로 아무 플랫폼(OpenRouter/Anthropic/OpenAI/Gemini). 비우면 코어는 결정론. (관례키는 `MDG_LLM_API_KEY_ENV` 로 이름지정) |
 | `MDG_ALLOW_LIVE` | autorun·live 선택 | `0`(기본)/`1` | operator-go 게이트. `0`/blank=전부 DRY, `1`=단일 가역 DROP 창 |
 | `MDG_VIEWER_TOKEN` | viewer 선택 | (blank) | 뷰어 bearer 토큰(blank=토큰 게이트 없음) |
 | `MDG_TESTBED_LABEL` | 선택 | `<testbed>` | 리포트 호스트 라벨(미설정 시 IP 미노출) |
@@ -41,7 +41,7 @@ split-core) 전용 **Mission-centric Defense Gateway(MDG)** 방어 AI 에이전�
 | `verify` | 어디서나(오프라인) | — | ✗ | 없음 |
 | `test` | 어디서나(오프라인) | — | ✗ | 없음 |
 | `campaign` | 어디서나(오프라인) | — | ✗ | 없음 (`live_executions=0`) |
-| `autorun` | **테스트베드 온-호스트** | (선택) `MDG_ALLOW_LIVE`·`ANTHROPIC_API_KEY` | ✗(온-호스트) | **DRY 기본** / `MDG_ALLOW_LIVE=1` 시 단일 가역 DROP |
+| `autorun` | **테스트베드 온-호스트** | (선택) `MDG_ALLOW_LIVE`·`MDG_LLM_API_KEY`+모델 | ✗(온-호스트) | **DRY 기본** / `MDG_ALLOW_LIVE=1` 시 단일 가역 DROP |
 | `live` | 로컬 → SSH | **`SSH_KEY`·`TESTBED_HOST`·`TESTBED_USER`** (+`MDG_ALLOW_LIVE`) | ✓ | read-only / `ALLOW_LIVE=1` 시 집행 |
 | `viewer` | 로컬 | (선택) `MDG_VIEWER_TOKEN`·`PORT` | ✗ | 없음(read-only) |
 | `status` | 로컬 → SSH | **`SSH_KEY`·`TESTBED_HOST`·`TESTBED_USER`** | ✓ | 없음(read-only) |
@@ -61,7 +61,7 @@ pip install -e ".[dev]"    # 런타임+pytest(테스트용). 런타임만이면 
 ./dah.sh campaign out        # 결정론 6공격 캠페인 → out/report.json (live_executions=0)
 
 # ── 라이브 (테스트베드 온-호스트, .env 필요) ──
-cp .env.example .env         # 값 채움: TESTBED_HOST/USER/SSH_KEY (+ 선택 ANTHROPIC_API_KEY)
+cp .env.example .env         # 값 채움: TESTBED_HOST/USER/SSH_KEY (+ 선택 MDG_LLM_API_KEY + MDG_ORIENT_MODEL/MDG_DECIDE_MODEL — 아무 플랫폼)
 ./dah.sh autorun             # 자율런 (DRY 기본 — 상태변경 0)
 MDG_ALLOW_LIVE=1 ./dah.sh autorun   # (operator 승인 시) 단일 가역 DROP 집행 창
 ./dah.sh live                # 온-테스트베드 오케스트레이션 검증 (read-only 기본)
@@ -258,7 +258,7 @@ export 해 `mdg/live/*.sh` 로 전달한다.
 | 변수 | 용도 | 비고 |
 |---|---|---|
 | `TESTBED_HOST` / `TESTBED_USER` / `SSH_KEY` | live/status 접속 | 오프라인 실행엔 불필요 |
-| `ANTHROPIC_API_KEY` | LLM(orient/decide) advisory | **비워도 됨**(코어는 결정론), 프로세스 env 로만 |
+| `MDG_LLM_API_KEY` + `MDG_ORIENT_MODEL`/`MDG_DECIDE_MODEL` | LLM(orient/decide) advisory — 키+모델 slug(아무 플랫폼) | **비워도 됨**(코어는 결정론), 프로세스 env 로만 |
 | `MDG_ALLOW_LIVE` | operator-go 게이트 | 미설정/0/false=전부 DRY · 1=단일 가역 DROP 창 |
 | `MDG_VIEWER_TOKEN` | (선택) 뷰어 bearer 토큰 | blank=루프백 뷰어 토큰 게이트 없음 |
 | `MDG_TESTBED_LABEL` | (선택) 리포트 호스트 라벨 | 미설정 시 `<testbed>`(IP 미노출) |

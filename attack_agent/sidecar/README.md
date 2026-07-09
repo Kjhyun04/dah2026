@@ -8,7 +8,7 @@
 
 | 이미지 | 디렉터리 | 계층 | vantage(sidecar) | 도구 | config 키 |
 |--------|----------|------|------------------|------|-----------|
-| `dahv2/air` | `air/` | A · D | `tools_ue`(`--network container:attacker_ue`) · `tools_sgi`(net_sgi) | pymavlink + OpenSSL(ARIA, vendored) | `tools.image.air`(필수) |
+| `dahv2/air-tools` | `air/` | A · D | `tools_ue`(`--network container:attacker_ue`) · `tools_sgi`(net_sgi) | pymavlink + OpenSSL(ARIA, vendored) | `tools.image.air`(필수) — `./dah.sh build-tools`. SITL `dahv2/air` 와 태그 구분 |
 | `dahv2/pfcp-poc` | `pfcp/` | B | `tools_core`(net_core, pivot 후) | scapy | `tools.image.pfcp`(옵션) |
 
 > `host` vantage(C 계층: `docker inspect`·`/sign.key`)와 `core`(pivot) 는 doc13 §2~§3 참조.

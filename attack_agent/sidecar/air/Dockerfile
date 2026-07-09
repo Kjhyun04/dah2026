@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 # ─────────────────────────────────────────────────────────────────────────────
-# dahv2/air — A/D 계층 툴링 사이드카 (pymavlink + OpenSSL(ARIA) · arducopter 불요)
+# dahv2/air-tools — A/D 계층 툴링 사이드카 (pymavlink + OpenSSL(ARIA) · arducopter 불요)
+#   ★ 빌드 태그 = dahv2/air-tools (./dah.sh build-tools). 테스트베드 SITL 이미지 dahv2/air 와 태그 구분.
 #
 #   역할(doc13 §2): tools_ue / tools_sgi 가 공유하는 "장수(long-lived) 툴링 사이드카".
 #   attacker_ue 에는 python3·nc 조차 없으므로(srsRAN 이미지, doc13 §0) 도구 일체를
@@ -19,7 +20,7 @@ FROM ubuntu:22.04
 
 # 이미지 정체 라벨(R2). 런타임 사이드카 라벨(dahv2.owner=agent, dahv2.run_id=$RUN)은
 # `docker create/run --label …` 로 실행기가 부여한다(이미지가 아니라 컨테이너 속성).
-LABEL org.dah.image="dahv2/air" \
+LABEL org.dah.image="dahv2/air-tools" \
       org.dah.role="tooling-sidecar" \
       org.dah.layer="A,D" \
       org.dah.note="offline-skeleton; vendor+exec filled at control stage"

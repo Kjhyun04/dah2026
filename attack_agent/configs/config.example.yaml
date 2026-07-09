@@ -22,7 +22,7 @@ exec:
 
 tools:
   image:
-    air: dahv2/air            # MAV 툴링 사이드카 이미지 (필수)
+    air: dahv2/air-tools      # MAV 툴링 사이드카 이미지 (필수) — ./dah.sh build-tools 로 빌드(baked 스크립트). 테스트베드 SITL 이미지 dahv2/air 와 태그 구분.
     pfcp: dahv2/pfcp-poc      # (옵션) PFCP 툴링 이미지
 
 # ── 2-B. 타깃 (컨테이너 **이름** 권장 — IP 는 런타임 docker inspect 해석) ──
