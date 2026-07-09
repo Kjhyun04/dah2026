@@ -75,7 +75,12 @@ def build_collectors(out_queue: "_queue.Queue", keyring: Keyring, kid: str, *,
     # 유지(버스트 시 조기 종료)하여 텔레탭 손실-온셋 샘플링 공백도 함께 줄인다.
     air_common = dict(common, interval_s=0.1)
     return [
-        AirCommandTap(out_queue, keyring, kid, netns_prefix=m.get("gcs_proxy"), **air_common),
+        # AirCommandTap DISABLED (라이브 수집기 제외) — 14556 업링크 명령-탭이 정상 업링크(드론
+        #   GUIDED@30m 유지용 GCS setpoint 등)를 Unauthorized_Command 로 오탐 → single-signal →
+        #   backdoor_pause(web_backend docker_pause) → 8080 대시보드 중단을 유발. 5762 공방전과
+        #   무관한 오탐 경로라 라이브에서 제거. 클래스/테스트/verifier 는 유지(부재=idle-baseline=
+        #   healthy 로 안전 처리, verifier.py:185). 재활성 원하면 아래 라인 주석 해제 + 오탐 baseline 필요.
+        # AirCommandTap(out_queue, keyring, kid, netns_prefix=m.get("gcs_proxy"), **air_common),
         AirTelemetryTap(out_queue, keyring, kid, netns_prefix=m.get("uav_ue"), **air_common),
         NetworkMetricCollector(out_queue, keyring, kid, **common),
         WebProbeCollector(out_queue, keyring, kid, netns_prefix=m.get("uav_ue"), **common),
