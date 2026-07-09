@@ -36,10 +36,12 @@ services:
     volumes:
       - ../proxy/mav_aria_proxy.py:/proxy.py:ro
       - ../.mav-sign-key:/sign.key:ro
+      - ../.env-aria:/aria.key:ro                # ARIA 키 파일마운트(:ro) — argv 노출 제거(.mav-sign-key 규약과 동일)
     environment:
       MAV_SIGN_KEYFILE: /sign.key
+      ARIA_KEY_FILE: /aria.key                   # 프록시가 여기서 키를 읽음(docker inspect/ps 에 키 미노출)
     command:
       - sh
       - -c
-      - python3 /proxy.py --plain-listen 127.0.0.1:14550 --cipher-listen 0.0.0.0:14555 --cipher-peer 172.30.0.10:14555 --key-hex ${ARIA_KEY_HEX}
+      - python3 /proxy.py --plain-listen 127.0.0.1:14550 --cipher-listen 0.0.0.0:14555 --cipher-peer 172.30.0.10:14555
     restart: unless-stopped

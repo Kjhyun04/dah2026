@@ -21,15 +21,19 @@ docker logs -f gcs_c2                                # 2~3분 양방향 C2 유�
 # ── 방어 에이전트 ──
 cd ~/dah2026/defense_agent && python3 -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]"
 ./dah.sh verify && ./dah.sh test                     # ALL GATES PASS + 269 passed / 1 skipped
-# .env 채움(cp .env.example .env): ANTHROPIC_API_KEY=<키>  (LLM advisory용; 없으면 결정론 폴백으로 동작)
-#   SITL 데모 시: MDG_ALLOW_LIVE=1 MDG_OPERATOR_AUTO=1 [MDG_OPERATOR_PICK=signed_guided]
-sudo -E bash dah.sh monitor                          # 24/7 자율 감시 (netns 관측엔 sudo -E)
+# .env 채움(cp .env.example .env) — ★키+모델 slug 만: 아무 플랫폼(OpenRouter/Anthropic/OpenAI/Gemini) 동작.
+#   MDG_LLM_API_KEY=<키>  MDG_ORIENT_MODEL=<slug>  MDG_DECIDE_MODEL=<slug>
+#   (예 OpenRouter: openrouter/anthropic/claude-sonnet-4.5 · OpenAI: openai/gpt-4o-mini · Anthropic: anthropic/claude-sonnet-4-5)
+#   비우면 결정론 폴백(안전, advisory 침묵). SITL 데모: MDG_ALLOW_LIVE=1 MDG_OPERATOR_AUTO=1
+sudo -E bash dah.sh monitor                          # 24/7 자율 감시 (netns 관측엔 sudo -E · 5762 DAH5762 계수 포착)
 bash dah.sh viewer live_out/monitor/run.jsonl        # 실시간 뷰어(127.0.0.1:8787, 출력 URL 접속)
 # ── 공격 에이전트 (동일 인스턴스, 자율 공방전) ──
 cd ~/dah2026/attack_agent && python3 -m venv .venv && . .venv/bin/activate && pip install -e .
 ./dah.sh verify                                      # 11 게이트 ALL PASS
-# .env 채움: OPENROUTER_API_KEY=<키>  TESTBED_HOST=127.0.0.1  (ARIA_KEY 는 testbed/.env-aria 자동해석)
-./dah.sh campaign                                    # 자율 공방전 (LLM 계획 + 독립 감독)
+./dah.sh build-tools                                 # ★캠페인 전 1회: 툴링 사이드카 이미지 dahv2/air-tools 빌드(recon/주입 스크립트 baked)
+# .env 채움 — ★키+모델 slug 만: LLM_MODEL=<slug>  LLM_API_KEY=<키>  TESTBED_HOST=127.0.0.1
+#   (관례키 재사용 시 LLM_API_KEY_ENV=OPENROUTER_API_KEY. ARIA_KEY 는 testbed/.env-aria 자동해석)
+./dah.sh campaign                                    # 자율 공방전 (기본 goal.land · LLM 계획 + 독립 감독)
 ```
 > **시크릿 자동생성(자체정합):** `.mav-sign-key`(bringup 0-pre)·`.env-aria`(70-aria-up)가 없으면 fresh
 > 64-hex로 생성되어 인스턴스 내 모든 컴포넌트가 동일 키를 쓴다. 방어 에이전트는 **key-free**(서명은 gcs_c2

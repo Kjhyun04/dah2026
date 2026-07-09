@@ -179,6 +179,7 @@ def completion(
     mock_response: Optional[dict[str, Any]] = None,
     use_caching: bool = True,
     n: int = 1,
+    api_key: Optional[str] = None,
 ) -> Result[ModelResponse]:
     """litellm 단일 호출 래퍼(sync). Ok(ModelResponse) | Err(CRSError).
 
@@ -211,6 +212,8 @@ def completion(
                 "temperature": temperature,
                 "n": n,
             }
+            if api_key:
+                kwargs["api_key"] = api_key   # provider-agnostic: 운영자 단일 .env 키 명시 주입(로그 미노출)
             if tools:
                 kwargs["tools"] = tools
                 if tool_choice is not None:

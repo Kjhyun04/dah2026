@@ -45,7 +45,7 @@ LOW_CONFIDENCE_THRESHOLD: float = 0.5
 # --- metric weight table (weight is per-domain sum <= 1, E6; no renormalize) ---
 # {metric: {domain, bands..., weight}}
 METRICS: dict[str, dict[str, object]] = {
-    "PFCP_Delete_Attempt": {"domain": "session_network", "normal": [0, 0], "warning": [1, 1], "critical": [2, 3], "danger": [4, "inf"], "weight": 0.40},
+    "PFCP_Delete_Attempt": {"domain": "session_network", "normal": [0, 0], "warning": [1, 1], "critical": [2, 3], "danger": [4, "inf"], "weight": 0.55},  # 0.40->0.55: danger distrust 49.5 >= session_network floor 40 -> Yellow -> orient (PFCP 단독 탐지). warning/critical 은 여전히 Green(오탐 방지).
     "Unauthorized_Command": {"domain": "command", "normal": [0, 0], "warning": [1, 1], "critical": [2, "inf"], "weight": 0.35},
     "Signature_Verify_Fail": {"domain": "command", "warning": [1, 3], "critical": [4, "inf"], "weight": 0.20},
     "Port_5762_State": {"domain": "command", "normal": "LISTEN_NO_ESTAB", "danger": "ESTAB_PRESENT", "weight": 0.45},

@@ -7,8 +7,11 @@ cd "$HERE"
 
 # 공유 마스터키(양 프록시 동일). .env-aria 에 보존(비커밋).
 if [ -f .env-aria ]; then ARIA_KEY_HEX="$(cat .env-aria)"; else ARIA_KEY_HEX="$(openssl rand -hex 32)"; echo "$ARIA_KEY_HEX" > .env-aria; fi
-export ARIA_KEY_HEX
-log "공유 ARIA 키(앞8): ${ARIA_KEY_HEX:0:8}…  (uav_proxy/gcs_proxy 동일)"
+# compose 는 이제 키를 argv(${ARIA_KEY_HEX})가 아니라 .env-aria 파일마운트(:ro, ARIA_KEY_FILE=/aria.key)로
+#   주입한다 → docker inspect(Config.Cmd)/ps 에 키 미노출. export 불필요(제거). 로그엔 평문키 금지 —
+#   sha256 지문(비가역)만 남긴다. (.env-aria 는 아래 compose up 전에 반드시 존재 — 위 라인이 보장.)
+ARIA_FP="$(printf '%s' "$ARIA_KEY_HEX" | openssl dgst -sha256 -r 2>/dev/null | cut -c1-8)"
+log "공유 ARIA 키(.env-aria 파일주입) 지문 sha256:${ARIA_FP}  (uav_proxy/gcs_proxy 동일)"
 
 log "GCS측 재구성: gcs_proxy + gcs_c2 (기존 gcs_c2 단독 대체)"
 docker compose -f compose/docker-compose.gcs.yml up -d --force-recreate

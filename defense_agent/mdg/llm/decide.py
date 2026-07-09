@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from ..config import loader
 from ..core.state import DecideNote
-from .client import complete_structured, has_api_key, litellm_available
+from .client import complete_structured, has_api_key, litellm_available, resolve_api_key
 from .features import DECIDE_FEATURES, sanitize
 from .render import jinja_available, render
 
@@ -42,15 +42,19 @@ _SYSTEM = (
 
 def make_decide_llm(models_cfg: dict | None = None):
     """Build the decide LLM callable, or None when unavailable (deterministic fallback)."""
-    if not (litellm_available() and jinja_available() and has_api_key()):
-        return None
     cfg = models_cfg or loader.models()
+    # has_api_key 는 models.yaml 최상위 api_key_env(기본 ANTHROPIC_API_KEY)가 가리키는 env 를
+    # 확인한다 — provider(anthropic 직결 vs openrouter)를 하드코딩하지 않기 위함.
+    if not (litellm_available() and jinja_available()
+            and has_api_key(cfg.get("api_key_env"))):
+        return None
     role = cfg.get("roles", {}).get("decide", {})
     timeout = float(cfg.get("timeout_s", 5))
+    api_key = resolve_api_key(cfg)                            # provider-agnostic 키 명시 주입
 
     def _call(features: dict) -> DecideNote:
         clean = sanitize(features, DECIDE_FEATURES)          # PS-7 derived-only gate
         user = render("decide.jinja", clean)                 # StrictUndefined + empty guard
-        return complete_structured(role, _SYSTEM, user, DecideNote, timeout)
+        return complete_structured(role, _SYSTEM, user, DecideNote, timeout, api_key=api_key)
 
     return _call

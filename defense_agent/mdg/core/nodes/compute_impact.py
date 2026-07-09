@@ -15,7 +15,9 @@ Confidence used ONCE: lowest-present-domain confidence bumps the risk band up on
 """
 from __future__ import annotations
 
+from ...config import defaults as D
 from ...config import loader
+from ..scoring import bump_band
 from ..scoring import compute_impact as score_impact
 from ..scoring import overall_impact as agg_overall
 from ..state import ImpactObj, Incident, MDGState
@@ -53,6 +55,22 @@ def compute_impact(state: MDGState) -> dict:
 
     overall, _raw = agg_overall(distrust, weights, floor_table)
     score, band, shift = score_impact(overall, min_conf)
+
+    # CR01 co-occurrence bump: a same-tick correlation incident (e.g. PFCP_Delete_Attempt +
+    # Unauthorized_Command, min_members=2) means multiple domains are attacked at once even
+    # when each alone sits below its criticality floor. Bump the band one step (never past
+    # Red) so the 2-signal correlation leaves Green -> orient. Scoped to THIS tick's incident
+    # id (endswith '-<tick>') so it is not a permanent bump. Deterministic (incident.kind +
+    # tick, no LLM field) -> routing purity kept; the routed recovery (pfcp_firewall) is reversible.
+    tick = int(state.get("tick_i", 0))
+    corr_now = any(
+        getattr(inc, "kind", None) in D.CORRELATION_RULES
+        and str(getattr(inc, "id", "")).endswith(f"-{tick}")
+        for inc in state.get("incidents", [])
+    )
+    if corr_now and band != "Red":
+        band = bump_band(band, 1)
+
     impact = ImpactObj(score=score, band=band, confidence_margin=float(shift))
 
     out: dict = {"impact": impact}

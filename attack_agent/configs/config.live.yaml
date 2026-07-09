@@ -19,7 +19,7 @@ exec:
 
 tools:
   image:
-    air: dahv2/air
+    air: dahv2/air-tools
     pfcp: dahv2/pfcp-poc
 
 tgt:
@@ -36,8 +36,8 @@ tgt:
 
 llm:
   mode: live                     # ★ 실제 litellm 호출(ReAct 자율)
-  model: claude-opus-4-8         # friendly名 → models.yaml aliases 로 routable 해석
-  api_key_env: OPENROUTER_API_KEY
+  model: ${LLM_MODEL:-claude-opus-4-8}         # .env LLM_MODEL 로 아무 provider slug 지정(미설정 시 friendly名 → aliases 해석)
+  api_key_env: ${LLM_API_KEY_ENV:-LLM_API_KEY} # .env 키 이름(기본 LLM_API_KEY). 관례키 재사용 시 LLM_API_KEY_ENV=OPENROUTER_API_KEY 등
   models_path: configs/models.yaml   # ★ MODEL_MAP 외부화(A5)
 
 run:

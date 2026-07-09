@@ -162,10 +162,12 @@ class AttackOrchestrator:
         observer: Optional[Observer] = None,
         evidence: Optional[Evidence] = None,
         auto_seed_recon: bool = False,
+        api_key: Optional[str] = None,
     ) -> None:
         self.goal = goal
         self.kb = kb
         self.model = model
+        self._api_key = api_key           # provider-agnostic 단일 .env 키(live 시 driver 가 주입)
         self.replay = replay
         self.max_steps = max_steps
         self.max_pivots = max_pivots      # 교착 하드캡(무진전 스텝 상한)
@@ -313,6 +315,7 @@ class AttackOrchestrator:
             tool_choice="required",
             temperature=self.temperature,
             mock_response=mock,
+            api_key=self._api_key,
         )
         match res:
             case Ok(resp):

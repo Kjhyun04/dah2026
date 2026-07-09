@@ -33,7 +33,7 @@ from . import safeexec
 #   postrotate command — genuine state changes — and nsenter/docker can wrap any binary.
 #   We pin the post-nsenter binary to the known non-mutating observers and reject any
 #   write/exec/rotate flag before granting the fast-path.
-_READONLY_OBSERVERS = frozenset({"tcpdump", "ss", "docker"})
+_READONLY_OBSERVERS = frozenset({"tcpdump", "ss", "docker", "iptables"})
 #   -w/-W/-G/-z: tcpdump file-write, filecount, rotate-seconds, postrotate-exec.
 _READONLY_BANNED_FLAGS = ("-w", "-W", "-G", "-z")
 #   NOTE (live finding, 2026-07-08): ``ip`` is deliberately NOT here. The recon tun-scan
@@ -75,6 +75,29 @@ def is_read_only_argv(argv: list[str]) -> bool:
         # IP) — a metadata read, NOT a state change — so recon can resolve pids under allow_live=False
         # (detection path). Mutating docker verbs (run/rm/exec/pause/stop) stay blocked.
         if not rest or rest[0] not in ("logs", "inspect"):
+            return False
+    if binary == "iptables":                  # only read-only listing (-L/-S/-C); no mutation
+        # DAH5762 backdoor SYN-counter read (`iptables -n -v -x -L DAH5762`). Reject EVERY
+        # mutating verb — long form OR any short cluster containing a command letter
+        # (A/I/D/R/F/X/N/P/Z/E, incl. -Z counter-zero) — so this read-only fast-path can never
+        # install/flush/zero a rule; and require at least one listing verb (-L/-S/-C). Handles
+        # both separate (-n -v -x -L) and combined (-nvxL) short-flag forms.
+        _MUT_LONG = {"--append", "--insert", "--delete", "--replace", "--flush",
+                     "--delete-chain", "--new-chain", "--policy", "--zero", "--rename-chain"}
+        _MUT_LETTERS, _LIST_LETTERS = set("AIDRFXNPZE"), set("LSC")
+        listing = False
+        for a in rest:
+            if a in _MUT_LONG:
+                return False
+            if a in ("--list", "--list-rules", "--check"):
+                listing = True
+            elif a.startswith("-") and not a.startswith("--"):
+                cluster = set(a[1:])
+                if cluster & _MUT_LETTERS:
+                    return False
+                if cluster & _LIST_LETTERS:
+                    listing = True
+        if not listing:
             return False
     return True
 

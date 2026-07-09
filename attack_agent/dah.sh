@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # dah.sh — attack_agent 단일 런처(유일한 셸 진입점). 나머지 .sh 는 사이드카 내부 공격도구일 뿐이다.
 #   에이전트 본체는 파이썬(run.py / run_live_gate5.py). 이 스크립트는 env 로딩 + 다중 netns 조율만 감싼다.
-#   사용: ./dah.sh <verify|recon|campaign|land|viewer|status|help> [flags]
+#   사용: ./dah.sh <verify|build-tools|recon|campaign|land|viewer|status|help> [flags]
+#   ★ 라이브 캠페인/land 전 1회: ./dah.sh build-tools (툴링 사이드카 이미지 dahv2/air-tools 빌드).
 set -uo pipefail
 cd "$(dirname "$0")"
 PY=.venv/bin/python; [ -x "$PY" ] || PY=python3
@@ -29,6 +30,19 @@ case "$cmd" in
   verify)   # 8개 무결성 게이트 단일 러너 (오프라인·무해)
     exec $PY verify.py ;;
 
+  build-tools)  # ── A/D 툴링 사이드카 이미지 빌드 (dahv2/air-tools) · 라이브 캠페인 전 1회 ──
+    # 사이드카가 `docker exec <sidecar> dah_exec/…` 로 baked 스크립트를 실행하므로 이 이미지가
+    # 반드시 있어야 recon/주입 tool 이 동작한다. 없으면 recon 이 reach 를 못 만들어(스크립트 부재)
+    # 정찰 무한루프에 빠지고 planner 가 주입에 영영 도달 못 한다(공방전 미성립의 근본원인).
+    # ★ 테스트베드 SITL 이미지(dahv2/air, arducopter 포함)와 태그가 충돌하지 않도록 -tools 접미사.
+    #   config.*.yaml 의 tools.image.air 도 dahv2/air-tools 를 가리킨다.
+    # ★ pymavlink 는 host(.venv)와 동일 버전으로 핀(golden-frame 정합). vendor/aria_gcm.py 는
+    #   placeholder 라도 serial5762/forceland(직결 5762 — ARIA·서명 관통) 공방전엔 충분하다.
+    #   전 계층 ARIA 공격(forge_aria 등)까지 쓰려면 통제단계에서 실 vendor 를 채운 뒤 재빌드.
+    PYMV="$($PY -c 'import pymavlink;print(pymavlink.__version__)' 2>/dev/null || echo 2.4.49)"
+    echo "build dahv2/air-tools (pymavlink=$PYMV) from sidecar/air"
+    exec docker build -t dahv2/air-tools --build-arg PYMAVLINK_VERSION="$PYMV" sidecar/air ;;
+
   recon)    # 정찰 폐루프 (오프라인 mock 기본; 실측은 --backend local)
     _load_env
     exec $PY run.py --config configs/config.testbed.yaml --goal goals/goal.testbed.yaml "$@" ;;
@@ -37,7 +51,10 @@ case "$cmd" in
     # 감독 = gcs_proxy netns(nsenter)에서 14555 ARIA 복호  ·  캠페인 = 호스트 netns live LLM
     # (run_live_gate5 의 in-proc 감독은 netns 불일치라 반드시 분리 실행)
     _load_env
-    CONFIG="${CONFIG:-configs/config.live.yaml}"; GOAL="${GOAL:-goals/goal.p4.yaml}"
+    # 기본 goal=goal.land(mode_set mode=9 LAND) — 5762 백도어로 서명·ARIA 관통 LAND 강제.
+    # 방어가 탐지가능한 능동주입(uav_ue netns 5762 ESTAB)을 생성해 가시 공방전을 성립시킨다.
+    # (goal.p4=signing_bypass mode=5 등 다른 목표는 GOAL=goals/goal.p4.yaml 로 오버라이드.)
+    CONFIG="${CONFIG:-configs/config.live.yaml}"; GOAL="${GOAL:-goals/goal.land.yaml}"
     SUP_WINDOW="${SUP_WINDOW:-200}"; TAP="${TAP:-gcs_proxy}"
     : "${OPENROUTER_API_KEY:?export OPENROUTER_API_KEY (또는 .env.openrouter) 필요}"
     ARIA="$(grep -oE '[0-9a-fA-F]{64}' "${_ARIA_F:-/nonexistent}" 2>/dev/null | head -1)"

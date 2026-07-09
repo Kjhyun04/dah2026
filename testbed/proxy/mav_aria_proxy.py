@@ -160,7 +160,24 @@ def main():
     ap.add_argument("--key-hex")
     a = ap.parse_args()
     if a.selftest: sys.exit(selftest())
-    if not (a.plain_listen and a.cipher_listen and a.key_hex): ap.error("--plain-listen/--cipher-listen/--key-hex 필요")
+    # ── 키 주입: argv(--key-hex) 대신 파일/env 우선(누수 위생) ──────────────────────────
+    #   docker inspect(Config.Cmd)/ps 에 키가 노출되지 않도록 배포는 파일마운트를 쓴다
+    #   (compose: ../.env-aria:/aria.key:ro + ARIA_KEY_FILE=/aria.key). 우선순위:
+    #   --key-hex(수동/selftest) > ARIA_KEY_FILE(배포 정본) > env ARIA_KEY/ARIA_KEY_HEX(비상/수동).
+    #   .env-aria 가 'KEY=hex' 형태여도 64hex 토큰만 추출해 견고 파싱(.mav-sign-key 규약과 정합).
+    if not a.key_hex:
+        import re
+        raw = ""
+        kf = os.environ.get("ARIA_KEY_FILE")
+        if kf and os.path.exists(kf):
+            try: raw = open(kf, "r", encoding="utf-8").read()
+            except OSError: raw = ""
+        if not raw:
+            raw = os.environ.get("ARIA_KEY") or os.environ.get("ARIA_KEY_HEX") or ""
+        m = re.search(r"[0-9a-fA-F]{64}", raw)
+        if m: a.key_hex = m.group(0)
+    if not (a.plain_listen and a.cipher_listen and a.key_hex):
+        ap.error("--plain-listen/--cipher-listen 및 키(--key-hex | ARIA_KEY_FILE 파일마운트 | env ARIA_KEY) 필요")
     sys.exit(run_proxy(a))
 
 if __name__ == "__main__": main()

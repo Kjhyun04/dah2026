@@ -17,6 +17,10 @@ from ..worldstate import WorldState
 # incident kind -> candidate recovery types (closed mapping)
 _INCIDENT_RECOVERY = {
     "CR01": ["pfcp_firewall", "command_override"],
+    # PFCP delete flood (single-metric, no correlation) — route to pfcp_firewall
+    # (nsenter_input_drop, MED, reversible). correlate leaves its target "" (no attributable
+    # attacker source), so the enforcement stays inert/DRY and cannot -s DROP a victim.
+    "PFCP_DELETE": ["pfcp_firewall"],
     # Phase 3 (B2, S2) — single-signal now offers BOTH the container-isolation recovery
     # (backdoor_pause, docker_pause) AND the flight-recovery candidate (signed_guided,
     # send_signed_mode). This is CANDIDATE WIRING ONLY — the legality gate (send_signed_mode

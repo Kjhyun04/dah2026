@@ -15,17 +15,43 @@ PORT_ROLE = {5762: "uav5762", 14555: "gcs14555", 14556: "gcs14556",
 UDP_MAVLINK = {14555, 14556}
 
 def connected_subnets():
-    """자기 라우팅의 scope link /24(하드코딩 아님)를 discover."""
+    """자기 라우팅의 scope link /24(하드코딩 아님)를 discover.
+
+    추가: srsue tun(tun_srsue)은 point-to-point 라우팅이라 UE-pool 피어(uav5762)가 scope-link
+    /24 로 안 뜨는 경우가 있다(관측). 그래서 자기 **인터페이스 주소**의 /24 도 함께 방출해 동일
+    UE-pool 의 피어(드론)를 스윕 대상에 포함한다(하드코딩 아님 — 자기 addr 파생). 여전히 아래
+    list(net.hosts())[:32] 유계 스윕이라 RO·비파괴.
+    """
+    nets, seen = [], set()
+
+    def _add(net):
+        if net not in seen:
+            seen.add(net); nets.append(net)
+
     out = subprocess.run(["ip", "-o", "-4", "route", "show", "scope", "link"],
                          capture_output=True, text=True, timeout=5).stdout
-    nets = []
     for ln in out.splitlines():
         tok = ln.split()
         if tok and "/" in tok[0]:
             try:
-                nets.append(ipaddress.ip_network(tok[0], strict=False))
+                _add(ipaddress.ip_network(tok[0], strict=False))
             except ValueError:
                 pass
+
+    # 자기 인터페이스 주소의 /24 (tun point-to-point /32 대비 — UE-pool 동일 서브넷 피어 포함).
+    addr = subprocess.run(["ip", "-o", "-4", "addr", "show"],
+                          capture_output=True, text=True, timeout=5).stdout
+    for ln in addr.splitlines():
+        for tok in ln.split():
+            if "/" in tok and tok[0].isdigit():
+                try:
+                    iface = ipaddress.ip_interface(tok)
+                    if iface.ip.is_loopback:
+                        continue
+                    _add(ipaddress.ip_network(f"{iface.ip}/24", strict=False))
+                except ValueError:
+                    pass
+                break
     return nets
 
 def probe(ip, port, t=1.5):   # UE 터널(srsue) 경유 경로는 느림 → 넉넉한 connect 타임아웃

@@ -24,14 +24,18 @@ def correlate(state: MDGState, clock=None) -> dict:
         # single-signal; collapsing them under one kind would mis-route their recovery
         # to a uav_ue 5762 DROP (self-DoS). Identified purely by metric; members carries
         # the metric so downstream can confirm the 5762 attribution.
-        kind = "BACKDOOR_5762" if e.metric == "Port_5762_State" else "single-signal"
-        # target = attribution selector carried on the evidence (peer IP / imsi),
-        # taken from e.source (step-4 WebProbe peer for 5762; ingest selector for PFCP).
-        # NOT the metric value: audit F2 flagged PFCP_Delete_Attempt previously injecting
-        # value (a count) as target — a count is not a droppable endpoint. Only the 5762
-        # backdoor and PFCP delete carry an attributable source; everything else "".
-        # No source captured -> "" (fail-closed: downstream keeps DROP inert/DRY).
-        target = e.source if e.metric in ("Port_5762_State", "PFCP_Delete_Attempt") else ""
+        # 5762 backdoor -> BACKDOOR_5762 (nsenter DROP@uav_ue). PFCP delete flood ->
+        # dedicated PFCP_DELETE so select_policy routes it to pfcp_firewall (NOT a uav_ue
+        # 5762 DROP). Everything else stays generic single-signal.
+        kind = ("BACKDOOR_5762" if e.metric == "Port_5762_State"
+                else "PFCP_DELETE" if e.metric == "PFCP_Delete_Attempt"
+                else "single-signal")
+        # target = attribution selector (droppable endpoint). ONLY the 5762 backdoor carries
+        # an attacker-attributable peer (step-4 WebProbe peer). PFCP delete has NO attributable
+        # attacker: the Prometheus aggregate has no source IP and the SMF log carries the
+        # VICTIM UAV tun-IP — so leave PFCP target "" fail-closed, else pfcp_firewall could
+        # -s DROP a victim (self-DoS, harmlessness/leak-0 violation). No source -> "" (DRY).
+        target = e.source if e.metric == "Port_5762_State" else ""
         incidents.append(Incident(
             id=f"sig-{state.get('tick_i',0)}-{e.metric}", kind=kind,
             score=severity_factor(e.band), members=[e.metric], ts=e.ts or ts,

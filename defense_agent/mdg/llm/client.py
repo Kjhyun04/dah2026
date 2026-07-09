@@ -54,8 +54,20 @@ def litellm_available() -> bool:
         return False
 
 
-def has_api_key() -> bool:
-    return bool(os.environ.get("ANTHROPIC_API_KEY"))
+def has_api_key(api_key_env: str | None = None) -> bool:
+    """LLM 크리덴셜 존재 여부. provider 를 하드코딩하지 않는다 — models.yaml 의 최상위
+    ``api_key_env`` (없으면 ANTHROPIC_API_KEY) 가 가리키는 환경변수를 확인한다. OpenRouter 경유
+    운영 시 운영자는 models.yaml 에 ``api_key_env: OPENROUTER_API_KEY`` 를 두면 된다."""
+    return bool(os.environ.get(api_key_env or "ANTHROPIC_API_KEY"))
+
+
+def resolve_api_key(models_cfg: dict | None = None) -> str | None:
+    """Resolve the key VALUE from the env NAME in models.yaml (api_key_env), to pass
+    EXPLICITLY to litellm so ANY provider authenticates from the operator's single .env key
+    even under a non-conventional env name (e.g. MDG_LLM_API_KEY). None => unset (caller is
+    already gated by has_api_key). Never logged / never placed in messages/State (PS-3)."""
+    name = models_cfg.get("api_key_env") if isinstance(models_cfg, dict) else None
+    return os.environ.get(name or "ANTHROPIC_API_KEY") or None
 
 
 def _emit_temperature(model: str) -> bool:
@@ -116,7 +128,8 @@ def _schema_response_format(model_cls: Type[BaseModel]) -> dict:
 
 
 def complete_structured(role_cfg: dict, system: str, user: str,
-                        model_cls: Type[BaseModel], timeout_s: float = 5.0) -> BaseModel:
+                        model_cls: Type[BaseModel], timeout_s: float = 5.0,
+                        api_key: str | None = None) -> BaseModel:
     """Call litellm with the role's model chain and parse into ``model_cls``.
 
     Raises LLMUnavailable if litellm is absent, no model is configured, or every model
@@ -146,8 +159,15 @@ def complete_structured(role_cfg: dict, system: str, user: str,
                 timeout=timeout_s,
                 num_retries=0,               # 5s deadline is real; loop is the ONLY fallback
                 drop_params=True,            # provider-unsupported params dropped, not 400
-                response_format=response_format,
             )
+            if api_key:
+                kwargs["api_key"] = api_key   # provider-agnostic: 운영자의 단일 .env 키를 명시 주입
+            # json_schema response_format 는 Anthropic 직결(anthropic/*)에서만 신뢰성 있게
+            # 지원된다. OpenRouter 등 경유 라우팅(openrouter/*)은 이 파라미터를 Anthropic 백엔드로
+            # 그대로 전달하지 못해 400/타입위반을 유발하므로 anthropic/* 모델에만 첨부한다. 응답
+            # 파싱은 _parse_capped 의 model_validate_json 이 authoritative 게이트라 생략해도 안전.
+            if str(model).lower().startswith("anthropic/"):
+                kwargs["response_format"] = response_format
             if _emit_temperature(model):
                 kwargs["temperature"] = 0    # FORCED for sampling-accepting families
             resp = litellm.completion(**kwargs)

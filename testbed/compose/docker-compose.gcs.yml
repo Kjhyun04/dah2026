@@ -15,11 +15,14 @@ services:
         ipv4_address: 172.30.0.10           # UAV가 접속하는 GCS측 주소(암호문 수신)
     volumes:
       - ../proxy/mav_aria_proxy.py:/proxy.py:ro
+      - ../.env-aria:/aria.key:ro                # ARIA 키 파일마운트(:ro) — uav_proxy 와 동일 파일 → 동일 키(G4 왕복)
+    environment:
+      ARIA_KEY_FILE: /aria.key                   # 프록시가 여기서 키를 읽음(argv/inspect 노출 제거)
     # UE풀 역경로(다운링크) + ARIA 프록시(암호문 14555 ↔ 평문 gcs_c2)
     command:
       - sh
       - -c
-      - ip route replace 10.45.0.0/16 via 172.30.0.2 && python3 /proxy.py --plain-listen 0.0.0.0:14556 --plain-peer 127.0.0.1:14550,172.30.0.20:14560 --cipher-listen 0.0.0.0:14555 --key-hex ${ARIA_KEY_HEX}
+      - ip route replace 10.45.0.0/16 via 172.30.0.2 && python3 /proxy.py --plain-listen 0.0.0.0:14556 --plain-peer 127.0.0.1:14550,172.30.0.20:14560 --cipher-listen 0.0.0.0:14555
     restart: unless-stopped
 
   gcs_c2:

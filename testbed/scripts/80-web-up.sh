@@ -12,7 +12,7 @@ log "web_backend 기동 (net_sgi 172.30.0.20, 호스트 8080)"
 docker compose -f compose/docker-compose.web.yml up -d
 
 # gcs_proxy 의 fan-out(web_backend 로 내보내기)을 반영하려고 GCS측을 재기동한다(ARIA 키는 유지).
-export ARIA_KEY_HEX="$(cat .env-aria)"
+#   키는 이제 .env-aria 파일마운트(:ro)로 프록시에 주입되므로 ARIA_KEY_HEX export 는 불필요(제거).
 log "gcs_proxy fan-out 갱신(→web_backend)"
 docker compose -f compose/docker-compose.gcs.yml up -d --force-recreate
 

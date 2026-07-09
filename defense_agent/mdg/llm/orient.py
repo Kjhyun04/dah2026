@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from ..config import loader
 from ..core.state import OrientNote
-from .client import complete_structured, has_api_key, litellm_available
+from .client import complete_structured, has_api_key, litellm_available, resolve_api_key
 from .features import ORIENT_FEATURES, sanitize
 from .render import jinja_available, render
 
@@ -44,15 +44,19 @@ _SYSTEM = (
 
 def make_orient_llm(models_cfg: dict | None = None):
     """Build the orient LLM callable, or None when unavailable (deterministic fallback)."""
-    if not (litellm_available() and jinja_available() and has_api_key()):
-        return None
     cfg = models_cfg or loader.models()
+    # has_api_key 는 models.yaml 최상위 api_key_env(기본 ANTHROPIC_API_KEY)가 가리키는 env 를
+    # 확인한다 — provider(anthropic 직결 vs openrouter)를 하드코딩하지 않기 위함.
+    if not (litellm_available() and jinja_available()
+            and has_api_key(cfg.get("api_key_env"))):
+        return None
     role = cfg.get("roles", {}).get("orient", {})
     timeout = float(cfg.get("timeout_s", 5))
+    api_key = resolve_api_key(cfg)                            # provider-agnostic 키 명시 주입
 
     def _call(features: dict) -> OrientNote:
         clean = sanitize(features, ORIENT_FEATURES)          # PS-7 derived-only gate
         user = render("orient.jinja", clean)                 # StrictUndefined + empty guard
-        return complete_structured(role, _SYSTEM, user, OrientNote, timeout)
+        return complete_structured(role, _SYSTEM, user, OrientNote, timeout, api_key=api_key)
 
     return _call

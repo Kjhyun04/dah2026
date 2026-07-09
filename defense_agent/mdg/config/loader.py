@@ -121,9 +121,42 @@ def recovery_priors() -> dict:
             "default_enforce_at": D.RECOVERY_DEFAULT_ENFORCE_AT}
 
 
+def _apply_model_env(cfg: dict) -> dict:
+    """.env overlay so supervisors set model slug + key-env without editing models.yaml.
+    All optional; unset => yaml unchanged. Only the env NAME lands in the dict — never the
+    key VALUE (PS-3: the value is resolved later in client.resolve_api_key from os.environ).
+      MDG_LLM_API_KEY     — key VALUE (provider-agnostic). Its presence self-points
+                            api_key_env at itself so has_api_key()/client find it.
+      MDG_LLM_API_KEY_ENV — override the api_key_env NAME (provider-conventional keys); wins.
+      MDG_ORIENT_MODEL / MDG_DECIDE_MODEL       — primary slug per role (openrouter/…, anthropic/…, openai/…, gemini/…).
+      MDG_ORIENT_FALLBACK / MDG_DECIDE_FALLBACK — comma list; '' clears (same-provider slug when switching provider).
+    """
+    if not isinstance(cfg, dict):
+        return cfg
+    name = os.environ.get("MDG_LLM_API_KEY_ENV")
+    if name:
+        cfg["api_key_env"] = name
+    elif os.environ.get("MDG_LLM_API_KEY"):
+        cfg["api_key_env"] = "MDG_LLM_API_KEY"
+    roles = cfg.get("roles")
+    if isinstance(roles, dict):
+        for role, mkey, fkey in (("orient", "MDG_ORIENT_MODEL", "MDG_ORIENT_FALLBACK"),
+                                 ("decide", "MDG_DECIDE_MODEL", "MDG_DECIDE_FALLBACK")):
+            rc = roles.get(role)
+            if not isinstance(rc, dict):
+                continue
+            m = os.environ.get(mkey)
+            if m and m.strip():
+                rc["model"] = m.strip()
+            fb = os.environ.get(fkey)
+            if fb is not None:
+                rc["fallback"] = [s.strip() for s in fb.split(",") if s.strip()]
+    return cfg
+
+
 @lru_cache(maxsize=1)
 def models() -> dict:
-    return _try_yaml("models.yaml") or {"roles": {}, "timeout_s": 5}
+    return _apply_model_env(_try_yaml("models.yaml") or {"roles": {}, "timeout_s": 5})
 
 
 @lru_cache(maxsize=1)

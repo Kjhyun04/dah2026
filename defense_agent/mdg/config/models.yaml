@@ -1,18 +1,32 @@
 # models.yaml — LLM 역할별 모델·폴백 (FRAMEWORK_STACK §6#2 · litellm). temp=0 강제(수용 모델만).
-# ANTHROPIC_API_KEY = litellm 생성자 env 주입 (State/JSONL 미경유, PS-3). 프롬프트 렌더러 미접근.
-# P3-Q6 FIX-4: 은퇴/폐기 ID 교체 — Haiku 3.5(은퇴 2026-02-19) → haiku-4-5, opus-4-1(폐기,
-#   retires 2026-08-05) → opus-4-8. opus-4-8/sonnet-5 등 current-gen은 temperature 400이므로
-#   client._emit_temperature 게이트가 해당 패밀리엔 temperature 미방출(drop_params 2차망).
+#
+# ── provider 선택 (하드코딩 금지) ─────────────────────────────────────────────
+# api_key_env: litellm 이 읽을 API 키의 "환경변수 이름". provider 를 코드에 박지 않고 여기서 고른다.
+#   · OpenRouter 경유(기본):  api_key_env: OPENROUTER_API_KEY, 모델 slug = openrouter/anthropic/<slug>
+#   · Anthropic 직결:         api_key_env: ANTHROPIC_API_KEY,  모델 slug = anthropic/<slug>
+#   client.has_api_key() 가 이 env 존재를 확인하고, 없으면 orient/decide 는 결정론 폴백(G6)으로 침묵한다.
+#   ★ slug 는 provider 카탈로그 종속이라 예시값이다. 라이브 실행 전 운영자가 자기 계정의 정확한
+#     slug 로 교체할 것(OpenRouter 는 claude-sonnet-4.5 처럼 dot 표기, Anthropic 직결은 claude-sonnet-4-5).
+# response_format(json_schema): client 는 anthropic/* 모델에만 이를 첨부한다(openrouter/* 경유는
+#   Anthropic 백엔드로 미전달 → 400/타입위반). 응답은 _parse_capped(model_validate_json)이
+#   authoritative 게이트라 provider 제약 생략과 무관하게 안전하다.
+# temperature: opus/sonnet current-gen 은 400 이므로 client._emit_temperature 게이트가 미방출(drop_params 2차망).
+# ─────────────────────────────────────────────────────────────────────────────
+# ★ .env 오버라이드가 이 yaml 보다 우선(감독관은 yaml 편집 없이 .env 만 채우면 됨):
+#   MDG_LLM_API_KEY(키값·자기지정) / MDG_LLM_API_KEY_ENV(키 이름) / MDG_ORIENT_MODEL / MDG_DECIDE_MODEL / MDG_*_FALLBACK.
+#   미설정 시 아래 yaml 기본값 사용. egress_allowlist 는 선언용 주석(코드 미강제) — provider 추가 시 호스트 병기(PS-4 정직).
+api_key_env: OPENROUTER_API_KEY               # OpenRouter 경유(기본). Anthropic 직결 시 ANTHROPIC_API_KEY 로 교체(또는 .env MDG_LLM_API_KEY_ENV).
+
 roles:
   orient:
-    model: "anthropic/claude-sonnet-4-5"       # Orient = 경량 (근거·신규성·모호성 1회). 활성(temp 수용).
-    fallback: ["anthropic/claude-haiku-4-5"]    # was claude-3-5-haiku-latest (은퇴 → 404). 활성.
+    model: "openrouter/anthropic/claude-sonnet-4.5"    # Orient = 경량 (근거·신규성·모호성 1회). 활성(temp 수용).
+    fallback: ["openrouter/anthropic/claude-opus-4"]   # 폴백(검증 slug). Anthropic 직결 시 anthropic/claude-haiku-4-5 등.
     temperature: 0                              # 문서용; 실제 방출은 client._emit_temperature 게이트가 결정.
     response_model: "OrientNote"
     max_tokens: 1024
   decide:
-    model: "anthropic/claude-opus-4-8"          # Decide = 상위 (6단계 래더 1회). was opus-4-1(폐기). temp 미방출(게이트).
-    fallback: ["anthropic/claude-sonnet-4-5"]   # 활성(temp 수용).
+    model: "openrouter/anthropic/claude-opus-4.1"      # Decide = 상위 (6단계 래더 1회). temp 미방출(게이트).
+    fallback: ["openrouter/anthropic/claude-sonnet-4.5"]  # 폴백. 활성(temp 수용).
     temperature: 0
     response_model: "DecideNote"
     max_tokens: 1024
@@ -20,4 +34,4 @@ roles:
 # 렌더실패/빈프롬프트/스키마오류/바이트초과 => 결정표 폴백 (G6). 5s 초과 => 결정론 결정 확정 (E13).
 timeout_s: 5
 on_error: "deterministic_fallback"
-egress_allowlist: ["api.anthropic.com:443"]     # PS-4
+egress_allowlist: ["openrouter.ai:443", "api.anthropic.com:443"]     # PS-4 — provider별 egress(선택 경로만 사용).

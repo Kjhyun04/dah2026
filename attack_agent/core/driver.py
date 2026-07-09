@@ -274,6 +274,11 @@ def build_orchestrator(
             use_llm=use_evidence_llm,
         )
     max_steps = 0 if no_llm else cfg.run.max_iters
+    # provider-agnostic 키: live+llm 시에만 cfg.llm.api_key_env 가 가리키는 env 값을 해석해
+    #   litellm 에 명시 주입(관례키 이름과 무관하게 어떤 provider 든 인증). replay/no_llm 은 None.
+    api_key = None
+    if cfg.llm.mode == "live" and not no_llm:
+        api_key = os.environ.get(cfg.llm.api_key_env) or None
     return AttackOrchestrator(
         goal=g,
         kb=kb,
@@ -287,6 +292,7 @@ def build_orchestrator(
         observer=observer,
         evidence=evidence,
         auto_seed_recon=True,  # init baseline: recon 러너로 KB 시드(12 §5)
+        api_key=api_key,
     )
 
 
