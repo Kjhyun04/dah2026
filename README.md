@@ -11,6 +11,10 @@
 
 ## 실행 방법 (새 인스턴스, git clone 부터)
 
+### 인스턴스 생성 
+ubuntu 24.04 LTS (HVM)
+c6i.2xlarge ( 최소 ) 
+
 ### 0) 클론 + 시스템 준비
 ```bash
 git clone https://github.com/Kjhyun04/dah2026 ~/dah2026
