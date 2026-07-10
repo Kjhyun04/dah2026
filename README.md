@@ -86,6 +86,7 @@ OpenRouter 경유(기본): `api_key_env=OPENROUTER_API_KEY`, slug = `openrouter/
 ```bash
 ssh -i <키.pem> -L 8787:127.0.0.1:8787 -L 8090:127.0.0.1:8090 -L 8080:127.0.0.1:8080 ubuntu@<서버IP>
 # 브라우저:  방어 http://localhost:8787 · 공격 http://localhost:8090 · 텔레메트리 http://localhost:8080
+# 방어는 viewer 실행시 나오는 토큰 값을 붙여야 한다.
 ```
 
 ---
